@@ -316,6 +316,9 @@
   .roles-matrix-table th:first-child { text-align: left; }
   .roles-matrix-table td { padding: 10px 6px; border-bottom: 1px solid var(--line); }
   .roles-matrix-table .roles-matrix-name { font-weight: 600; color: var(--ink); }
+  .dashboard-widgets-group { margin-bottom: 18px; }
+  .dashboard-widgets-group h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--wine); margin: 0 0 10px; }
+  .dashboard-widget-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); padding: 5px 0; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -423,7 +426,11 @@
     </nav>
 
     <nav class="sidebar-nav" data-workspace-nav="produzione" style="display:none">
-      <button data-sub="prod-riepilogo" class="active">
+      <button data-sub="prod-dashboard" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Dashboard
+      </button>
+      <button data-sub="prod-riepilogo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/></svg>
         Per bottiglia
       </button>
@@ -438,7 +445,11 @@
     </nav>
 
     <nav class="sidebar-nav" data-workspace-nav="magazzino" style="display:none">
-      <button data-sub="mag-ordini" class="active">
+      <button data-sub="mag-dashboard" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Dashboard
+      </button>
+      <button data-sub="mag-ordini">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
         Ordini
       </button>
@@ -453,7 +464,11 @@
     </nav>
 
     <nav class="sidebar-nav" data-workspace-nav="crm" style="display:none">
-      <button data-sub="crm-clienti" class="active">
+      <button data-sub="crm-dashboard" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Dashboard
+      </button>
+      <button data-sub="crm-clienti">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
         Clienti
       </button>
@@ -498,17 +513,19 @@
       <div class="subpanel active" id="sub-com-dashboard">
         <div class="cards" id="com-stats-cards"></div>
         <div class="dash-two-col" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-          <div>
+          <div id="com-widget-revenue_by_channel">
             <h3 style="margin-bottom:10px">Ricavo per canale</h3>
             <div class="table-wrap"><table><thead><tr><th>Canale</th><th>Ordini</th><th>Ricavo</th></tr></thead><tbody id="com-by-channel"></tbody></table></div>
           </div>
-          <div>
+          <div id="com-widget-revenue_by_pricelist">
             <h3 style="margin-bottom:10px">Ricavo per listino</h3>
             <div class="table-wrap"><table><thead><tr><th>Listino</th><th>Ordini</th><th>Ricavo</th></tr></thead><tbody id="com-by-pricelist"></tbody></table></div>
           </div>
         </div>
-        <h3 style="margin:20px 0 10px">Top prodotti</h3>
-        <div class="table-wrap"><table><thead><tr><th>Prodotto</th><th>Quantità</th><th>Ricavo</th></tr></thead><tbody id="com-top-products"></tbody></table></div>
+        <div id="com-widget-top_products">
+          <h3 style="margin:20px 0 10px">Top prodotti</h3>
+          <div class="table-wrap"><table><thead><tr><th>Prodotto</th><th>Quantità</th><th>Ricavo</th></tr></thead><tbody id="com-top-products"></tbody></table></div>
+        </div>
       </div>
 
       <div class="subpanel" id="sub-com-ordini">
@@ -594,7 +611,11 @@
 
     <!-- ═══ PRODUZIONE ═══ -->
     <div class="module" id="module-produzione">
-      <div class="subpanel active" id="sub-prod-riepilogo">
+      <div class="subpanel active" id="sub-prod-dashboard">
+        <div class="crm-overview-cards" id="prod-dashboard-cards"></div>
+      </div>
+
+      <div class="subpanel" id="sub-prod-riepilogo">
         <div class="toolbar">
           <input type="date" id="prod-from"> <input type="date" id="prod-to">
           <button class="btn secondary" onclick="loadProductionSummary()">Filtra</button>
@@ -631,7 +652,11 @@
 
     <!-- ═══ MAGAZZINO ═══ -->
     <div class="module" id="module-magazzino">
-      <div class="subpanel active" id="sub-mag-ordini">
+      <div class="subpanel active" id="sub-mag-dashboard">
+        <div class="crm-overview-cards" id="mag-dashboard-cards"></div>
+      </div>
+
+      <div class="subpanel" id="sub-mag-ordini">
         <div class="kanban-board" id="kanban-board">
           <div class="kanban-col" data-status="nuovo">
             <div class="kanban-col-header">Nuovo <span class="kanban-count" id="kanban-count-nuovo">0</span></div>
@@ -671,7 +696,11 @@
 
     <!-- ═══ CRM ═══ -->
     <div class="module" id="module-crm">
-      <div class="subpanel active" id="sub-crm-clienti">
+      <div class="subpanel active" id="sub-crm-dashboard">
+        <div class="crm-overview-cards" id="crm-dashboard-cards"></div>
+      </div>
+
+      <div class="subpanel" id="sub-crm-clienti">
         <div class="list-card">
           <div class="list-toolbar">
             <div class="search-input">
@@ -753,6 +782,7 @@
             <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Generale</h4>
             <button type="button" onclick="openSettingsPanel('email-avvisi')" data-settings-label="Email per gli avvisi di magazzino">Email per gli avvisi di magazzino</button>
             <button type="button" onclick="openSettingsPanel('regole')" data-settings-label="Regole">Regole</button>
+            <button type="button" onclick="openSettingsPanel('dashboard-widgets')" data-settings-label="Dashboard">Dashboard</button>
           </div>
           <div class="settings-card-group" data-settings-group="utenti">
             <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="4.5"/></svg>Utenti e accessi</h4>
@@ -802,6 +832,14 @@
             </div>
             <p style="margin:0 0 14px;font-size:11.5px;color:var(--ink-soft)">Oltre la soglia "semi attivo" un cliente è considerato inattivo. Vale per CRM → Clienti e la scheda "Clienti seguiti" di ogni agente.</p>
             <button class="btn" onclick="saveRules()">Salva regole</button>
+          </div>
+        </div>
+
+        <div class="settings-panel" id="settings-panel-dashboard-widgets">
+          <div class="box" style="max-width:640px">
+            <h3>Dashboard</h3>
+            <p style="margin:0 0 14px;font-size:12.5px;color:var(--ink-soft)">Scegli quali dati e grafici mostrare nella dashboard di ogni sezione. Le modifiche si salvano subito.</p>
+            <div id="dashboard-widgets-config"></div>
           </div>
         </div>
 
@@ -1613,6 +1651,7 @@ function openSettings() {
   loadPortalUsers();
   loadAgentCredentials();
   loadRolesMatrix();
+  loadDashboardWidgetsConfig();
   closeMobileSidebar();
 }
 
@@ -1665,31 +1704,103 @@ function loadSubpanel(sub) {
   if (sub === 'com-listini') loadPriceLists();
   if (sub === 'com-news') loadNews();
   if (sub === 'com-catalogo') loadCatalogs();
+  if (sub === 'prod-dashboard') loadProduzioneDashboard();
   if (sub === 'prod-riepilogo') loadProductionSummary();
   if (sub === 'prod-clienti') loadProductionSummary();
   if (sub === 'prod-righe') loadProductionItems();
+  if (sub === 'mag-dashboard') loadMagazzinoDashboard();
+  if (sub === 'crm-dashboard') loadCrmDashboard();
   if (sub === 'crm-clienti') loadCustomers();
   if (sub === 'crm-agenti') loadAgents();
   if (sub === 'crm-importatori') loadImporters();
   if (sub === 'crm-fornitori') loadSuppliers();
 }
 
+// ── Dashboard: widget abilitati (configurabili da Impostazioni) ──────────────────
+let DASHBOARD_WIDGETS_CACHE = null;
+async function getDashboardWidgets() {
+  if (!DASHBOARD_WIDGETS_CACHE) DASHBOARD_WIDGETS_CACHE = await api('/api/admin/dashboard-widgets');
+  return DASHBOARD_WIDGETS_CACHE;
+}
+function isWidgetOn(catalog, workspace, key) {
+  const w = (catalog[workspace] || []).find(x => x.key === key);
+  return w ? w.enabled : true;
+}
+
 // ── COMMERCIALE: dashboard ─────────────────────────────────────────────────────
 async function loadDashboard() {
-  const s = await api('/api/admin/commercial/stats');
-  document.getElementById('com-stats-cards').innerHTML = `
-    <div class="card"><div class="label">Ordini totali</div><div class="value">${s.totals.orders}</div></div>
-    <div class="card"><div class="label">Ricavo totale</div><div class="value">€ ${fmtEuro(s.totals.revenue_cents)}</div></div>
-  `;
+  const [catalog, s] = await Promise.all([getDashboardWidgets(), api('/api/admin/commercial/stats')]);
+  const on = k => isWidgetOn(catalog, 'commerciale', k);
+  const cards = [];
+  if (on('orders_total')) cards.push(`<div class="card"><div class="label">Ordini totali</div><div class="value">${s.totals.orders}</div></div>`);
+  if (on('revenue_total')) cards.push(`<div class="card"><div class="label">Ricavo totale</div><div class="value">€ ${fmtEuro(s.totals.revenue_cents)}</div></div>`);
+  document.getElementById('com-stats-cards').innerHTML = cards.join('');
+
+  document.getElementById('com-widget-revenue_by_channel').style.display = on('revenue_by_channel') ? 'block' : 'none';
   document.getElementById('com-by-channel').innerHTML = s.byChannel.length ? s.byChannel.map(c => `
     <tr><td>${esc(c.channel)}</td><td>${c.orders}</td><td>€ ${fmtEuro(c.revenue_cents)}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty">Nessun dato.</td></tr>';
+
+  document.getElementById('com-widget-revenue_by_pricelist').style.display = on('revenue_by_pricelist') ? 'block' : 'none';
   document.getElementById('com-by-pricelist').innerHTML = s.byPriceList.length ? s.byPriceList.map(c => `
     <tr><td>${esc(c.price_list)}</td><td>${c.orders}</td><td>€ ${fmtEuro(c.revenue_cents)}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty">Nessun dato.</td></tr>';
+
+  document.getElementById('com-widget-top_products').style.display = on('top_products') ? 'block' : 'none';
   document.getElementById('com-top-products').innerHTML = s.topProducts.length ? s.topProducts.map(p => `
     <tr><td>${esc(p.product_name)}</td><td>${p.quantity}</td><td>€ ${fmtEuro(p.revenue_cents)}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty">Nessun dato.</td></tr>';
+}
+
+// ── CRM: dashboard ─────────────────────────────────────────────────────────────
+async function loadCrmDashboard() {
+  const [catalog, s] = await Promise.all([getDashboardWidgets(), api('/api/admin/crm/dashboard')]);
+  const on = k => isWidgetOn(catalog, 'crm', k);
+  const cards = [];
+  if (on('customers_by_status')) {
+    cards.push(`<div class="card"><div class="label">Clienti attivi</div><div class="value">${s.customersByStatus.attivo}</div></div>`);
+    cards.push(`<div class="card"><div class="label">Clienti semi attivi</div><div class="value">${s.customersByStatus.semi_attivo}</div></div>`);
+    cards.push(`<div class="card"><div class="label">Clienti inattivi</div><div class="value">${s.customersByStatus.inattivo}</div></div>`);
+  }
+  if (on('agents_count')) cards.push(`<div class="card"><div class="label">Agenti attivi</div><div class="value">${s.agentsCount}</div></div>`);
+  if (on('importers_count')) cards.push(`<div class="card"><div class="label">Importatori</div><div class="value">${s.importersCount}</div></div>`);
+  if (on('suppliers_count')) cards.push(`<div class="card"><div class="label">Fornitori</div><div class="value">${s.suppliersCount}</div></div>`);
+  if (on('open_deals')) cards.push(`<div class="card"><div class="label">Affari aperti</div><div class="value">${s.openDeals.c}</div><div style="font-size:11px;color:var(--ink-soft);margin-top:4px">€ ${fmtEuro(s.openDeals.value_cents)}</div></div>`);
+  if (on('open_tasks')) cards.push(`<div class="card"><div class="label">Compiti aperti</div><div class="value">${s.openTasks}</div></div>`);
+  document.getElementById('crm-dashboard-cards').innerHTML = cards.length ? cards.join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessun widget attivo. Abilitane uno da Impostazioni → Dashboard.</p>';
+}
+
+// ── MAGAZZINO: dashboard ───────────────────────────────────────────────────────
+async function loadMagazzinoDashboard() {
+  const [catalog, s] = await Promise.all([getDashboardWidgets(), api('/api/admin/magazzino/dashboard')]);
+  const on = k => isWidgetOn(catalog, 'magazzino', k);
+  const cards = [];
+  if (on('orders_by_status')) {
+    Object.entries(ORDER_STATUS_LABELS).forEach(([key, label]) => {
+      cards.push(`<div class="card"><div class="label">${esc(label)}</div><div class="value">${s.ordersByStatus[key] || 0}</div></div>`);
+    });
+  }
+  if (on('finished_below_threshold')) cards.push(`<div class="card"><div class="label">Prodotti finiti sotto soglia</div><div class="value">${s.finishedBelowThreshold}</div></div>`);
+  if (on('raw_below_threshold')) cards.push(`<div class="card"><div class="label">Materie prime sotto soglia</div><div class="value">${s.rawBelowThreshold}</div></div>`);
+  document.getElementById('mag-dashboard-cards').innerHTML = cards.length ? cards.join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessun widget attivo. Abilitane uno da Impostazioni → Dashboard.</p>';
+}
+
+// ── PRODUZIONE: dashboard ──────────────────────────────────────────────────────
+async function loadProduzioneDashboard() {
+  const [catalog, s] = await Promise.all([getDashboardWidgets(), api('/api/admin/produzione/dashboard')]);
+  const on = k => isWidgetOn(catalog, 'produzione', k);
+  const cards = [];
+  if (on('bottles_to_produce')) cards.push(`<div class="card"><div class="label">Bottiglie da produrre</div><div class="value">${s.bottlesToProduce}</div></div>`);
+  if (on('pending_lines')) cards.push(`<div class="card"><div class="label">Righe ordine in sospeso</div><div class="value">${s.pendingLines}</div></div>`);
+  let html = cards.join('');
+  if (on('top_customers_volume')) {
+    const rows = s.topCustomers.length ? s.topCustomers.map(c => `<tr><td>${esc(c.customer_name)}</td><td>${c.quantity}</td></tr>`).join('') : '<tr><td colspan="2" class="empty">Nessun dato.</td></tr>';
+    html += `<div style="grid-column:1/-1;margin-top:6px">
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--wine);margin:0 0 10px">Top clienti per volume</h4>
+      <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Quantità</th></tr></thead><tbody>${rows}</tbody></table></div>
+    </div>`;
+  }
+  document.getElementById('prod-dashboard-cards').innerHTML = html || '<p style="color:var(--ink-soft);font-size:13px">Nessun widget attivo. Abilitane uno da Impostazioni → Dashboard.</p>';
 }
 
 // ── COMMERCIALE: ordini ────────────────────────────────────────────────────────
@@ -3239,6 +3350,34 @@ async function deleteRole(id) {
   await api('/api/admin/roles/' + id, { method: 'DELETE' });
   loadRolesMatrix();
   loadPortalUsers();
+}
+
+// ── IMPOSTAZIONI: widget dashboard ──────────────────────────────────────────────
+async function loadDashboardWidgetsConfig() {
+  DASHBOARD_WIDGETS_CACHE = null; // forza il refresh dei dati piu' recenti
+  const catalog = await getDashboardWidgets();
+  document.getElementById('dashboard-widgets-config').innerHTML = Object.entries(WORKSPACE_LABELS)
+    .filter(([ws]) => catalog[ws])
+    .map(([ws, wsLabel]) => `
+      <div class="dashboard-widgets-group">
+        <h4>${esc(wsLabel)}</h4>
+        ${catalog[ws].map(w => `
+          <label class="dashboard-widget-check">
+            <input type="checkbox" ${w.enabled ? 'checked' : ''} onchange="toggleDashboardWidget('${ws}', '${w.key}', this.checked)">
+            ${esc(w.label)}
+          </label>
+        `).join('')}
+      </div>
+    `).join('');
+}
+
+async function toggleDashboardWidget(workspace, key, checked) {
+  const catalog = await getDashboardWidgets();
+  const list = catalog[workspace];
+  const w = list.find(x => x.key === key);
+  if (w) w.enabled = checked;
+  const enabledKeys = list.filter(x => x.enabled).map(x => x.key);
+  await api('/api/admin/dashboard-widgets', { method: 'POST', body: JSON.stringify({ workspace, enabledKeys }) });
 }
 
 // ── MAGAZZINO: Kanban ordini ────────────────────────────────────────────────────

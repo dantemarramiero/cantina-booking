@@ -1702,6 +1702,70 @@ app.get('/api/admin/settings', authAdmin, (req, res) => {
     semi_active_months_threshold: getSetting('semi_active_months_threshold', '12'),
   });
 });
+const DASHBOARD_WIDGET_CATALOG = {
+  commerciale: [
+    { key: 'orders_total', label: 'Ordini totali' },
+    { key: 'revenue_total', label: 'Ricavo totale' },
+    { key: 'revenue_by_channel', label: 'Ricavo per canale' },
+    { key: 'revenue_by_pricelist', label: 'Ricavo per listino' },
+    { key: 'top_products', label: 'Top prodotti' },
+  ],
+  produzione: [
+    { key: 'bottles_to_produce', label: 'Bottiglie da produrre' },
+    { key: 'pending_lines', label: 'Righe ordine in sospeso' },
+    { key: 'top_customers_volume', label: 'Top clienti per volume' },
+  ],
+  magazzino: [
+    { key: 'orders_by_status', label: 'Ordini per stato' },
+    { key: 'finished_below_threshold', label: 'Prodotti finiti sotto soglia' },
+    { key: 'raw_below_threshold', label: 'Materie prime sotto soglia' },
+  ],
+  crm: [
+    { key: 'customers_by_status', label: 'Clienti per stato attività' },
+    { key: 'agents_count', label: 'Agenti attivi' },
+    { key: 'importers_count', label: 'Importatori' },
+    { key: 'suppliers_count', label: 'Fornitori' },
+    { key: 'open_deals', label: 'Affari aperti' },
+    { key: 'open_tasks', label: 'Compiti aperti' },
+  ],
+  enoturismo: [
+    { key: 'bookings_confirmed', label: 'Prenotazioni confermate' },
+    { key: 'guests_total', label: 'Ospiti totali' },
+    { key: 'revenue', label: 'Ricavo' },
+    { key: 'pending', label: 'In attesa' },
+    { key: 'future_bookings', label: 'Prenotazioni future' },
+    { key: 'newsletter_subscribers', label: 'Iscritti newsletter' },
+    { key: 'reviews_to_moderate', label: 'Recensioni da moderare' },
+    { key: 'revenue_by_experience', label: 'Ricavi per esperienza' },
+  ],
+};
+
+app.get('/api/admin/dashboard-widgets', authAdmin, (req, res) => {
+  const stored = getSetting('dashboard_widgets', null);
+  const enabled = stored ? JSON.parse(stored) : null;
+  const result = {};
+  for (const ws of Object.keys(DASHBOARD_WIDGET_CATALOG)) {
+    result[ws] = DASHBOARD_WIDGET_CATALOG[ws].map(w => ({
+      ...w,
+      enabled: enabled ? (enabled[ws] || []).includes(w.key) : true,
+    }));
+  }
+  res.json(result);
+});
+
+app.post('/api/admin/dashboard-widgets', authAdmin, (req, res) => {
+  const { workspace, enabledKeys } = req.body || {};
+  if (!DASHBOARD_WIDGET_CATALOG[workspace]) return res.status(400).json({ error: 'Workspace non valido.' });
+  const stored = getSetting('dashboard_widgets', null);
+  const current = stored ? JSON.parse(stored) : {};
+  for (const ws of Object.keys(DASHBOARD_WIDGET_CATALOG)) {
+    if (!current[ws]) current[ws] = DASHBOARD_WIDGET_CATALOG[ws].map(w => w.key);
+  }
+  current[workspace] = Array.isArray(enabledKeys) ? enabledKeys : [];
+  setSetting('dashboard_widgets', JSON.stringify(current));
+  res.json({ success: true });
+});
+
 app.post('/api/admin/settings', authAdmin, (req, res) => {
   const { commercial_alert_email, procurement_alert_email, active_months_threshold, semi_active_months_threshold } = req.body || {};
   if (commercial_alert_email !== undefined) setSetting('commercial_alert_email', commercial_alert_email);
@@ -1948,6 +2012,46 @@ app.get('/api/admin/commercial/stats', authAdmin, (req, res) => {
     GROUP BY COALESCE(p.id, oi.product_name_raw) ORDER BY revenue_cents DESC LIMIT 10
   `).all();
   res.json({ totals, byChannel, byPriceList, topProducts });
+});
+
+app.get('/api/admin/crm/dashboard', authAdmin, (req, res) => {
+  const customers = db.prepare(`
+    SELECT c.id, (SELECT MAX(o.order_date) FROM orders o WHERE o.customer_id = c.id) AS last_order_date FROM customers c
+  `).all();
+  const customersByStatus = { attivo: 0, semi_attivo: 0, inattivo: 0 };
+  customers.forEach(c => { customersByStatus[customerActivityStatus(c.last_order_date)]++; });
+
+  const agentsCount = db.prepare('SELECT COUNT(*) AS c FROM agents WHERE active = 1').get().c;
+  const importersCount = db.prepare('SELECT COUNT(*) AS c FROM importers').get().c;
+  const suppliersCount = db.prepare('SELECT COUNT(*) AS c FROM suppliers').get().c;
+  const openDeals = db.prepare(`SELECT COUNT(*) AS c, COALESCE(SUM(value_cents),0) AS value_cents FROM crm_deals WHERE stage NOT IN ('vinto','perso')`).get();
+  const openTasks = db.prepare(`SELECT COUNT(*) AS c FROM crm_tasks WHERE status = 'aperto'`).get().c;
+
+  res.json({ customersByStatus, agentsCount, importersCount, suppliersCount, openDeals, openTasks });
+});
+
+app.get('/api/admin/magazzino/dashboard', authAdmin, (req, res) => {
+  const ordersByStatus = {};
+  db.prepare(`SELECT status, COUNT(*) AS c FROM orders GROUP BY status`).all().forEach(r => { ordersByStatus[r.status] = r.c; });
+  const finishedBelowThreshold = db.prepare('SELECT COUNT(*) AS c FROM warehouse_finished WHERE below_threshold = 1').get().c;
+  const rawBelowThreshold = db.prepare('SELECT COUNT(*) AS c FROM warehouse_raw WHERE below_threshold = 1').get().c;
+  res.json({ ordersByStatus, finishedBelowThreshold, rawBelowThreshold });
+});
+
+app.get('/api/admin/produzione/dashboard', authAdmin, (req, res) => {
+  const bottlesToProduce = db.prepare(`
+    SELECT COUNT(DISTINCT COALESCE(p.id, oi.product_name_raw)) AS c
+    FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
+    WHERE oi.production_status != 'completato'
+  `).get().c;
+  const pendingLines = db.prepare(`SELECT COUNT(*) AS c FROM order_items WHERE production_status != 'completato'`).get().c;
+  const topCustomers = db.prepare(`
+    SELECT o.customer_name, SUM(oi.quantity) AS quantity
+    FROM order_items oi JOIN orders o ON o.id = oi.order_id
+    WHERE oi.production_status != 'completato'
+    GROUP BY o.customer_name ORDER BY quantity DESC LIMIT 5
+  `).all();
+  res.json({ bottlesToProduce, pendingLines, topCustomers });
 });
 
 // ── CRM: agenti ─────────────────────────────────────────────────────────────────

@@ -467,8 +467,10 @@
     <!-- DASHBOARD -->
     <div class="panel active" id="panel-dashboard">
       <div class="cards" id="stats-cards"></div>
-      <h3 style="margin-bottom:12px">Ricavi per esperienza</h3>
-      <div class="table-wrap"><table id="stats-by-exp"><thead><tr><th>Esperienza</th><th>Prenotazioni</th><th>Ospiti</th><th>Ricavo</th></tr></thead><tbody></tbody></table></div>
+      <div id="stats-widget-revenue_by_experience">
+        <h3 style="margin-bottom:12px">Ricavi per esperienza</h3>
+        <div class="table-wrap"><table id="stats-by-exp"><thead><tr><th>Esperienza</th><th>Prenotazioni</th><th>Ospiti</th><th>Ricavo</th></tr></thead><tbody></tbody></table></div>
+      </div>
     </div>
 
     <!-- EXPERIENCES -->
@@ -1086,17 +1088,30 @@ function loadPanel(tab) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
+let DASHBOARD_WIDGETS_CACHE = null;
+async function getDashboardWidgets() {
+  if (!DASHBOARD_WIDGETS_CACHE) DASHBOARD_WIDGETS_CACHE = await api('/api/admin/dashboard-widgets');
+  return DASHBOARD_WIDGETS_CACHE;
+}
+function isWidgetOn(catalog, workspace, key) {
+  const w = (catalog[workspace] || []).find(x => x.key === key);
+  return w ? w.enabled : true;
+}
+
 async function loadDashboard() {
-  const s = await api('/api/admin/stats');
-  document.getElementById('stats-cards').innerHTML = `
-    <div class="card"><div class="label">Prenotazioni confermate</div><div class="value">${s.totals.bookings}</div></div>
-    <div class="card"><div class="label">Ospiti totali</div><div class="value">${s.totals.guests}</div></div>
-    <div class="card"><div class="label">Ricavo</div><div class="value">€ ${fmtEuro(s.totals.revenue_cents)}</div></div>
-    <div class="card"><div class="label">In attesa</div><div class="value">${s.pending}</div></div>
-    <div class="card"><div class="label">Prenotazioni future</div><div class="value">${s.upcoming}</div></div>
-    <div class="card"><div class="label">Iscritti newsletter</div><div class="value">${s.newsletterCount}</div></div>
-    <div class="card"><div class="label">Recensioni da moderare</div><div class="value">${s.reviewsPending}</div></div>
-  `;
+  const [catalog, s] = await Promise.all([getDashboardWidgets(), api('/api/admin/stats')]);
+  const on = k => isWidgetOn(catalog, 'enoturismo', k);
+  const cards = [];
+  if (on('bookings_confirmed')) cards.push(`<div class="card"><div class="label">Prenotazioni confermate</div><div class="value">${s.totals.bookings}</div></div>`);
+  if (on('guests_total')) cards.push(`<div class="card"><div class="label">Ospiti totali</div><div class="value">${s.totals.guests}</div></div>`);
+  if (on('revenue')) cards.push(`<div class="card"><div class="label">Ricavo</div><div class="value">€ ${fmtEuro(s.totals.revenue_cents)}</div></div>`);
+  if (on('pending')) cards.push(`<div class="card"><div class="label">In attesa</div><div class="value">${s.pending}</div></div>`);
+  if (on('future_bookings')) cards.push(`<div class="card"><div class="label">Prenotazioni future</div><div class="value">${s.upcoming}</div></div>`);
+  if (on('newsletter_subscribers')) cards.push(`<div class="card"><div class="label">Iscritti newsletter</div><div class="value">${s.newsletterCount}</div></div>`);
+  if (on('reviews_to_moderate')) cards.push(`<div class="card"><div class="label">Recensioni da moderare</div><div class="value">${s.reviewsPending}</div></div>`);
+  document.getElementById('stats-cards').innerHTML = cards.join('');
+
+  document.getElementById('stats-widget-revenue_by_experience').style.display = on('revenue_by_experience') ? 'block' : 'none';
   const tbody = document.querySelector('#stats-by-exp tbody');
   tbody.innerHTML = s.byExperience.length ? s.byExperience.map(e => `
     <tr><td>${esc(e.name_it)}</td><td>${e.bookings}</td><td>${e.guests}</td><td>€ ${fmtEuro(e.revenue_cents)}</td></tr>
