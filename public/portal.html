@@ -278,6 +278,21 @@
   .crm-activity-item .crm-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
   .crm-overview-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
   @media (max-width: 700px) { .crm-info-grid { grid-template-columns: 1fr; } }
+  .crm-tc-group { margin-bottom: 20px; }
+  .crm-tc-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .crm-tc-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .crm-tc-dot.attivo { background: #2e9e5b; }
+  .crm-tc-dot.semi_attivo { background: #d99a2b; }
+  .crm-tc-dot.inattivo { background: #b8bcc4; }
+  .crm-tc-group-title { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .crm-tc-group-count { font-size: 12px; color: #9aa0ab; }
+  .crm-info-tip { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: #eceef2; color: #6b7280; font-size: 10.5px; font-weight: 700; font-style: normal; cursor: help; }
+  .crm-tc-customer { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; margin-bottom: 8px; cursor: pointer; transition: border-color .15s; }
+  .crm-tc-customer:hover { border-color: var(--wine); }
+  .crm-tc-customer .crm-item-title { font-weight: 600; color: var(--ink); font-size: 13.5px; }
+  .crm-tc-customer .crm-item-meta { font-size: 11.5px; color: #9aa0ab; margin-top: 2px; }
+  .crm-tc-customer-right { text-align: right; font-size: 12px; color: var(--ink-soft); flex-shrink: 0; }
+  .crm-tc-empty { font-size: 12.5px; color: #9aa0ab; padding: 4px 2px; }
 </style>
 </head>
 <body>
@@ -1219,7 +1234,8 @@
     <button type="button" data-rtab="allegati">Allegati</button>
     <button type="button" data-rtab="riunioni">Riunioni</button>
     <button type="button" data-rtab="compiti">Compiti</button>
-    <button type="button" data-rtab="affari">Affari</button>
+    <button type="button" data-rtab="affari" id="crm-tab-affari-btn">Affari</button>
+    <button type="button" data-rtab="clienti-seguiti" id="crm-tab-clienti-seguiti-btn" style="display:none">Clienti seguiti</button>
     <button type="button" data-rtab="ordini" id="crm-tab-ordini-btn" style="display:none">Ordini</button>
   </div>
 
@@ -1257,6 +1273,10 @@
   <div class="crm-record-panel" id="crm-rtab-affari">
     <div class="crm-panel-toolbar"><div class="list-spacer"></div><button class="btn-generate" style="margin-top:0" onclick="openCrmDealModal()">+ Nuovo affare</button></div>
     <div id="crm-deals-list"></div>
+  </div>
+
+  <div class="crm-record-panel" id="crm-rtab-clienti-seguiti">
+    <div id="crm-tracked-customers"></div>
   </div>
 
   <div class="crm-record-panel" id="crm-rtab-ordini">
@@ -2312,6 +2332,7 @@ function switchCrmTab(tab) {
   if (tab === 'riunioni') loadCrmMeetings();
   if (tab === 'compiti') loadCrmTasks();
   if (tab === 'affari') loadCrmDeals();
+  if (tab === 'clienti-seguiti') loadCrmTrackedCustomers();
   if (tab === 'ordini') loadCrmOrders();
 }
 
@@ -2320,8 +2341,52 @@ async function openCrmRecord(type, id) {
   document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
   document.getElementById('crm-record-view').style.display = 'block';
   document.getElementById('crm-tab-ordini-btn').style.display = (type === 'customer' || type === 'importer') ? 'inline-block' : 'none';
+  document.getElementById('crm-tab-affari-btn').style.display = type === 'agent' ? 'none' : 'inline-block';
+  document.getElementById('crm-tab-clienti-seguiti-btn').style.display = type === 'agent' ? 'inline-block' : 'none';
   switchCrmTab('info');
   await loadCrmRecordData();
+}
+
+const CRM_TC_STATUS_LABELS = { attivo: 'Clienti attivi', semi_attivo: 'Clienti semi attivi', inattivo: 'Clienti inattivi' };
+const CRM_TC_STATUS_TIPS = {
+  attivo: 'Ha effettuato almeno un ordine negli ultimi 6 mesi.',
+  semi_attivo: 'Ultimo ordine tra 6 mesi e 1 anno fa.',
+  inattivo: 'Nessun ordine da più di 1 anno (o mai ordinato).',
+};
+
+async function loadCrmTrackedCustomers() {
+  const box = document.getElementById('crm-tracked-customers');
+  box.innerHTML = '<p class="crm-tc-empty">Caricamento...</p>';
+  const rows = await api(`/api/admin/agents/${CRM_CURRENT.id}/tracked-customers`);
+  const groups = { attivo: [], semi_attivo: [], inattivo: [] };
+  rows.forEach(r => groups[r.status].push(r));
+
+  box.innerHTML = ['attivo', 'semi_attivo', 'inattivo'].map(status => {
+    const list = groups[status];
+    const items = list.length
+      ? list.map(c => `
+        <div class="crm-tc-customer" onclick="openCrmRecord('customer', ${c.id})">
+          <div>
+            <div class="crm-item-title">${esc(c.name)}</div>
+            <div class="crm-item-meta">${esc(c.city || 'nessuna località')}${c.province ? ' (' + esc(c.province) + ')' : ''}</div>
+          </div>
+          <div class="crm-tc-customer-right">
+            ${c.last_order_date ? 'Ultimo ordine: ' + esc(c.last_order_date) : 'Nessun ordine'}<br>
+            ${c.order_count} ordini · € ${fmtEuro(c.revenue_cents)}
+          </div>
+        </div>`).join('')
+      : '<p class="crm-tc-empty">Nessun cliente in questa categoria.</p>';
+    return `
+      <div class="crm-tc-group">
+        <div class="crm-tc-group-head">
+          <span class="crm-tc-dot ${status}"></span>
+          <span class="crm-tc-group-title">${CRM_TC_STATUS_LABELS[status]}</span>
+          <span class="crm-tc-group-count">(${list.length})</span>
+          <i class="crm-info-tip" title="${esc(CRM_TC_STATUS_TIPS[status])}">i</i>
+        </div>
+        ${items}
+      </div>`;
+  }).join('');
 }
 
 function closeCrmRecord() {

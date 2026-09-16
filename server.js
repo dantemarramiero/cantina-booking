@@ -795,6 +795,19 @@ function agentWithStats(agent) {
   return { ...agentSafe, provinces, orderCount, revenueCents, avgValueCents, avgFrequencyDays, customerCount };
 }
 
+function customerActivityStatus(lastOrderDate) {
+  if (!lastOrderDate) return 'inattivo';
+  const last = new Date(lastOrderDate + 'T00:00:00');
+  if (isNaN(last.getTime())) return 'inattivo';
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  if (last >= sixMonthsAgo) return 'attivo';
+  if (last >= oneYearAgo) return 'semi_attivo';
+  return 'inattivo';
+}
+
 const uploadsDir = path.join(__dirname, 'public', 'uploads', 'products');
 fs.mkdirSync(uploadsDir, { recursive: true });
 const upload = multer({
@@ -1973,6 +1986,19 @@ app.delete('/api/admin/agents/:id', authAdmin, (req, res) => {
   db.prepare('DELETE FROM agent_provinces WHERE agent_id = ?').run(req.params.id);
   db.prepare('DELETE FROM agents WHERE id = ?').run(req.params.id);
   res.json({ success: true });
+});
+
+app.get('/api/admin/agents/:id/tracked-customers', authAdmin, (req, res) => {
+  const rows = db.prepare(`
+    SELECT c.id, c.name, c.city, c.province, c.country,
+      (SELECT MAX(o.order_date) FROM orders o WHERE o.customer_id = c.id) AS last_order_date,
+      (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) AS order_count,
+      (SELECT COALESCE(SUM(o.total_cents),0) FROM orders o WHERE o.customer_id = c.id) AS revenue_cents
+    FROM customers c
+    WHERE c.agent_id = ?
+    ORDER BY c.name
+  `).all(req.params.id);
+  res.json(rows.map(r => ({ ...r, status: customerActivityStatus(r.last_order_date) })));
 });
 
 // ── CRM: clienti ──────────────────────────────────────────────────────────────
