@@ -780,6 +780,7 @@
         <div class="settings-grid" id="settings-grid">
           <div class="settings-card-group" data-settings-group="generale">
             <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Generale</h4>
+            <button type="button" onclick="openMyProfilePanel()" data-settings-label="Impostazioni personali">Impostazioni personali</button>
             <button type="button" onclick="openSettingsPanel('email-avvisi')" data-settings-label="Email per gli avvisi di magazzino">Email per gli avvisi di magazzino</button>
             <button type="button" onclick="openSettingsPanel('regole')" data-settings-label="Regole">Regole</button>
             <button type="button" onclick="openSettingsPanel('dashboard-widgets')" data-settings-label="Dashboard">Dashboard</button>
@@ -798,6 +799,31 @@
 
       <div id="settings-detail-view" style="display:none">
         <button class="btn secondary small" style="margin-bottom:18px" onclick="closeSettingsPanel()">← Torna alla configurazione</button>
+
+        <div class="settings-panel" id="settings-panel-impostazioni-personali">
+          <div id="my-profile-master-msg" class="box" style="display:none;max-width:520px">
+            <h3>Impostazioni personali</h3>
+            <p style="margin:0;font-size:12.5px;color:var(--ink-soft)">Stai usando la chiave amministratore, che non è un account personale. Accedi con username e password per gestire il tuo profilo.</p>
+          </div>
+          <div id="my-profile-box" style="display:none">
+            <div class="box" style="max-width:520px">
+              <h3>Il mio profilo</h3>
+              <div id="my-profile-msg"></div>
+              <div class="field"><label>Nome e cognome</label><input id="mp-name"></div>
+              <div class="field"><label>Email</label><input type="email" id="mp-email"></div>
+              <div class="field"><label>Username</label><input id="mp-username"></div>
+              <button class="btn" onclick="saveMyProfile()">Salva profilo</button>
+            </div>
+            <div class="box" style="max-width:520px">
+              <h3>Cambia password</h3>
+              <div id="my-password-msg"></div>
+              <div class="field"><label>Password attuale</label><input type="password" id="mp-current-password"></div>
+              <div class="field"><label>Nuova password</label><input type="password" id="mp-new-password"></div>
+              <div class="field"><label>Conferma nuova password</label><input type="password" id="mp-confirm-password"></div>
+              <button class="btn" onclick="saveMyPassword()">Cambia password</button>
+            </div>
+          </div>
+        </div>
 
         <div class="settings-panel" id="settings-panel-email-avvisi">
           <div class="box" style="max-width:520px">
@@ -3369,6 +3395,57 @@ async function loadDashboardWidgetsConfig() {
         `).join('')}
       </div>
     `).join('');
+}
+
+// ── IMPOSTAZIONI: impostazioni personali ────────────────────────────────────────
+async function openMyProfilePanel() {
+  openSettingsPanel('impostazioni-personali');
+  const me = await api('/api/admin/my-profile');
+  document.getElementById('my-profile-master-msg').style.display = me.isMaster ? 'block' : 'none';
+  document.getElementById('my-profile-box').style.display = me.isMaster ? 'none' : 'block';
+  if (!me.isMaster) {
+    document.getElementById('my-profile-msg').innerHTML = '';
+    document.getElementById('my-password-msg').innerHTML = '';
+    document.getElementById('mp-name').value = me.name;
+    document.getElementById('mp-email').value = me.email;
+    document.getElementById('mp-username').value = me.username;
+    document.getElementById('mp-current-password').value = '';
+    document.getElementById('mp-new-password').value = '';
+    document.getElementById('mp-confirm-password').value = '';
+  }
+}
+
+async function saveMyProfile() {
+  const msg = document.getElementById('my-profile-msg');
+  try {
+    await api('/api/admin/my-profile', { method: 'PATCH', body: JSON.stringify({
+      name: document.getElementById('mp-name').value.trim(),
+      email: document.getElementById('mp-email').value.trim(),
+      username: document.getElementById('mp-username').value.trim(),
+    }) });
+    msg.innerHTML = '<div class="msg success">Profilo aggiornato.</div>';
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function saveMyPassword() {
+  const msg = document.getElementById('my-password-msg');
+  const newPassword = document.getElementById('mp-new-password').value;
+  const confirmPassword = document.getElementById('mp-confirm-password').value;
+  if (newPassword !== confirmPassword) { msg.innerHTML = '<div class="msg error">Le due password non coincidono.</div>'; return; }
+  try {
+    await api('/api/admin/my-profile/password', { method: 'POST', body: JSON.stringify({
+      currentPassword: document.getElementById('mp-current-password').value,
+      newPassword,
+    }) });
+    document.getElementById('mp-current-password').value = '';
+    document.getElementById('mp-new-password').value = '';
+    document.getElementById('mp-confirm-password').value = '';
+    msg.innerHTML = '<div class="msg success">Password aggiornata.</div>';
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
 }
 
 async function toggleDashboardWidget(workspace, key, checked) {

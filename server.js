@@ -2769,6 +2769,39 @@ app.get('/api/admin/me', authAdmin, (req, res) => {
   });
 });
 
+app.get('/api/admin/my-profile', authAdmin, (req, res) => {
+  if (req.isMasterKey) return res.json({ isMaster: true });
+  const { name, email, username } = req.portalUser;
+  res.json({ isMaster: false, name, email, username });
+});
+
+app.patch('/api/admin/my-profile', authAdmin, (req, res) => {
+  if (req.isMasterKey) return res.status(400).json({ error: 'La chiave amministratore non è un account personale.' });
+  const { name, email, username } = req.body || {};
+  const updates = [], params = [];
+  if (name !== undefined) { updates.push('name = ?'); params.push(name.trim()); }
+  if (email !== undefined) { updates.push('email = ?'); params.push(email.trim().toLowerCase()); }
+  if (username !== undefined) { updates.push('username = ?'); params.push(username.trim()); }
+  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  params.push(req.portalUser.id);
+  try {
+    db.prepare(`UPDATE portal_users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(400).json({ error: 'Username o email già in uso.' });
+  }
+});
+
+app.post('/api/admin/my-profile/password', authAdmin, (req, res) => {
+  if (req.isMasterKey) return res.status(400).json({ error: 'La chiave amministratore non è un account personale.' });
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Inserisci la password attuale e quella nuova.' });
+  if (newPassword.length < 6) return res.status(400).json({ error: 'La nuova password deve avere almeno 6 caratteri.' });
+  if (!verifyPassword(currentPassword, req.portalUser.password_hash)) return res.status(400).json({ error: 'Password attuale non corretta.' });
+  db.prepare('UPDATE portal_users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), req.portalUser.id);
+  res.json({ success: true });
+});
+
 app.post('/api/portal-users/login', (req, res) => {
   const { username, password } = req.body || {};
   if (!username?.trim() || !password) return res.status(400).json({ error: 'Inserisci username e password.' });
