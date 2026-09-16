@@ -1,0 +1,2083 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portale interno — Gestionale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --wine: #3b6fe0; --wine-dark: #f3f6fb; --gold: #3b6fe0; --gold-light: #3b6fe0;
+    --cream: #f5f6f8; --line: #e6e8ee; --ink: #10131a; --ink-soft: #6b7280; --ok: #16a34a; --bad: #dc2626; --warn: #d97706;
+    --sidebar-w: 226px;
+    --sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --mono: var(--sans);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--sans); background: var(--cream); color: var(--ink-soft); font-size: 14px; }
+  h1, h2, h3 { font-family: var(--sans); font-weight: 600; margin: 0; color: var(--ink); }
+  button { font-family: inherit; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; background: #fff; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; font-size: 12.5px; }
+  th { background: #fafbfc; color: var(--ink-soft); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+  tr:hover td { background: #fafbfd; }
+  a.plain { color: var(--wine); }
+
+  #login-screen { max-width: 340px; width: 100%; margin: 90px auto; padding: 0 16px; text-align: center; }
+  #login-screen input { width: 100%; padding: 10px; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+
+  /* App shell: sidebar + main area */
+  .app-shell { display: flex; min-height: 100vh; }
+  .sidebar { width: var(--sidebar-w); flex-shrink: 0; background: #fff; border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 18px 14px; }
+  .sidebar-brand { display: flex; align-items: center; gap: 9px; padding: 4px 8px 18px; }
+  .sidebar-brand img { height: 26px; }
+  .sidebar-brand span { font-weight: 700; font-size: 14.5px; color: var(--ink); }
+  .sidebar-section-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: #9aa0ab; font-weight: 600; padding: 14px 10px 6px; }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+  .sidebar-nav button { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border: none; background: none; border-radius: 8px; font-size: 13.5px; font-weight: 500; color: #444a56; text-align: left; width: 100%; }
+  .sidebar-nav button svg { width: 18px; height: 18px; flex-shrink: 0; color: #8a90a0; }
+  .sidebar-nav button:hover { background: #f2f4f8; }
+  .sidebar-nav button.active { background: rgba(59,111,224,0.09); color: var(--wine); font-weight: 600; }
+  .sidebar-nav button.active svg { color: var(--wine); }
+  .sidebar-footer { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+  .sidebar-footer a, .sidebar-footer button { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border: none; background: none; border-radius: 8px; font-size: 13px; color: #444a56; text-decoration: none; width: 100%; text-align: left; }
+  .sidebar-footer svg { width: 17px; height: 17px; color: #8a90a0; }
+
+  /* Workspace switcher (top-level area selector, à la Zoho "Spazio di lavoro") */
+  .workspace-switcher { position: relative; margin: 2px 0 16px; }
+  .workspace-trigger { width: 100%; display: flex; align-items: center; gap: 9px; padding: 6px; border: none; background: none; border-radius: 8px; cursor: pointer; text-align: left; }
+  .workspace-trigger:hover { background: #f2f4f8; }
+  .ws-badge { width: 26px; height: 26px; border-radius: 7px; background: rgba(59,111,224,0.1); color: var(--wine); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ws-badge svg { width: 15px; height: 15px; }
+  .workspace-trigger-text { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .workspace-chevron { width: 15px; height: 15px; color: #9aa0ab; flex-shrink: 0; }
+  .workspace-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(16,19,26,0.14); padding: 5px; display: none; z-index: 30; }
+  .workspace-menu.open { display: block; }
+  .workspace-menu button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 7px 8px; border: none; background: none; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--ink); text-align: left; cursor: pointer; }
+  .workspace-menu button:hover { background: #f2f4f8; }
+  .workspace-menu button.active { background: rgba(59,111,224,0.09); color: var(--wine); font-weight: 600; }
+  .workspace-menu button.active .ws-badge { background: var(--wine); color: #fff; }
+  .sidebar-footer a:hover, .sidebar-footer button:hover { background: #f2f4f8; }
+
+  .ord-new-dropdown { position: relative; margin-left: auto; }
+  .ord-new-menu { position: absolute; top: calc(100% + 6px); right: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(16,19,26,0.14); padding: 5px; display: none; z-index: 30; min-width: 220px; max-height: 280px; overflow-y: auto; }
+  .ord-new-menu.open { display: block; }
+  .ord-new-menu a { display: block; padding: 8px 10px; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--ink); text-decoration: none; }
+  .ord-new-menu a:hover { background: #f2f4f8; }
+  .ord-new-menu .ord-new-empty { padding: 10px; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
+
+  .main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .topbar { height: 58px; flex-shrink: 0; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 26px; }
+  .topbar .crumb { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .topbar .crumb small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* Shared list/record UI (shadcn-inspired: rounded cards, list rows, segmented controls) */
+  .list-card { background: #fff; border: 1px solid var(--line); border-radius: 20px; overflow: hidden; box-shadow: 0 1px 3px rgba(16,19,26,0.04); margin-bottom: 24px; }
+  .list-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+  .list-toolbar-title { flex-shrink: 0; }
+  .list-toolbar-title h3 { font-size: 15px; }
+  .list-toolbar-title p { margin: 2px 0 0; font-size: 12px; color: var(--ink-soft); }
+  .list-spacer { flex: 1; }
+  .search-input { position: relative; min-width: 200px; }
+  .search-input svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: #9aa0ab; pointer-events: none; }
+  .search-input input { width: 100%; padding: 9px 14px 9px 36px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; background: #fafbfc; font-family: var(--sans); color: var(--ink); }
+  .search-input input:focus { outline: none; border-color: var(--wine); background: #fff; box-shadow: 0 0 0 3px rgba(59,111,224,0.1); }
+  .segmented { display: inline-flex; background: #f0f2f5; border-radius: 999px; padding: 3px; gap: 2px; flex-shrink: 0; }
+  .segmented button { border: none; background: none; padding: 7px 15px; border-radius: 999px; font-size: 12.5px; font-weight: 500; color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+  .segmented button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(16,19,26,0.1); font-weight: 600; }
+  .pill-stat { padding: 6px 13px; border-radius: 999px; background: #f5f6f8; font-size: 11.5px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+  .list-rows { display: flex; flex-direction: column; }
+  .list-row { display: flex; align-items: center; gap: 14px; padding: 15px 22px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .list-row:last-child { border-bottom: none; }
+  .list-row:hover { background: #fafbfd; }
+  .list-row-icon { width: 40px; height: 40px; border-radius: 12px; background: #f0f2f5; display: flex; align-items: center; justify-content: center; color: var(--ink-soft); flex-shrink: 0; font-size: 15px; font-weight: 600; }
+  .list-row-icon svg { width: 18px; height: 18px; }
+  .list-row-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+  .list-row-body { flex: 1; min-width: 0; flex-basis: 200px; }
+  .list-row-title { font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-row-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-row-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .list-row-value { font-size: 13.5px; font-weight: 600; color: var(--ink); text-align: right; }
+  .btn-outline-pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 12px; font-weight: 500; color: var(--ink); cursor: pointer; white-space: nowrap; font-family: var(--sans); }
+  .btn-outline-pill:hover { border-color: var(--wine); color: var(--wine); }
+  .btn-outline-pill.danger:hover { border-color: var(--bad); color: var(--bad); }
+  .list-empty { padding: 40px 20px; text-align: center; color: var(--ink-soft); font-size: 13.5px; }
+  .btn-generate { display: inline-flex; align-items: center; gap: 8px; background: var(--wine); color: #fff; border: none; padding: 9px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; box-shadow: 0 6px 16px rgba(59,111,224,0.28); }
+  .btn-generate:hover { background: #2f5fc9; }
+
+  .subtabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .subtabs button { display: flex; align-items: center; gap: 6px; padding: 8px 16px; border: 1px solid var(--line); background: #fff; border-radius: 999px; font-size: 12.5px; font-weight: 500; color: var(--ink-soft); }
+  .subtabs button.active { background: rgba(59,111,224,0.08); color: var(--wine); border-color: rgba(59,111,224,0.35); font-weight: 600; }
+
+  main { padding: 26px 32px; max-width: 1680px; margin: 0 auto; width: 100%; }
+  .module { display: none; }
+  .module.active { display: block; }
+  .subpanel { display: none; }
+  .subpanel.active { display: block; }
+  .crm-panel { display: none; }
+  .crm-panel.active { display: block; }
+  /* Rounded form primitives shared with the availability generator */
+  .avail-header { display: flex; align-items: center; gap: 14px; }
+  .avail-icon { width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%; background: rgba(59,111,224,0.1); color: var(--wine); display: flex; align-items: center; justify-content: center; }
+  .avail-icon svg { width: 20px; height: 20px; }
+  .avail-row { display: grid; gap: 14px; margin-bottom: 16px; }
+  .avail-field { margin-bottom: 16px; }
+  .avail-field:last-child { margin-bottom: 0; }
+  .avail-field > label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #9aa0ab; margin-bottom: 8px; }
+  .pill-input { width: 100%; padding: 10px 15px; border: 1px solid var(--line); border-radius: 999px; font-size: 13.5px; font-family: var(--sans); background: #fff; color: var(--ink); }
+  .pill-input:focus { outline: none; border-color: var(--wine); box-shadow: 0 0 0 3px rgba(59,111,224,0.12); }
+
+  .chip-select-box { border: 1px solid var(--line); border-radius: 16px; padding: 14px; background: #fafbfc; }
+  .province-picker { max-height: 180px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+  .province-chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--ink-soft); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.12s ease; }
+  .province-chip:hover { border-color: var(--wine); color: var(--wine); }
+  .province-chip.selected { background: var(--wine); border-color: var(--wine); color: #fff; }
+
+  .link-pill-box { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 999px; padding: 6px 8px 6px 16px; background: #fafbfc; color: #9aa0ab; }
+  .link-pill-box input { flex: 1; border: none; background: none; font-size: 12px; font-family: var(--mono); color: var(--ink); padding: 4px 0; min-width: 0; }
+  .link-pill-box input:focus { outline: none; }
+  .link-pill-btn { width: 30px; height: 30px; border-radius: 50%; border: none; background: #fff; box-shadow: 0 1px 2px rgba(16,19,26,0.08); color: var(--wine); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
+  .link-pill-btn:hover { background: rgba(59,111,224,0.1); }
+  .link-pill-btn.danger { color: var(--bad); }
+  .link-pill-btn.danger:hover { background: rgba(220,38,38,0.1); }
+  .time-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .time-chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 8px 7px 14px; border-radius: 999px; background: rgba(59,111,224,0.1); color: var(--wine); font-size: 12.5px; font-weight: 600; }
+  .time-chip button { width: 18px; height: 18px; border-radius: 50%; border: none; background: rgba(59,111,224,0.18); color: var(--wine); font-size: 12px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .time-chip button:hover { background: var(--wine); color: #fff; }
+  .agent-link-box { display: flex; gap: 8px; align-items: center; }
+  .agent-link-box input { font-size: 11.5px; background: #fafbfc; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 2px rgba(16,19,26,0.03); }
+  .card .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #9aa0ab; font-weight: 600; }
+  .card .value { font-size: 25px; font-family: var(--sans); font-weight: 700; color: var(--ink); margin-top: 8px; }
+
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .toolbar input, .toolbar select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; background: #fff; color: var(--ink); }
+  .btn { background: var(--wine); color: #fff; border: none; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: var(--sans); }
+  .btn:hover { background: #2f5fc9; }
+  .btn.secondary { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+  .btn.secondary:hover { background: #f5f6f8; }
+  .btn.small { padding: 5px 10px; font-size: 11.5px; }
+  .btn.danger { background: #fee2e2; color: var(--bad); }
+  .btn.ok { background: #dcfce7; color: var(--ok); }
+  .badge { padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; white-space:nowrap; }
+  .badge.green { background: #dcfce7; color: var(--ok); }
+  .badge.yellow { background: #fef3c7; color: var(--warn); }
+  .badge.red { background: #fee2e2; color: var(--bad); }
+  .badge.grey { background: #f0f1f3; color: var(--ink-soft); }
+  .actions-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+  .table-wrap { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; overflow-x: auto; background: #fff; box-shadow: 0 1px 2px rgba(16,19,26,0.03); }
+  .empty { padding: 26px; text-align: center; color: var(--ink-soft); }
+  .prod-thumb { width: 40px; height: 52px; object-fit: cover; border-radius: 6px; background: var(--line); }
+
+  .box { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 22px; box-shadow: 0 1px 2px rgba(16,19,26,0.03); }
+  .box h3 { margin-bottom: 14px; font-size: 16px; }
+  .help { font-size: 12.5px; color: var(--ink-soft); line-height: 1.6; background: #f5f8ff; border: 1px solid #e1e9fb; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+  code { background: #eef1f6; padding: 1px 5px; border-radius: 3px; font-size: 11.5px; color: var(--wine); }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(16,19,26,0.4); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: #fff; border: 1px solid var(--line); max-width: 560px; width: 100%; max-height: 88vh; overflow-y: auto; border-radius: 16px; padding: 26px; box-shadow: 0 12px 40px rgba(16,19,26,0.18); }
+  .modal-box h3 { margin-bottom: 18px; }
+  .field { margin-bottom: 13px; }
+  .field label { display: block; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #9aa0ab; margin-bottom: 6px; }
+  .field input, .field select, .field textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13.5px; font-family: var(--sans); background: #fff; color: var(--ink); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field-row:has(> :nth-child(3)) { grid-template-columns: 1fr 1fr 1fr; }
+  .form-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--wine); margin: 20px 0 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .form-section-title:first-of-type { margin-top: 4px; padding-top: 0; border-top: none; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .msg { padding: 9px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+  .msg.error { background: #fee2e2; color: var(--bad); }
+  .msg.success { background: #dcfce7; color: var(--ok); }
+  input.qty-input { width: 70px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); }
+
+  /* Kanban ordini (Magazzino) */
+  .kanban-board { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 16px; align-items: start; overflow-x: auto; }
+  .kanban-col { background: #f0f2f5; border-radius: 14px; padding: 10px; min-height: 200px; }
+  .kanban-col-header { font-size: 12.5px; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 8px 10px; display: flex; align-items: center; justify-content: space-between; }
+  .kanban-count { background: #fff; border-radius: 999px; padding: 1px 8px; font-size: 11px; color: var(--ink-soft); font-weight: 600; }
+  .kanban-col-body { display: flex; flex-direction: column; gap: 10px; min-height: 80px; border-radius: 10px; transition: background 0.15s ease; }
+  .kanban-col-body.drag-over { background: rgba(59,111,224,0.08); }
+  .kanban-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: grab; box-shadow: 0 1px 2px rgba(16,19,26,0.05); position: relative; }
+  .kanban-card:active { cursor: grabbing; }
+  .kanban-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .kanban-order-number { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+  .kanban-note-flag { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: var(--bad); color: #fff; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+  .kanban-customer { font-size: 12.5px; color: var(--ink); margin-bottom: 2px; }
+  .kanban-meta { font-size: 11px; color: var(--ink-soft); margin-bottom: 8px; }
+  .kanban-note-btn { width: 100%; background: #f5f6f8; border: 1px solid var(--line); border-radius: 7px; padding: 6px; font-size: 11.5px; font-weight: 600; color: var(--ink-soft); }
+  .kanban-note-btn:hover { background: #eceff3; }
+  .kanban-note-btn.has-note { background: #fee2e2; color: var(--bad); border-color: #fecaca; }
+
+  .mobile-topbar-toggle { display: none; width: 36px; height: 36px; align-items: center; justify-content: center; border: 1px solid var(--line); background: #fff; border-radius: 8px; color: var(--ink); flex-shrink: 0; }
+  .mobile-topbar-toggle svg { width: 19px; height: 19px; }
+  .sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(16,19,26,0.45); z-index: 190; }
+  .sidebar-backdrop.open { display: block; }
+
+  @media (max-width: 860px) {
+    .sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 200; transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: 10px 0 30px rgba(16,19,26,0.18); overflow-y: auto; }
+    .sidebar.open { transform: translateX(0); }
+    .mobile-topbar-toggle { display: flex; }
+    .topbar { padding: 0 14px; gap: 10px; justify-content: flex-start; }
+    main { padding: 16px; }
+    .field-row, .field-row:has(> :nth-child(3)) { grid-template-columns: 1fr; }
+    .avail-row { grid-template-columns: 1fr !important; }
+    .dash-two-col { grid-template-columns: 1fr !important; }
+    .modal-box { padding: 18px; }
+    .list-toolbar { flex-direction: column; align-items: stretch; }
+    .list-toolbar-title { margin-bottom: 6px; }
+    .list-toolbar .search-input { width: 100%; min-width: 0; }
+    .list-toolbar .segmented { max-width: 100%; overflow-x: auto; }
+    .list-toolbar .ord-new-dropdown { margin-left: 0; }
+    .list-toolbar .btn-generate, .list-toolbar > select { width: 100%; justify-content: center; }
+    .cal-toolbar-v2 .cal-range { min-width: 0; }
+    .cal-toolbar-v2 { justify-content: flex-start; }
+  }
+  @media (max-width: 480px) {
+    .cards { grid-template-columns: 1fr 1fr; }
+    .kanban-board { grid-template-columns: minmax(220px, 1fr); }
+  }
+  @media (max-width: 640px) {
+    table { font-size: 11px; }
+    th, td { padding: 6px 7px; }
+    th { font-size: 8.5px; }
+    .btn.small, .btn-outline-pill { padding: 4px 8px; font-size: 10.5px; }
+    .badge { padding: 2px 7px; font-size: 9.5px; }
+    .prod-thumb { width: 26px !important; height: 34px !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <h2>Portale interno</h2>
+  <p style="color:var(--ink-soft)">Accedi con le tue credenziali</p>
+  <div id="login-msg"></div>
+
+  <div id="login-form-user">
+    <input type="text" id="login-username" placeholder="Username" onkeydown="if(event.key==='Enter')doUserLogin()">
+    <input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key==='Enter')doUserLogin()">
+    <button class="btn" style="width:100%" onclick="doUserLogin()">Accedi</button>
+    <p style="margin-top:12px"><a href="#" onclick="showLoginForm('login-form-forgot');return false" style="font-size:12.5px;color:var(--ink-soft)">Password dimenticata?</a></p>
+    <p style="margin-top:14px;font-size:11.5px"><a href="#" onclick="showLoginForm('login-form-master');return false" style="color:var(--ink-soft)">Accesso con chiave amministratore</a></p>
+  </div>
+
+  <div id="login-form-master" style="display:none">
+    <input type="password" id="login-key" placeholder="Chiave amministratore" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn" style="width:100%" onclick="doLogin()">Accedi</button>
+    <p style="margin-top:14px;font-size:11.5px"><a href="#" onclick="showLoginForm('login-form-user');return false" style="color:var(--ink-soft)">Accedi con username e password</a></p>
+  </div>
+
+  <div id="login-form-forgot" style="display:none">
+    <input type="email" id="forgot-email" placeholder="La tua email" onkeydown="if(event.key==='Enter')doForgotPassword()">
+    <button class="btn" style="width:100%" onclick="doForgotPassword()">Invia link di reset</button>
+    <p style="margin-top:14px;font-size:11.5px"><a href="#" onclick="showLoginForm('login-form-user');return false" style="color:var(--ink-soft)">Torna al login</a></p>
+  </div>
+
+  <div id="login-form-reset" style="display:none">
+    <input type="password" id="reset-password" placeholder="Nuova password" onkeydown="if(event.key==='Enter')doResetPassword()">
+    <button class="btn" style="width:100%" onclick="doResetPassword()">Imposta nuova password</button>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img src="/img/marramiero-logo.webp" alt="Marramiero">
+    </div>
+
+    <div class="workspace-switcher" id="workspace-switcher">
+      <button class="workspace-trigger" onclick="toggleWorkspaceMenu()">
+        <span class="ws-badge" id="workspace-trigger-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+        </span>
+        <span class="workspace-trigger-text" id="workspace-trigger-label">Commerciale</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="workspace-chevron"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="workspace-menu" id="workspace-menu">
+        <button data-ws="enoturismo" onclick="switchWorkspace('enoturismo')">
+          <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg></span>
+          Enoturismo
+        </button>
+        <button data-ws="commerciale" class="active" onclick="switchWorkspace('commerciale')">
+          <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg></span>
+          Commerciale
+        </button>
+        <button data-ws="produzione" onclick="switchWorkspace('produzione')">
+          <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg></span>
+          Produzione
+        </button>
+        <button data-ws="magazzino" onclick="switchWorkspace('magazzino')">
+          <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/></svg></span>
+          Magazzino
+        </button>
+      </div>
+    </div>
+
+    <div class="sidebar-section-label">Sezioni</div>
+    <nav class="sidebar-nav" data-workspace-nav="commerciale">
+      <button data-sub="com-dashboard" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Dashboard
+      </button>
+      <button data-sub="com-ordini">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
+        Ordini
+      </button>
+      <button data-sub="com-import">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>
+        Importa da Excel
+      </button>
+      <button data-sub="com-prodotti">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg>
+        Bottiglie
+      </button>
+      <button data-sub="com-listini">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 12.6 12.6 20.4a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1 0-2.8L11.4 3.6a2 2 0 0 1 1.4-.6H19a2 2 0 0 1 2 2v6.6a2 2 0 0 1-.6 1.4Z"/><circle cx="15" cy="9" r="1.5"/></svg>
+        Listini
+      </button>
+      <button data-sub="com-crm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
+        CRM
+      </button>
+      <button data-sub="com-news">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="13" y2="17"/></svg>
+        News
+      </button>
+      <button data-sub="com-catalogo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 1 4 17.5v-13Z"/><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/></svg>
+        Catalogo
+      </button>
+    </nav>
+
+    <nav class="sidebar-nav" data-workspace-nav="produzione" style="display:none">
+      <button data-sub="prod-riepilogo" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/></svg>
+        Per bottiglia
+      </button>
+      <button data-sub="prod-clienti">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
+        Per cliente/etichetta
+      </button>
+      <button data-sub="prod-righe">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
+        Righe ordine
+      </button>
+    </nav>
+
+    <nav class="sidebar-nav" data-workspace-nav="magazzino" style="display:none">
+      <button data-sub="mag-ordini" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
+        Ordini
+      </button>
+      <button data-sub="mag-finiti">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/></svg>
+        Prodotti finiti
+      </button>
+      <button data-sub="mag-materie">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
+        Materie prime
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button onclick="openSettings()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3h-6l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4L4.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1L9 21h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4Z"/></svg>
+        Impostazioni
+      </button>
+      <button onclick="logout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Esci
+      </button>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button type="button" class="mobile-topbar-toggle" onclick="toggleMobileSidebar()" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+      </button>
+      <div class="crumb"><small>Marramiero</small><span id="topbar-title">Commerciale</span></div>
+    </header>
+
+  <main>
+    <!-- ═══ COMMERCIALE ═══ -->
+    <div class="module active" id="module-commerciale">
+      <div class="subpanel active" id="sub-com-dashboard">
+        <div class="cards" id="com-stats-cards"></div>
+        <div class="dash-two-col" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div>
+            <h3 style="margin-bottom:10px">Ricavo per canale</h3>
+            <div class="table-wrap"><table><thead><tr><th>Canale</th><th>Ordini</th><th>Ricavo</th></tr></thead><tbody id="com-by-channel"></tbody></table></div>
+          </div>
+          <div>
+            <h3 style="margin-bottom:10px">Ricavo per listino</h3>
+            <div class="table-wrap"><table><thead><tr><th>Listino</th><th>Ordini</th><th>Ricavo</th></tr></thead><tbody id="com-by-pricelist"></tbody></table></div>
+          </div>
+        </div>
+        <h3 style="margin:20px 0 10px">Top prodotti</h3>
+        <div class="table-wrap"><table><thead><tr><th>Prodotto</th><th>Quantità</th><th>Ricavo</th></tr></thead><tbody id="com-top-products"></tbody></table></div>
+      </div>
+
+      <div class="subpanel" id="sub-com-ordini">
+        <div class="list-card">
+          <div class="list-toolbar">
+            <div class="search-input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="ord-search" placeholder="Cerca cliente o n. ordine" oninput="loadOrders()">
+            </div>
+            <div class="segmented" id="ord-status-seg">
+              <button type="button" class="active" data-status="all">Tutti</button>
+              <button type="button" data-status="nuovo">Nuovo</button>
+              <button type="button" data-status="in_lavorazione">In lavorazione</button>
+              <button type="button" data-status="sospeso">Sospeso</button>
+              <button type="button" data-status="evaso">Evaso</button>
+            </div>
+            <div class="ord-new-dropdown" id="ord-new-dropdown">
+              <button class="btn" onclick="toggleOrdNewMenu()">+ Nuovo ordine</button>
+              <div class="ord-new-menu" id="ord-new-menu"></div>
+            </div>
+          </div>
+          <div class="list-rows" id="orders-tbody"></div>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-com-import">
+        <div class="box">
+          <h3>Importa ordini da Excel</h3>
+          <div class="help">
+            Il collegamento automatico con il gestionale non è ancora stato configurato — per ora carica manualmente il file .xlsx esportato.<br>
+            Colonne attese (l'intestazione non è case-sensitive): <code>order_number</code>, <code>order_date</code>, <code>customer_name</code>,
+            <code>customer_country</code>, <code>channel</code>, <code>price_list</code>, <code>product_sku</code>, <code>product_name</code>,
+            <code>label_variant</code>, <code>quantity</code>, <code>unit_price</code>.<br>
+            Più righe con lo stesso <code>order_number</code> vengono raggruppate in un unico ordine con più articoli.
+          </div>
+          <div id="import-msg"></div>
+          <input type="file" id="import-file" accept=".xlsx,.xls">
+          <div style="margin-top:14px"><button class="btn" onclick="importExcel()">Importa file</button></div>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-com-prodotti">
+        <div class="toolbar"><button class="btn" onclick="openProductModal()">+ Nuova bottiglia</button></div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Foto</th><th>SKU</th><th>Nome</th><th>Annata</th><th>Vitigno</th><th>Stato</th><th>Azioni</th></tr></thead>
+          <tbody id="products-tbody"></tbody></table>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-com-listini">
+        <div class="toolbar"><button class="btn" onclick="openPriceListModal()">+ Nuovo listino</button></div>
+        <div id="price-lists-container"></div>
+      </div>
+
+      <div class="subpanel" id="sub-com-crm">
+        <div class="subtabs crm-tabs">
+          <button data-crm="crm-agenti" class="active">Agenti</button>
+          <button data-crm="crm-clienti">Clienti</button>
+        </div>
+
+        <div class="crm-panel active" id="crm-agenti">
+          <div class="list-card">
+            <div class="list-toolbar">
+              <div class="list-toolbar-title"><h3>Agenti</h3><p>Rete vendita con link personale di accesso</p></div>
+              <div class="list-spacer"></div>
+              <button class="btn-generate" onclick="openAgentModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+                Nuovo agente
+              </button>
+            </div>
+            <div class="list-rows" id="agents-tbody"></div>
+          </div>
+        </div>
+
+        <div class="crm-panel" id="crm-clienti">
+          <div class="list-card">
+            <div class="list-toolbar">
+              <div class="search-input">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="cust-search" placeholder="Cerca cliente" oninput="loadCustomers()">
+              </div>
+              <select id="cust-agent-filter" onchange="loadCustomers()" style="padding:9px 30px 9px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:13px"><option value="">Tutti gli agenti</option></select>
+              <div class="list-spacer"></div>
+              <button class="btn-generate" onclick="openCustomerModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+                Nuovo cliente
+              </button>
+            </div>
+            <div class="list-rows" id="customers-tbody"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-com-news">
+        <div class="list-card">
+          <div class="list-toolbar">
+            <div class="list-toolbar-title"><h3>News</h3><p>Comunicazioni visibili a tutti gli agenti nel portale ordini</p></div>
+            <div class="list-spacer"></div>
+            <button class="btn-generate" onclick="openNewsModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+              Nuova news
+            </button>
+          </div>
+          <div class="list-rows" id="news-tbody"></div>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-com-catalogo">
+        <div class="list-card">
+          <div class="list-toolbar">
+            <div class="list-toolbar-title"><h3>Catalogo</h3><p>PDF condivisi con tutti gli agenti nel portale ordini</p></div>
+            <div class="list-spacer"></div>
+            <button class="btn-generate" onclick="openCatalogModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+              Carica PDF
+            </button>
+          </div>
+          <div class="list-rows" id="catalogs-tbody"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PRODUZIONE ═══ -->
+    <div class="module" id="module-produzione">
+      <div class="subpanel active" id="sub-prod-riepilogo">
+        <div class="toolbar">
+          <input type="date" id="prod-from"> <input type="date" id="prod-to">
+          <button class="btn secondary" onclick="loadProductionSummary()">Filtra</button>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Bottiglia</th><th>Etichetta / Variante</th><th>Quantità richiesta</th><th>N. ordini</th></tr></thead>
+          <tbody id="prod-by-product"></tbody></table>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-prod-clienti">
+        <div class="table-wrap">
+          <table><thead><tr><th>Cliente</th><th>Bottiglia</th><th>Etichetta / Variante</th><th>Quantità</th></tr></thead>
+          <tbody id="prod-by-customer"></tbody></table>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-prod-righe">
+        <div class="toolbar">
+          <select id="prod-item-status">
+            <option value="all">Tutti gli stati</option>
+            <option value="da_produrre">Da produrre</option>
+            <option value="in_produzione">In produzione</option>
+            <option value="completato">Completato</option>
+          </select>
+          <button class="btn secondary" onclick="loadProductionItems()">Filtra</button>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Ordine</th><th>Cliente</th><th>Paese</th><th>Bottiglia</th><th>Etichetta</th><th>Quantità</th><th>Stato</th><th>Azioni</th></tr></thead>
+          <tbody id="prod-items-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ MAGAZZINO ═══ -->
+    <div class="module" id="module-magazzino">
+      <div class="subpanel active" id="sub-mag-ordini">
+        <div class="kanban-board" id="kanban-board">
+          <div class="kanban-col" data-status="nuovo">
+            <div class="kanban-col-header">Nuovo <span class="kanban-count" id="kanban-count-nuovo">0</span></div>
+            <div class="kanban-col-body" id="kanban-col-nuovo" data-status="nuovo" ondragover="kanbanDragOver(event)" ondrop="kanbanDrop(event)"></div>
+          </div>
+          <div class="kanban-col" data-status="in_lavorazione">
+            <div class="kanban-col-header">In lavorazione <span class="kanban-count" id="kanban-count-in_lavorazione">0</span></div>
+            <div class="kanban-col-body" id="kanban-col-in_lavorazione" data-status="in_lavorazione" ondragover="kanbanDragOver(event)" ondrop="kanbanDrop(event)"></div>
+          </div>
+          <div class="kanban-col" data-status="sospeso">
+            <div class="kanban-col-header">Sospeso <span class="kanban-count" id="kanban-count-sospeso">0</span></div>
+            <div class="kanban-col-body" id="kanban-col-sospeso" data-status="sospeso" ondragover="kanbanDragOver(event)" ondrop="kanbanDrop(event)"></div>
+          </div>
+          <div class="kanban-col" data-status="evaso">
+            <div class="kanban-col-header">Evaso <span class="kanban-count" id="kanban-count-evaso">0</span></div>
+            <div class="kanban-col-body" id="kanban-col-evaso" data-status="evaso" ondragover="kanbanDragOver(event)" ondrop="kanbanDrop(event)"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-mag-finiti">
+        <div class="toolbar"><button class="btn" onclick="openFinishedModal()">+ Traccia bottiglia</button></div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Bottiglia</th><th>SKU</th><th>Quantità</th><th>Soglia</th><th>Stato</th><th>Email alert</th><th>Azioni</th></tr></thead>
+          <tbody id="finished-tbody"></tbody></table>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-mag-materie">
+        <div class="toolbar"><button class="btn" onclick="openRawModal()">+ Nuova referenza</button></div>
+        <div class="table-wrap">
+          <table><thead><tr><th>SKU</th><th>Referenza</th><th>Quantità</th><th>Unità</th><th>Soglia</th><th>Stato</th><th>Email alert</th><th>Azioni</th></tr></thead>
+          <tbody id="raw-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ IMPOSTAZIONI ═══ -->
+    <div class="module" id="module-impostazioni">
+      <div class="box" style="max-width:520px">
+        <h3>Email per gli avvisi di magazzino</h3>
+        <div id="settings-msg"></div>
+        <div class="field">
+          <label>Avviso scarsità prodotto finito (Commerciale)</label>
+          <input type="email" id="set-commercial-email" placeholder="commerciale@cantina.it">
+        </div>
+        <div class="field">
+          <label>Avviso riordino materie prime (Acquisti/Produzione)</label>
+          <input type="email" id="set-procurement-email" placeholder="acquisti@cantina.it">
+        </div>
+        <button class="btn" onclick="saveSettings()">Salva impostazioni</button>
+      </div>
+
+      <div class="list-card" style="max-width:720px">
+        <div class="list-toolbar">
+          <div class="list-toolbar-title"><h3>Utenti del portale</h3><p>Persone che possono accedere al gestionale interno con username e password</p></div>
+          <div class="list-spacer"></div>
+          <button class="btn-generate" onclick="openPortalUserModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+            Nuovo utente
+          </button>
+        </div>
+        <div class="list-rows" id="portal-users-tbody"></div>
+      </div>
+    </div>
+  </main>
+  </div>
+</div>
+</div>
+
+<!-- Product modal -->
+<div class="modal-overlay" id="product-modal">
+  <div class="modal-box">
+    <h3 id="product-modal-title">Nuova bottiglia</h3>
+    <div id="product-modal-msg"></div>
+    <input type="hidden" id="prod-id">
+    <div class="field-row">
+      <div class="field"><label>SKU</label><input id="prod-sku"></div>
+      <div class="field"><label>Nome</label><input id="prod-name"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Annata</label><input id="prod-vintage"></div>
+      <div class="field"><label>Vitigno</label><input id="prod-varietal"></div>
+    </div>
+    <div class="field"><label>Descrizione</label><textarea id="prod-description" rows="3"></textarea></div>
+    <div class="field"><label>Foto bottiglia</label><input type="file" id="prod-image" accept="image/*"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('product-modal')">Annulla</button>
+      <button class="btn" onclick="saveProduct()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Price list modal -->
+<div class="modal-overlay" id="pricelist-modal">
+  <div class="modal-box">
+    <h3>Nuovo listino</h3>
+    <div id="pricelist-modal-msg"></div>
+    <div class="field"><label>Nome listino (es. Italia, Estero, B2C)</label><input id="pl-name"></div>
+    <div class="field"><label>Valuta</label><input id="pl-currency" value="EUR"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('pricelist-modal')">Annulla</button>
+      <button class="btn" onclick="savePriceList()">Crea</button>
+    </div>
+  </div>
+</div>
+
+<!-- Agent modal -->
+<div class="modal-overlay" id="agent-modal">
+  <div class="modal-box" style="max-width:560px">
+    <div class="avail-header" style="margin-bottom:20px">
+      <div class="avail-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/></svg>
+      </div>
+      <div>
+        <h3 id="agent-modal-title" style="font-size:16.5px">Nuovo agente</h3>
+        <p style="margin:0;font-size:12.5px;color:var(--ink-soft)">Crea il profilo e genera username e password per l'accesso al portale ordini</p>
+      </div>
+    </div>
+    <div id="agent-modal-msg"></div>
+    <input type="hidden" id="agent-id">
+
+    <div class="avail-row" style="grid-template-columns:1fr 110px 140px">
+      <div class="avail-field">
+        <label>Nome</label>
+        <input id="agent-name" class="pill-input" placeholder="Nome e cognome">
+      </div>
+      <div class="avail-field">
+        <label>Genere</label>
+        <select id="agent-gender" class="pill-input">
+          <option value="">—</option>
+          <option value="M">Uomo</option>
+          <option value="F">Donna</option>
+        </select>
+      </div>
+      <div class="avail-field">
+        <label>Codice</label>
+        <input id="agent-code" class="pill-input" placeholder="es. 100">
+      </div>
+    </div>
+    <div class="avail-row" style="grid-template-columns:1fr 1fr">
+      <div class="avail-field">
+        <label>Email</label>
+        <input type="email" id="agent-email" class="pill-input" placeholder="nome@cantina.it">
+      </div>
+      <div class="avail-field">
+        <label>Telefono</label>
+        <input id="agent-phone" class="pill-input" placeholder="+39 ...">
+      </div>
+    </div>
+
+    <div class="avail-field">
+      <label>Provincie di competenza</label>
+      <div class="chip-select-box">
+        <div class="time-chips" id="agent-province-chips" style="margin-bottom:10px"></div>
+        <input type="text" id="agent-province-filter" class="pill-input" placeholder="Cerca una provincia da aggiungere..." oninput="filterProvincePicker('agent-province-picker', this.value)">
+        <div class="province-picker" id="agent-province-picker"></div>
+      </div>
+    </div>
+
+    <div id="agent-link-section" style="display:none" class="avail-field">
+      <label>Credenziali di accesso al portale agenti</label>
+      <div class="avail-row" style="grid-template-columns:1fr 1fr">
+        <div class="avail-field">
+          <label style="font-size:10.5px">Username</label>
+          <input type="text" id="agent-username-value" class="pill-input">
+        </div>
+        <div class="avail-field">
+          <label style="font-size:10.5px">Password</label>
+          <div class="link-pill-box">
+            <input type="text" id="agent-password-value" readonly placeholder="••••••••">
+            <button class="link-pill-btn" type="button" onclick="copyAgentPassword()" title="Copia password">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+            <button class="link-pill-btn danger" type="button" onclick="regenerateAgentPassword()" title="Rigenera password">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-soft)">L'agente accede su <code>/agent.html</code> con queste credenziali. La password non è recuperabile in seguito: se persa, rigenerala.</p>
+
+      <label style="margin-top:14px;display:block">Link diretto (facoltativo)</label>
+      <div class="link-pill-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"/></svg>
+        <input type="text" id="agent-link-value" readonly>
+        <button class="link-pill-btn" type="button" onclick="copyAgentLink()" title="Copia link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <button class="link-pill-btn danger" type="button" onclick="regenerateAgentLink()" title="Rigenera link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+        </button>
+      </div>
+      <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-soft)">Il link accede automaticamente senza chiedere username e password: usalo solo internamente.</p>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('agent-modal')">Annulla</button>
+      <button class="btn-generate" style="margin-top:0" onclick="saveAgent()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>
+        Salva
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Customer modal -->
+<div class="modal-overlay" id="customer-modal">
+  <div class="modal-box" style="max-width:640px">
+    <h3 id="customer-modal-title">Nuovo cliente</h3>
+    <div id="customer-modal-msg"></div>
+    <input type="hidden" id="cust-id">
+
+    <div class="form-section-title">Anagrafica</div>
+    <div class="field-row">
+      <div class="field"><label>Ragione sociale</label><input id="cust-name"></div>
+      <div class="field"><label>Email</label><input type="email" id="cust-email"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Telefono</label><input id="cust-phone"></div>
+      <div class="field"><label>Cellulare</label><input id="cust-mobile"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Fax</label><input id="cust-fax"></div>
+      <div class="field"><label>PEC</label><input type="email" id="cust-pec"></div>
+    </div>
+
+    <div class="form-section-title">Localizzazione</div>
+    <div class="field"><label>Indirizzo</label><input id="cust-address"></div>
+    <div class="field-row">
+      <div class="field"><label>CAP</label><input id="cust-postal-code"></div>
+      <div class="field"><label>Città</label><input id="cust-city"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Provincia</label><input id="cust-province"></div>
+      <div class="field"><label>Paese</label><input id="cust-country" value="Italia"></div>
+      <div class="field"><label>Zona</label><input id="cust-zone"></div>
+    </div>
+
+    <div class="form-section-title">Dati fiscali</div>
+    <div class="field-row">
+      <div class="field"><label>Partita IVA</label><input id="cust-vat"></div>
+      <div class="field"><label>Codice fiscale</label><input id="cust-fiscal-code"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Codice destinatario (SDI)</label><input id="cust-sdi"></div>
+      <div class="field"><label>IBAN</label><input id="cust-iban"></div>
+    </div>
+
+    <div class="form-section-title">Commerciale</div>
+    <div class="field-row">
+      <div class="field"><label>Agente collegato</label><select id="cust-agent"><option value="">— Nessuno —</option></select></div>
+      <div class="field"><label>Listino assegnato</label><select id="cust-price-list"><option value="">— Nessuno —</option></select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Condizioni di pagamento</label><input id="cust-payment-terms" placeholder="es. 30gg d.f."></div>
+      <div class="field"><label>Categoria</label><input id="cust-category"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Codice sconto standard</label><input id="cust-discount-code" placeholder="es. SCONTO10"></div>
+      <div class="field"><label>Sconto automatico (%)</label><input type="number" id="cust-discount-percent" min="0" max="100" step="0.5" placeholder="0"></div>
+    </div>
+
+    <div class="form-section-title">Operativo</div>
+    <div class="field-row">
+      <div class="field"><label>Giorni di chiusura</label><input id="cust-closing-days" placeholder="es. Lun, Dom pomeriggio"></div>
+      <div class="field"><label>Note di consegna (orari, preavviso)</label><input id="cust-delivery-notes"></div>
+    </div>
+    <div class="field"><label>Note generali</label><textarea id="cust-notes" rows="2"></textarea></div>
+
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('customer-modal')">Annulla</button>
+      <button class="btn" onclick="saveCustomer()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- News modal -->
+<div class="modal-overlay" id="news-modal">
+  <div class="modal-box">
+    <h3 id="news-modal-title">Nuova news</h3>
+    <div id="news-modal-msg"></div>
+    <input type="hidden" id="news-id">
+    <div class="field"><label>Titolo</label><input id="news-title" placeholder="es. Nuova annata disponibile"></div>
+    <div class="field"><label>Testo</label><textarea id="news-body" rows="5"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('news-modal')">Annulla</button>
+      <button class="btn" onclick="saveNews()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Portal user modal -->
+<div class="modal-overlay" id="portal-user-modal">
+  <div class="modal-box" style="max-width:440px">
+    <h3 id="portal-user-modal-title">Nuovo utente</h3>
+    <div id="portal-user-modal-msg"></div>
+    <input type="hidden" id="pu-id">
+    <div class="field"><label>Nome e cognome</label><input id="pu-name"></div>
+    <div class="field"><label>Email</label><input type="email" id="pu-email" placeholder="usato per il recupero password"></div>
+    <div class="field"><label>Username</label><input id="pu-username"></div>
+    <div class="field" id="pu-password-field"><label>Password</label><input type="password" id="pu-password"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('portal-user-modal')">Annulla</button>
+      <button class="btn" onclick="savePortalUser()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Warehouse order note modal -->
+<div class="modal-overlay" id="warehouse-note-modal">
+  <div class="modal-box" style="max-width:420px">
+    <h3>Nota magazzino — <span id="wh-note-order-number"></span></h3>
+    <div id="wh-note-modal-msg"></div>
+    <input type="hidden" id="wh-note-order-id">
+    <div class="field">
+      <label>Nota per commerciale e agente</label>
+      <textarea id="wh-note-text" rows="4" placeholder="es. In attesa di disponibilità etichetta USA"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('warehouse-note-modal')">Annulla</button>
+      <button class="btn" onclick="saveWarehouseNote()">Salva nota</button>
+    </div>
+  </div>
+</div>
+
+<!-- Catalog upload modal -->
+<div class="modal-overlay" id="catalog-modal">
+  <div class="modal-box">
+    <h3>Carica catalogo PDF</h3>
+    <div id="catalog-modal-msg"></div>
+    <div class="field"><label>Nome catalogo</label><input id="catalog-name" placeholder="es. Listino 2026"></div>
+    <div class="field"><label>File PDF</label><input type="file" id="catalog-file" accept="application/pdf"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('catalog-modal')">Annulla</button>
+      <button class="btn" onclick="saveCatalog()">Carica</button>
+    </div>
+  </div>
+</div>
+
+<!-- Finished warehouse modal -->
+<div class="modal-overlay" id="finished-modal">
+  <div class="modal-box">
+    <h3>Traccia bottiglia in magazzino</h3>
+    <div id="finished-modal-msg"></div>
+    <div class="field"><label>Bottiglia</label><select id="fin-product"></select></div>
+    <div class="field-row">
+      <div class="field"><label>Quantità</label><input type="number" id="fin-qty" value="0"></div>
+      <div class="field"><label>Soglia minima</label><input type="number" id="fin-threshold" value="0"></div>
+    </div>
+    <div class="field"><label>Email alert (opzionale, altrimenti usa quella predefinita)</label><input type="email" id="fin-email"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('finished-modal')">Annulla</button>
+      <button class="btn" onclick="saveFinished()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Raw warehouse modal -->
+<div class="modal-overlay" id="raw-modal">
+  <div class="modal-box">
+    <h3>Nuova referenza materia prima</h3>
+    <div id="raw-modal-msg"></div>
+    <div class="field-row">
+      <div class="field"><label>SKU</label><input id="raw-sku"></div>
+      <div class="field"><label>Nome referenza</label><input id="raw-name"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Unità di misura</label><input id="raw-unit" value="pz"></div>
+      <div class="field"><label>Quantità</label><input type="number" id="raw-qty" value="0"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Soglia minima</label><input type="number" id="raw-threshold" value="0"></div>
+      <div class="field"><label>Email alert (opzionale)</label><input type="email" id="raw-email"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('raw-modal')">Annulla</button>
+      <button class="btn" onclick="saveRaw()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let ADMIN_KEY = null;
+let PRODUCTS = [];
+
+function toggleMobileSidebar() {
+  document.querySelector('.sidebar').classList.toggle('open');
+  document.querySelector('.sidebar-backdrop').classList.toggle('open');
+}
+function closeMobileSidebar() {
+  document.querySelector('.sidebar').classList.remove('open');
+  document.querySelector('.sidebar-backdrop').classList.remove('open');
+}
+
+function doLogin() {
+  const key = document.getElementById('login-key').value.trim();
+  if (!key) return;
+  ADMIN_KEY = key;
+  sessionStorage.setItem('admin_key', key);
+  boot();
+}
+function logout() { sessionStorage.removeItem('admin_key'); location.reload(); }
+
+function showLoginForm(id) {
+  ['login-form-user', 'login-form-master', 'login-form-forgot', 'login-form-reset'].forEach(f => document.getElementById(f).style.display = f === id ? 'block' : 'none');
+  document.getElementById('login-msg').innerHTML = '';
+}
+
+async function doUserLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const msg = document.getElementById('login-msg');
+  msg.innerHTML = '';
+  if (!username || !password) { msg.innerHTML = '<div class="msg error">Inserisci username e password.</div>'; return; }
+  try {
+    const res = await fetch('/api/portal-users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore');
+    ADMIN_KEY = data.key;
+    sessionStorage.setItem('admin_key', data.key);
+    boot();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${e.message}</div>`;
+  }
+}
+
+async function doForgotPassword() {
+  const email = document.getElementById('forgot-email').value.trim();
+  const msg = document.getElementById('login-msg');
+  msg.innerHTML = '';
+  if (!email) { msg.innerHTML = '<div class="msg error">Inserisci la tua email.</div>'; return; }
+  try {
+    await fetch('/api/portal-users/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+    msg.innerHTML = '<div class="msg success">Se l\'indirizzo è registrato riceverai a breve un\'email con il link per reimpostare la password.</div>';
+  } catch (e) {
+    msg.innerHTML = '<div class="msg error">Errore, riprova.</div>';
+  }
+}
+
+async function doResetPassword() {
+  const password = document.getElementById('reset-password').value;
+  const msg = document.getElementById('login-msg');
+  msg.innerHTML = '';
+  const token = new URLSearchParams(location.search).get('reset');
+  if (!password || password.length < 6) { msg.innerHTML = '<div class="msg error">La password deve avere almeno 6 caratteri.</div>'; return; }
+  try {
+    const res = await fetch('/api/portal-users/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, password }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore');
+    msg.innerHTML = '<div class="msg success">Password aggiornata. Ora puoi accedere.</div>';
+    setTimeout(() => { window.location.href = '/portal.html'; }, 1500);
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${e.message}</div>`;
+  }
+}
+
+async function api(path, opts = {}) {
+  const headers = Object.assign({ 'x-admin-key': ADMIN_KEY }, opts.headers || {});
+  if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+  opts.headers = headers;
+  const res = await fetch(path, opts);
+  if (res.status === 401) { sessionStorage.removeItem('admin_key'); location.reload(); throw new Error('unauthorized'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Errore');
+  return data;
+}
+
+function fmtEuro(cents) { return ((cents || 0) / 100).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function esc(s) { return (s ?? '').toString().replace(/</g, '&lt;'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function stockBadge(qty, threshold) {
+  if (qty <= 0) return '<span class="badge red">Esaurito</span>';
+  if (qty <= threshold) return '<span class="badge yellow">Sotto soglia</span>';
+  return '<span class="badge green">OK</span>';
+}
+
+// ── Workspace switcher (top-level area selector) ───────────────────────────────
+const WORKSPACE_LABELS = { enoturismo: 'Enoturismo', commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino' };
+const WORKSPACE_ICONS = {
+  enoturismo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg>',
+  commerciale: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>',
+  produzione: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg>',
+  magazzino: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/></svg>'
+};
+const MODULE_TITLES = { commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino', impostazioni: 'Impostazioni' };
+
+function toggleWorkspaceMenu() { document.getElementById('workspace-menu').classList.toggle('open'); }
+document.addEventListener('click', (e) => {
+  const switcher = document.getElementById('workspace-switcher');
+  if (switcher && !switcher.contains(e.target)) document.getElementById('workspace-menu').classList.remove('open');
+});
+
+function switchWorkspace(ws) {
+  document.getElementById('workspace-menu').classList.remove('open');
+  if (ws === 'enoturismo') { window.location.href = '/admin.html?key=' + encodeURIComponent(ADMIN_KEY); return; }
+
+  document.querySelectorAll('#workspace-menu button').forEach(b => b.classList.toggle('active', b.dataset.ws === ws));
+  document.getElementById('workspace-trigger-label').textContent = WORKSPACE_LABELS[ws];
+  document.getElementById('workspace-trigger-icon').innerHTML = WORKSPACE_ICONS[ws];
+
+  document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+  document.getElementById('module-' + ws).classList.add('active');
+  document.getElementById('topbar-title').textContent = MODULE_TITLES[ws];
+
+  document.querySelectorAll('[data-workspace-nav]').forEach(nav => { nav.style.display = nav.dataset.workspaceNav === ws ? 'flex' : 'none'; });
+  const activeNav = document.querySelector(`[data-workspace-nav="${ws}"]`);
+  const firstBtn = activeNav?.querySelector('button');
+  if (firstBtn) firstBtn.click();
+
+  if (ws === 'commerciale') loadDashboard();
+  if (ws === 'produzione') loadProductionSummary();
+  if (ws === 'magazzino') { loadKanban(); loadFinished(); loadRaw(); }
+}
+
+function openSettings() {
+  document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+  document.getElementById('module-impostazioni').classList.add('active');
+  document.getElementById('topbar-title').textContent = 'Impostazioni';
+  loadSettings();
+  loadPortalUsers();
+  closeMobileSidebar();
+}
+
+// ── Sidebar sub-nav (contextual to the selected workspace) ────────────────────
+document.querySelectorAll('[data-workspace-nav] button[data-sub]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const group = btn.closest('[data-workspace-nav]');
+    group.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const moduleEl = document.getElementById('module-' + group.dataset.workspaceNav);
+    moduleEl.querySelectorAll('.subpanel').forEach(p => p.classList.remove('active'));
+    document.getElementById('sub-' + btn.dataset.sub).classList.add('active');
+    loadSubpanel(btn.dataset.sub);
+    closeMobileSidebar();
+  });
+});
+
+// ── CRM inner tabs (Agenti / Clienti) ──────────────────────────────────────────
+document.querySelectorAll('.crm-tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.crm-tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.crm-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(btn.dataset.crm).classList.add('active');
+    if (btn.dataset.crm === 'crm-agenti') loadAgents();
+    if (btn.dataset.crm === 'crm-clienti') loadCustomers();
+  });
+});
+
+// ── CRM inner tabs (Agenti / Clienti) ──────────────────────────────────────────
+document.querySelectorAll('.crm-tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.crm-tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.crm-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(btn.dataset.crm).classList.add('active');
+    if (btn.dataset.crm === 'crm-agenti') loadAgents();
+    if (btn.dataset.crm === 'crm-clienti') loadCustomers();
+  });
+});
+
+function loadSubpanel(sub) {
+  if (sub === 'com-dashboard') loadDashboard();
+  if (sub === 'com-ordini') loadOrders();
+  if (sub === 'com-prodotti') loadProducts();
+  if (sub === 'com-listini') loadPriceLists();
+  if (sub === 'com-crm') loadAgents();
+  if (sub === 'com-news') loadNews();
+  if (sub === 'com-catalogo') loadCatalogs();
+  if (sub === 'prod-riepilogo') loadProductionSummary();
+  if (sub === 'prod-clienti') loadProductionSummary();
+  if (sub === 'prod-righe') loadProductionItems();
+}
+
+// ── COMMERCIALE: dashboard ─────────────────────────────────────────────────────
+async function loadDashboard() {
+  const s = await api('/api/admin/commercial/stats');
+  document.getElementById('com-stats-cards').innerHTML = `
+    <div class="card"><div class="label">Ordini totali</div><div class="value">${s.totals.orders}</div></div>
+    <div class="card"><div class="label">Ricavo totale</div><div class="value">€ ${fmtEuro(s.totals.revenue_cents)}</div></div>
+  `;
+  document.getElementById('com-by-channel').innerHTML = s.byChannel.length ? s.byChannel.map(c => `
+    <tr><td>${esc(c.channel)}</td><td>${c.orders}</td><td>€ ${fmtEuro(c.revenue_cents)}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="empty">Nessun dato.</td></tr>';
+  document.getElementById('com-by-pricelist').innerHTML = s.byPriceList.length ? s.byPriceList.map(c => `
+    <tr><td>${esc(c.price_list)}</td><td>${c.orders}</td><td>€ ${fmtEuro(c.revenue_cents)}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="empty">Nessun dato.</td></tr>';
+  document.getElementById('com-top-products').innerHTML = s.topProducts.length ? s.topProducts.map(p => `
+    <tr><td>${esc(p.product_name)}</td><td>${p.quantity}</td><td>€ ${fmtEuro(p.revenue_cents)}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="empty">Nessun dato.</td></tr>';
+}
+
+// ── COMMERCIALE: ordini ────────────────────────────────────────────────────────
+let ORD_STATUS_FILTER = 'all';
+document.querySelectorAll('#ord-status-seg button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#ord-status-seg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    ORD_STATUS_FILTER = btn.dataset.status;
+    loadOrders();
+  });
+});
+const ORDER_STATUS_LABELS = { nuovo: 'Nuovo', in_lavorazione: 'In lavorazione', sospeso: 'Sospeso', evaso: 'Evaso' };
+
+async function loadOrders() {
+  const params = new URLSearchParams();
+  const q = document.getElementById('ord-search').value.trim();
+  if (q) params.set('q', q);
+  if (ORD_STATUS_FILTER && ORD_STATUS_FILTER !== 'all') params.set('status', ORD_STATUS_FILTER);
+  const rows = await api('/api/admin/orders?' + params.toString());
+  document.getElementById('orders-tbody').innerHTML = rows.length ? rows.map(o => `
+    <div class="list-row">
+      <div class="list-row-icon">${esc(o.channel || '?').charAt(0).toUpperCase()}</div>
+      <div class="list-row-body">
+        <div class="list-row-title">
+          ${esc(o.order_number)} · ${esc(o.customer_name)}
+          ${o.warehouse_note ? `<span class="kanban-note-flag" title="${esc(o.warehouse_note)}" style="cursor:pointer;margin-left:6px" onclick='openWarehouseNoteModal(${JSON.stringify({ id: o.id, order_number: o.order_number, warehouse_note: o.warehouse_note })})'>!</span>` : ''}
+        </div>
+        <div class="list-row-sub">
+          ${o.order_date} ${o.delivery_date ? '→ consegna ' + o.delivery_date : ''} · ${esc(o.causale || 'ORDCLI')}
+          ${o.billing_customer_name && o.billing_customer_name !== o.customer_name ? ' · fatt. a ' + esc(o.billing_customer_name) : ''}
+          ${o.agent_name ? ' · agente ' + esc(o.agent_name) : ''}
+        </div>
+      </div>
+      <div class="list-row-meta">
+        <span class="pill-stat">${esc(o.channel)}</span>
+        <span class="pill-stat">${o.q} articoli</span>
+        <div class="list-row-value">€ ${fmtEuro(o.total_cents)}</div>
+        <select onchange="updateOrderStatus(${o.id}, this.value)" style="padding:6px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;background:#fff">
+          ${Object.entries(ORDER_STATUS_LABELS).map(([v, l]) => `<option value="${v}" ${o.status === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+        <button class="btn-outline-pill danger" onclick="deleteOrder(${o.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessun ordine. Importa un file Excel o condividi il link di un agente per iniziare.</div>';
+}
+async function updateOrderStatus(id, status) {
+  await api('/api/admin/orders/' + id, { method: 'PATCH', body: JSON.stringify({ status }) });
+}
+async function deleteOrder(id) {
+  if (!confirm('Eliminare questo ordine e le sue righe?')) return;
+  await api('/api/admin/orders/' + id, { method: 'DELETE' });
+  loadOrders();
+}
+
+// ── COMMERCIALE: import Excel ──────────────────────────────────────────────────
+async function importExcel() {
+  const fileInput = document.getElementById('import-file');
+  const msg = document.getElementById('import-msg');
+  msg.innerHTML = '';
+  if (!fileInput.files.length) { msg.innerHTML = '<div class="msg error">Seleziona un file .xlsx.</div>'; return; }
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  try {
+    const res = await api('/api/admin/orders/import', { method: 'POST', body: fd });
+    msg.innerHTML = `<div class="msg success">Importati ${res.orders_created} ordini da ${res.rows_processed} righe.</div>`;
+    fileInput.value = '';
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+// ── COMMERCIALE: prodotti (bottiglie) ──────────────────────────────────────────
+async function loadProducts() {
+  PRODUCTS = await api('/api/admin/products');
+  document.getElementById('products-tbody').innerHTML = PRODUCTS.length ? PRODUCTS.map(p => `
+    <tr>
+      <td>${p.image_url ? `<img class="prod-thumb" src="${p.image_url}">` : '—'}</td>
+      <td>${esc(p.sku)}</td><td>${esc(p.name)}</td><td>${esc(p.vintage)}</td><td>${esc(p.varietal)}</td>
+      <td><span class="badge ${p.active ? 'green' : 'grey'}">${p.active ? 'Attiva' : 'Disattiva'}</span></td>
+      <td class="actions-cell">
+        <button class="btn small secondary" onclick='openProductModal(${JSON.stringify(p)})'>Modifica</button>
+        <button class="btn small danger" onclick="deleteProduct(${p.id})">Elimina</button>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" class="empty">Nessuna bottiglia. Creane una.</td></tr>';
+}
+
+function openProductModal(p) {
+  document.getElementById('product-modal-msg').innerHTML = '';
+  document.getElementById('product-modal-title').textContent = p ? 'Modifica bottiglia' : 'Nuova bottiglia';
+  document.getElementById('prod-id').value = p ? p.id : '';
+  document.getElementById('prod-sku').value = p ? (p.sku || '') : '';
+  document.getElementById('prod-name').value = p ? p.name : '';
+  document.getElementById('prod-vintage').value = p ? (p.vintage || '') : '';
+  document.getElementById('prod-varietal').value = p ? (p.varietal || '') : '';
+  document.getElementById('prod-description').value = p ? (p.description || '') : '';
+  document.getElementById('prod-image').value = '';
+  openModal('product-modal');
+}
+
+async function saveProduct() {
+  const id = document.getElementById('prod-id').value;
+  const fd = new FormData();
+  fd.append('sku', document.getElementById('prod-sku').value.trim());
+  fd.append('name', document.getElementById('prod-name').value.trim());
+  fd.append('vintage', document.getElementById('prod-vintage').value.trim());
+  fd.append('varietal', document.getElementById('prod-varietal').value.trim());
+  fd.append('description', document.getElementById('prod-description').value.trim());
+  const imageFile = document.getElementById('prod-image').files[0];
+  if (imageFile) fd.append('image', imageFile);
+  try {
+    if (id) await api('/api/admin/products/' + id, { method: 'PATCH', body: fd });
+    else await api('/api/admin/products', { method: 'POST', body: fd });
+    closeModal('product-modal');
+    loadProducts();
+  } catch (e) {
+    document.getElementById('product-modal-msg').innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+async function deleteProduct(id) {
+  if (!confirm('Eliminare questa bottiglia dal catalogo?')) return;
+  await api('/api/admin/products/' + id, { method: 'DELETE' });
+  loadProducts();
+}
+
+// ── COMMERCIALE: listini ───────────────────────────────────────────────────────
+async function loadPriceLists() {
+  if (!PRODUCTS.length) PRODUCTS = await api('/api/admin/products');
+  const lists = await api('/api/admin/price-lists');
+  const container = document.getElementById('price-lists-container');
+  if (!lists.length) { container.innerHTML = '<div class="empty">Nessun listino creato.</div>'; return; }
+  container.innerHTML = lists.map(l => `
+    <div class="box">
+      <h3>${esc(l.name)} <span style="font-size:12px;color:var(--ink-soft)">(${esc(l.currency)})</span>
+        <button class="btn small danger" style="float:right" onclick="deletePriceList(${l.id})">Elimina listino</button>
+      </h3>
+      <div class="table-wrap">
+        <table><thead><tr><th>Bottiglia</th><th>Prezzo</th><th>Azioni</th></tr></thead>
+        <tbody>
+          ${PRODUCTS.map(p => {
+            const item = l.items.find(i => i.product_id === p.id);
+            return `<tr>
+              <td>${esc(p.name)}</td>
+              <td><input type="number" step="0.01" class="qty-input" style="width:100px" id="price-${l.id}-${p.id}" value="${item ? (item.price_cents / 100).toFixed(2) : ''}" placeholder="—"></td>
+              <td><button class="btn small ok" onclick="savePriceListItem(${l.id}, ${p.id})">Salva</button></td>
+            </tr>`;
+          }).join('')}
+        </tbody></table>
+      </div>
+    </div>
+  `).join('');
+}
+function openPriceListModal() {
+  document.getElementById('pricelist-modal-msg').innerHTML = '';
+  document.getElementById('pl-name').value = '';
+  document.getElementById('pl-currency').value = 'EUR';
+  openModal('pricelist-modal');
+}
+async function savePriceList() {
+  try {
+    await api('/api/admin/price-lists', { method: 'POST', body: JSON.stringify({
+      name: document.getElementById('pl-name').value.trim(),
+      currency: document.getElementById('pl-currency').value.trim() || 'EUR',
+    }) });
+    closeModal('pricelist-modal');
+    loadPriceLists();
+  } catch (e) {
+    document.getElementById('pricelist-modal-msg').innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+async function deletePriceList(id) {
+  if (!confirm('Eliminare questo listino?')) return;
+  await api('/api/admin/price-lists/' + id, { method: 'DELETE' });
+  loadPriceLists();
+}
+async function savePriceListItem(listId, productId) {
+  const input = document.getElementById(`price-${listId}-${productId}`);
+  const price = parseFloat(input.value);
+  if (isNaN(price)) return;
+  await api(`/api/admin/price-lists/${listId}/items`, { method: 'POST', body: JSON.stringify({ product_id: productId, price_cents: Math.round(price * 100) }) });
+  loadPriceLists();
+}
+
+// ── CRM: province italiane ──────────────────────────────────────────────────────
+const ITALIAN_PROVINCES = [
+  'Agrigento','Alessandria','Ancona','Aosta','Arezzo','Ascoli Piceno','Asti','Avellino',
+  'Bari','Barletta-Andria-Trani','Belluno','Benevento','Bergamo','Biella','Bologna','Bolzano','Brescia','Brindisi',
+  'Cagliari','Caltanissetta','Campobasso','Caserta','Catania','Catanzaro','Chieti','Como','Cosenza','Cremona','Crotone','Cuneo',
+  'Enna',
+  'Fermo','Ferrara','Firenze','Foggia','Forlì-Cesena','Frosinone',
+  'Genova','Gorizia','Grosseto',
+  'Imperia','Isernia',
+  'L\'Aquila','La Spezia','Latina','Lecce','Lecco','Livorno','Lodi','Lucca',
+  'Macerata','Mantova','Massa-Carrara','Matera','Messina','Milano','Modena','Monza e della Brianza',
+  'Napoli','Novara','Nuoro',
+  'Oristano',
+  'Padova','Palermo','Parma','Pavia','Perugia','Pesaro e Urbino','Pescara','Piacenza','Pisa','Pistoia','Pordenone','Potenza','Prato',
+  'Ragusa','Ravenna','Reggio Calabria','Reggio Emilia','Rieti','Rimini','Roma','Rovigo',
+  'Salerno','Sassari','Savona','Siena','Siracusa','Sondrio','Sud Sardegna',
+  'Taranto','Teramo','Terni','Torino','Trapani','Trento','Treviso','Trieste',
+  'Udine',
+  'Varese','Venezia','Verbano-Cusio-Ossola','Vercelli','Verona','Vibo Valentia','Vicenza','Viterbo',
+];
+
+let AGENT_PROVINCE_SELECTION = [];
+
+function renderProvincePicker(containerId, selected = []) {
+  AGENT_PROVINCE_SELECTION = [...selected];
+  renderProvincePickerChips(containerId);
+  renderProvinceSummaryChips();
+}
+
+function renderProvincePickerChips(containerId) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = ITALIAN_PROVINCES.map(p => `
+    <button type="button" class="province-chip ${AGENT_PROVINCE_SELECTION.includes(p) ? 'selected' : ''}" data-province="${esc(p)}">${esc(p)}</button>
+  `).join('');
+  el.querySelectorAll('.province-chip').forEach(btn => {
+    btn.addEventListener('click', () => toggleProvinceSelection(containerId, btn.dataset.province));
+  });
+}
+
+function renderProvinceSummaryChips() {
+  const el = document.getElementById('agent-province-chips');
+  if (!el) return;
+  if (!AGENT_PROVINCE_SELECTION.length) {
+    el.innerHTML = '<span style="font-size:12px;color:var(--ink-soft)">Nessuna provincia selezionata — copre tutto il territorio</span>';
+    return;
+  }
+  el.innerHTML = AGENT_PROVINCE_SELECTION.map(p => `<span class="time-chip" data-province="${esc(p)}">${esc(p)}<button type="button">×</button></span>`).join('');
+  el.querySelectorAll('.time-chip').forEach(chip => {
+    chip.querySelector('button').addEventListener('click', () => toggleProvinceSelection('agent-province-picker', chip.dataset.province));
+  });
+}
+
+function toggleProvinceSelection(containerId, province) {
+  const idx = AGENT_PROVINCE_SELECTION.indexOf(province);
+  if (idx >= 0) AGENT_PROVINCE_SELECTION.splice(idx, 1);
+  else AGENT_PROVINCE_SELECTION.push(province);
+  renderProvincePickerChips(containerId);
+  renderProvinceSummaryChips();
+}
+
+function filterProvincePicker(containerId, query) {
+  const q = query.trim().toLowerCase();
+  document.querySelectorAll(`#${containerId} .province-chip`).forEach(el => {
+    el.style.display = el.dataset.province.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function getCheckedProvinces() {
+  return [...AGENT_PROVINCE_SELECTION];
+}
+
+// ── CRM: agenti ──────────────────────────────────────────────────────────────────
+let AGENTS = [];
+
+async function toggleOrdNewMenu() {
+  const menu = document.getElementById('ord-new-menu');
+  const isOpen = menu.classList.contains('open');
+  if (isOpen) { menu.classList.remove('open'); return; }
+  if (!AGENTS.length) AGENTS = await api('/api/admin/agents');
+  const active = AGENTS.filter(a => a.active);
+  menu.innerHTML = active.length
+    ? active.map(a => `<a href="/agent.html?token=${encodeURIComponent(a.token)}" target="_blank" rel="noopener">${esc(a.name)}</a>`).join('')
+    : '<div class="ord-new-empty">Nessun agente attivo.<br>Creane uno nel CRM.</div>';
+  menu.classList.add('open');
+}
+document.addEventListener('click', (e) => {
+  const dd = document.getElementById('ord-new-dropdown');
+  const menu = document.getElementById('ord-new-menu');
+  if (dd && menu && !dd.contains(e.target)) menu.classList.remove('open');
+});
+
+async function loadAgents() {
+  AGENTS = await api('/api/admin/agents');
+  document.getElementById('agents-tbody').innerHTML = AGENTS.length ? AGENTS.map(a => `
+    <div class="list-row">
+      <div class="list-row-icon">${a.code ? esc(a.code) : esc(a.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(a.name)}</div>
+        <div class="list-row-sub">${a.username ? esc(a.username) : 'nessuna credenziale'} · ${a.provinces.length ? a.provinces.map(esc).join(', ') : 'nessuna provincia'}</div>
+      </div>
+      <div class="list-row-meta">
+        <span class="pill-stat">${a.customerCount} clienti</span>
+        <span class="pill-stat">${a.orderCount} ordini</span>
+        <span class="pill-stat">€ ${fmtEuro(a.revenueCents)}</span>
+        <span class="pill-stat">Freq. ${a.avgFrequencyDays != null ? a.avgFrequencyDays + ' gg' : '—'}</span>
+        <span class="badge ${a.active ? 'green' : 'grey'}">${a.active ? 'Attivo' : 'Disattivo'}</span>
+        <button class="btn-outline-pill" onclick='openAgentModal(${JSON.stringify(a)})'>Modifica</button>
+        <button class="btn-outline-pill" onclick="toggleAgentActive(${a.id}, ${a.active ? 0 : 1})">${a.active ? 'Disattiva' : 'Attiva'}</button>
+        <button class="btn-outline-pill danger" onclick="deleteAgent(${a.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessun agente. Creane uno per generargli un link personale.</div>';
+}
+
+function agentLinkUrl(token) {
+  return `${window.location.origin}/agent.html?token=${token}`;
+}
+
+function openAgentModal(a) {
+  document.getElementById('agent-modal-msg').innerHTML = '';
+  document.getElementById('agent-modal-title').textContent = a ? 'Modifica agente' : 'Nuovo agente';
+  document.getElementById('agent-id').value = a ? a.id : '';
+  document.getElementById('agent-name').value = a ? a.name : '';
+  document.getElementById('agent-code').value = a ? (a.code || '') : '';
+  document.getElementById('agent-gender').value = a ? (a.gender || '') : '';
+  document.getElementById('agent-email').value = a ? (a.email || '') : '';
+  document.getElementById('agent-phone').value = a ? (a.phone || '') : '';
+  document.getElementById('agent-province-filter').value = '';
+  renderProvincePicker('agent-province-picker', a ? a.provinces : []);
+  const linkSection = document.getElementById('agent-link-section');
+  if (a) {
+    linkSection.style.display = 'block';
+    document.getElementById('agent-link-value').value = agentLinkUrl(a.token);
+    document.getElementById('agent-link-value').dataset.agentId = a.id;
+    document.getElementById('agent-username-value').value = a.username || '';
+    document.getElementById('agent-username-value').dataset.agentId = a.id;
+    document.getElementById('agent-password-value').value = a.generatedPassword || '';
+    document.getElementById('agent-password-value').placeholder = a.generatedPassword ? '' : '••••••••';
+    document.getElementById('agent-password-value').dataset.agentId = a.id;
+  } else {
+    linkSection.style.display = 'none';
+  }
+  openModal('agent-modal');
+}
+
+async function saveAgent() {
+  const id = document.getElementById('agent-id').value;
+  const msg = document.getElementById('agent-modal-msg');
+  const body = {
+    name: document.getElementById('agent-name').value.trim(),
+    code: document.getElementById('agent-code').value.trim(),
+    gender: document.getElementById('agent-gender').value,
+    email: document.getElementById('agent-email').value.trim(),
+    phone: document.getElementById('agent-phone').value.trim(),
+    provinces: getCheckedProvinces('agent-province-picker'),
+  };
+  try {
+    if (id) {
+      const username = document.getElementById('agent-username-value').value.trim();
+      if (username) body.username = username;
+      await api('/api/admin/agents/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+      closeModal('agent-modal');
+      loadAgents();
+    } else {
+      const res = await api('/api/admin/agents', { method: 'POST', body: JSON.stringify(body) });
+      await loadAgents();
+      const created = AGENTS.find(a => a.id === res.id);
+      created.generatedPassword = res.password;
+      openAgentModal(created);
+      msg.innerHTML = '<div class="msg success">Agente creato. Comunicagli username e password qui sotto per l\'accesso al portale ordini — la password non sarà più visibile dopo aver chiuso questa finestra.</div>';
+    }
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+function copyAgentLink() {
+  const input = document.getElementById('agent-link-value');
+  input.select();
+  navigator.clipboard?.writeText(input.value).catch(() => {});
+}
+
+function copyAgentPassword() {
+  const input = document.getElementById('agent-password-value');
+  if (!input.value) return;
+  input.select();
+  navigator.clipboard?.writeText(input.value).catch(() => {});
+}
+
+async function regenerateAgentPassword() {
+  const id = document.getElementById('agent-password-value').dataset.agentId;
+  if (!confirm('Rigenerare la password? La vecchia smetterà di funzionare.')) return;
+  const res = await api(`/api/admin/agents/${id}/regenerate-password`, { method: 'POST' });
+  document.getElementById('agent-username-value').value = res.username;
+  document.getElementById('agent-password-value').value = res.password;
+  document.getElementById('agent-modal-msg').innerHTML = '<div class="msg success">Nuova password generata. Comunicala all\'agente: non sarà più visibile dopo aver chiuso questa finestra.</div>';
+}
+
+async function regenerateAgentLink() {
+  const id = document.getElementById('agent-link-value').dataset.agentId;
+  if (!confirm('Rigenerare il link? Il vecchio link smetterà di funzionare.')) return;
+  const res = await api(`/api/admin/agents/${id}/regenerate-token`, { method: 'POST' });
+  document.getElementById('agent-link-value').value = agentLinkUrl(res.token);
+  loadAgents();
+}
+
+async function toggleAgentActive(id, active) {
+  await api('/api/admin/agents/' + id, { method: 'PATCH', body: JSON.stringify({ active }) });
+  loadAgents();
+}
+async function deleteAgent(id) {
+  if (!confirm('Eliminare questo agente? I clienti collegati resteranno ma senza agente assegnato.')) return;
+  await api('/api/admin/agents/' + id, { method: 'DELETE' });
+  loadAgents();
+}
+
+// ── Commerciale: News (condivise col portale agenti) ──────────────────────────
+async function loadNews() {
+  const items = await api('/api/admin/news');
+  document.getElementById('news-tbody').innerHTML = items.length ? items.map(n => `
+    <div class="list-row">
+      <div class="list-row-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/></svg>
+      </div>
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(n.title)}</div>
+        <div class="list-row-sub">${n.created_at}</div>
+      </div>
+      <div class="list-row-meta">
+        <span class="badge ${n.active ? 'green' : 'grey'}">${n.active ? 'Pubblicata' : 'Nascosta'}</span>
+        <button class="btn-outline-pill" onclick='openNewsModal(${JSON.stringify(n)})'>Modifica</button>
+        <button class="btn-outline-pill" onclick="toggleNewsActive(${n.id}, ${n.active ? 0 : 1})">${n.active ? 'Nascondi' : 'Pubblica'}</button>
+        <button class="btn-outline-pill danger" onclick="deleteNews(${n.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessuna news pubblicata.</div>';
+}
+
+function openNewsModal(n) {
+  document.getElementById('news-modal-msg').innerHTML = '';
+  document.getElementById('news-modal-title').textContent = n ? 'Modifica news' : 'Nuova news';
+  document.getElementById('news-id').value = n ? n.id : '';
+  document.getElementById('news-title').value = n ? n.title : '';
+  document.getElementById('news-body').value = n ? (n.body || '') : '';
+  openModal('news-modal');
+}
+
+async function saveNews() {
+  const id = document.getElementById('news-id').value;
+  const msg = document.getElementById('news-modal-msg');
+  const body = { title: document.getElementById('news-title').value.trim(), body: document.getElementById('news-body').value.trim() };
+  try {
+    if (id) await api('/api/admin/news/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+    else await api('/api/admin/news', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('news-modal');
+    loadNews();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function toggleNewsActive(id, active) {
+  await api('/api/admin/news/' + id, { method: 'PATCH', body: JSON.stringify({ active }) });
+  loadNews();
+}
+
+async function deleteNews(id) {
+  if (!confirm('Eliminare questa news?')) return;
+  await api('/api/admin/news/' + id, { method: 'DELETE' });
+  loadNews();
+}
+
+// ── Commerciale: Catalogo PDF (condiviso col portale agenti) ──────────────────
+async function loadCatalogs() {
+  const items = await api('/api/admin/catalogs');
+  document.getElementById('catalogs-tbody').innerHTML = items.length ? items.map(c => `
+    <div class="list-row">
+      <div class="list-row-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 1 4 17.5v-13Z"/></svg>
+      </div>
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(c.name)}</div>
+        <div class="list-row-sub">${c.created_at}</div>
+      </div>
+      <div class="list-row-meta">
+        <a class="btn-outline-pill" href="/api/catalogs/${c.id}/download" target="_blank" rel="noopener">Apri</a>
+        <button class="btn-outline-pill danger" onclick="deleteCatalog(${c.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessun catalogo caricato.</div>';
+}
+
+function openCatalogModal() {
+  document.getElementById('catalog-modal-msg').innerHTML = '';
+  document.getElementById('catalog-name').value = '';
+  document.getElementById('catalog-file').value = '';
+  openModal('catalog-modal');
+}
+
+async function saveCatalog() {
+  const msg = document.getElementById('catalog-modal-msg');
+  const fileInput = document.getElementById('catalog-file');
+  if (!fileInput.files.length) { msg.innerHTML = '<div class="msg error">Seleziona un file PDF.</div>'; return; }
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  fd.append('name', document.getElementById('catalog-name').value.trim());
+  try {
+    await api('/api/admin/catalogs', { method: 'POST', body: fd });
+    closeModal('catalog-modal');
+    loadCatalogs();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function deleteCatalog(id) {
+  if (!confirm('Eliminare questo catalogo?')) return;
+  await api('/api/admin/catalogs/' + id, { method: 'DELETE' });
+  loadCatalogs();
+}
+
+// ── CRM: clienti ──────────────────────────────────────────────────────────────────
+async function loadCustomers() {
+  if (!AGENTS.length) AGENTS = await api('/api/admin/agents');
+  const filterSelect = document.getElementById('cust-agent-filter');
+  if (filterSelect.options.length <= 1) {
+    filterSelect.innerHTML = '<option value="">Tutti gli agenti</option>' + AGENTS.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  }
+  const params = new URLSearchParams();
+  const q = document.getElementById('cust-search').value.trim();
+  const agentId = filterSelect.value;
+  if (q) params.set('q', q);
+  if (agentId) params.set('agent_id', agentId);
+  const rows = await api('/api/admin/customers?' + params.toString());
+  document.getElementById('customers-tbody').innerHTML = rows.length ? rows.map(c => `
+    <div class="list-row">
+      <div class="list-row-icon">${esc(c.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(c.name)}</div>
+        <div class="list-row-sub">${esc(c.vat_number) ? 'P.IVA ' + esc(c.vat_number) + ' · ' : ''}${esc(c.city) || esc(c.province) || 'nessuna località'} · ${esc(c.agent_name) || 'nessun agente'}</div>
+      </div>
+      <div class="list-row-meta">
+        ${c.price_list_name ? `<span class="pill-stat">${esc(c.price_list_name)}</span>` : ''}
+        <span class="pill-stat">${c.order_count} ordini</span>
+        <div class="list-row-value">€ ${fmtEuro(c.revenue_cents)}</div>
+        <button class="btn-outline-pill" onclick='openCustomerModal(${JSON.stringify(c)})'>Modifica</button>
+        <button class="btn-outline-pill danger" onclick="deleteCustomer(${c.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessun cliente trovato.</div>';
+}
+
+const CUSTOMER_FIELD_MAP = {
+  name: 'cust-name', email: 'cust-email', phone: 'cust-phone', mobile: 'cust-mobile', fax: 'cust-fax', pec: 'cust-pec',
+  address: 'cust-address', postal_code: 'cust-postal-code', city: 'cust-city', province: 'cust-province', country: 'cust-country', zone: 'cust-zone',
+  vat_number: 'cust-vat', fiscal_code: 'cust-fiscal-code', sdi_code: 'cust-sdi', iban: 'cust-iban',
+  payment_terms: 'cust-payment-terms', category: 'cust-category',
+  discount_code: 'cust-discount-code', discount_percent: 'cust-discount-percent',
+  closing_days: 'cust-closing-days', delivery_notes: 'cust-delivery-notes', notes: 'cust-notes',
+};
+
+async function openCustomerModal(c) {
+  document.getElementById('customer-modal-msg').innerHTML = '';
+  document.getElementById('customer-modal-title').textContent = c ? 'Modifica cliente' : 'Nuovo cliente';
+  document.getElementById('cust-id').value = c ? c.id : '';
+  for (const [field, elId] of Object.entries(CUSTOMER_FIELD_MAP)) {
+    document.getElementById(elId).value = c ? (c[field] || '') : (field === 'country' ? 'Italia' : '');
+  }
+  if (!AGENTS.length) AGENTS = await api('/api/admin/agents');
+  document.getElementById('cust-agent').innerHTML = '<option value="">— Nessuno —</option>' +
+    AGENTS.map(a => `<option value="${a.id}" ${c && c.agent_id === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('');
+  const priceLists = await api('/api/admin/price-lists');
+  document.getElementById('cust-price-list').innerHTML = '<option value="">— Nessuno —</option>' +
+    priceLists.map(l => `<option value="${l.id}" ${c && c.price_list_id === l.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
+  openModal('customer-modal');
+}
+
+async function saveCustomer() {
+  const id = document.getElementById('cust-id').value;
+  const msg = document.getElementById('customer-modal-msg');
+  const body = {};
+  for (const [field, elId] of Object.entries(CUSTOMER_FIELD_MAP)) {
+    body[field] = document.getElementById(elId).value.trim();
+  }
+  body.agent_id = document.getElementById('cust-agent').value || '';
+  body.price_list_id = document.getElementById('cust-price-list').value || '';
+  try {
+    if (id) await api('/api/admin/customers/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+    else await api('/api/admin/customers', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('customer-modal');
+    loadCustomers();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+async function deleteCustomer(id) {
+  if (!confirm('Eliminare questo cliente?')) return;
+  await api('/api/admin/customers/' + id, { method: 'DELETE' });
+  loadCustomers();
+}
+
+// ── PRODUZIONE ──────────────────────────────────────────────────────────────────
+async function loadProductionSummary() {
+  const params = new URLSearchParams();
+  const from = document.getElementById('prod-from')?.value;
+  const to = document.getElementById('prod-to')?.value;
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const data = await api('/api/admin/production/summary?' + params.toString());
+  document.getElementById('prod-by-product').innerHTML = data.byProduct.length ? data.byProduct.map(r => `
+    <tr><td>${esc(r.product_name)}</td><td>${esc(r.label_variant) || '—'}</td><td>${r.quantity}</td><td>${r.orders}</td></tr>
+  `).join('') : '<tr><td colspan="4" class="empty">Nessun dato. Importa ordini nel modulo Commerciale.</td></tr>';
+  document.getElementById('prod-by-customer').innerHTML = data.byCustomer.length ? data.byCustomer.map(r => `
+    <tr><td>${esc(r.customer_name)}</td><td>${esc(r.product_name)}</td><td>${esc(r.label_variant) || '—'}</td><td>${r.quantity}</td></tr>
+  `).join('') : '<tr><td colspan="4" class="empty">Nessun dato.</td></tr>';
+}
+
+async function loadProductionItems() {
+  const status = document.getElementById('prod-item-status').value;
+  const rows = await api('/api/admin/production/items?status=' + status);
+  document.getElementById('prod-items-tbody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td>${esc(r.order_number)}</td><td>${esc(r.customer_name)}</td><td>${esc(r.customer_country)}</td>
+      <td>${esc(r.product_name)}</td><td>${esc(r.label_variant) || '—'}</td><td>${r.quantity}</td>
+      <td><span class="badge ${r.production_status === 'completato' ? 'green' : r.production_status === 'in_produzione' ? 'yellow' : 'grey'}">${r.production_status.replace('_',' ')}</span></td>
+      <td class="actions-cell">
+        <select onchange="updateItemStatus(${r.id}, this.value)">
+          <option value="da_produrre" ${r.production_status === 'da_produrre' ? 'selected' : ''}>Da produrre</option>
+          <option value="in_produzione" ${r.production_status === 'in_produzione' ? 'selected' : ''}>In produzione</option>
+          <option value="completato" ${r.production_status === 'completato' ? 'selected' : ''}>Completato</option>
+        </select>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="8" class="empty">Nessuna riga ordine trovata.</td></tr>';
+}
+async function updateItemStatus(id, production_status) {
+  await api('/api/admin/production/items/' + id, { method: 'PATCH', body: JSON.stringify({ production_status }) });
+}
+
+// ── MAGAZZINO: prodotti finiti ─────────────────────────────────────────────────
+async function loadFinished() {
+  const rows = await api('/api/admin/warehouse/finished');
+  document.getElementById('finished-tbody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td>${esc(r.product_name)}</td><td>${esc(r.sku)}</td>
+      <td><input type="number" class="qty-input" value="${r.quantity}" onchange="updateFinished(${r.id}, 'quantity', this.value)"></td>
+      <td><input type="number" class="qty-input" value="${r.threshold}" onchange="updateFinished(${r.id}, 'threshold', this.value)"></td>
+      <td>${stockBadge(r.quantity, r.threshold)}</td>
+      <td><input type="email" class="qty-input" style="width:180px" value="${esc(r.alert_email || '')}" placeholder="predefinita" onchange="updateFinished(${r.id}, 'alert_email', this.value)"></td>
+      <td class="actions-cell"><button class="btn small danger" onclick="deleteFinished(${r.id})">Rimuovi</button></td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" class="empty">Nessuna bottiglia tracciata in magazzino.</td></tr>';
+}
+async function updateFinished(id, field, value) {
+  await api('/api/admin/warehouse/finished/' + id, { method: 'PATCH', body: JSON.stringify({ [field]: value }) });
+  loadFinished();
+}
+async function deleteFinished(id) {
+  if (!confirm('Rimuovere questa bottiglia dal magazzino?')) return;
+  await api('/api/admin/warehouse/finished/' + id, { method: 'DELETE' });
+  loadFinished();
+}
+async function openFinishedModal() {
+  document.getElementById('finished-modal-msg').innerHTML = '';
+  if (!PRODUCTS.length) PRODUCTS = await api('/api/admin/products');
+  document.getElementById('fin-product').innerHTML = PRODUCTS.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  document.getElementById('fin-qty').value = 0;
+  document.getElementById('fin-threshold').value = 0;
+  document.getElementById('fin-email').value = '';
+  openModal('finished-modal');
+}
+async function saveFinished() {
+  try {
+    await api('/api/admin/warehouse/finished', { method: 'POST', body: JSON.stringify({
+      product_id: document.getElementById('fin-product').value,
+      quantity: document.getElementById('fin-qty').value,
+      threshold: document.getElementById('fin-threshold').value,
+      alert_email: document.getElementById('fin-email').value.trim(),
+    }) });
+    closeModal('finished-modal');
+    loadFinished();
+  } catch (e) {
+    document.getElementById('finished-modal-msg').innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+// ── MAGAZZINO: materie prime ────────────────────────────────────────────────────
+async function loadRaw() {
+  const rows = await api('/api/admin/warehouse/raw');
+  document.getElementById('raw-tbody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td>${esc(r.sku)}</td><td>${esc(r.name)}</td>
+      <td><input type="number" class="qty-input" value="${r.quantity}" onchange="updateRaw(${r.id}, 'quantity', this.value)"></td>
+      <td>${esc(r.unit)}</td>
+      <td><input type="number" class="qty-input" value="${r.threshold}" onchange="updateRaw(${r.id}, 'threshold', this.value)"></td>
+      <td>${stockBadge(r.quantity, r.threshold)}</td>
+      <td><input type="email" class="qty-input" style="width:180px" value="${esc(r.alert_email || '')}" placeholder="predefinita" onchange="updateRaw(${r.id}, 'alert_email', this.value)"></td>
+      <td class="actions-cell"><button class="btn small danger" onclick="deleteRaw(${r.id})">Elimina</button></td>
+    </tr>
+  `).join('') : '<tr><td colspan="8" class="empty">Nessuna referenza in magazzino.</td></tr>';
+}
+async function updateRaw(id, field, value) {
+  await api('/api/admin/warehouse/raw/' + id, { method: 'PATCH', body: JSON.stringify({ [field]: value }) });
+  loadRaw();
+}
+async function deleteRaw(id) {
+  if (!confirm('Eliminare questa referenza?')) return;
+  await api('/api/admin/warehouse/raw/' + id, { method: 'DELETE' });
+  loadRaw();
+}
+function openRawModal() {
+  document.getElementById('raw-modal-msg').innerHTML = '';
+  document.getElementById('raw-sku').value = '';
+  document.getElementById('raw-name').value = '';
+  document.getElementById('raw-unit').value = 'pz';
+  document.getElementById('raw-qty').value = 0;
+  document.getElementById('raw-threshold').value = 0;
+  document.getElementById('raw-email').value = '';
+  openModal('raw-modal');
+}
+async function saveRaw() {
+  try {
+    await api('/api/admin/warehouse/raw', { method: 'POST', body: JSON.stringify({
+      sku: document.getElementById('raw-sku').value.trim(),
+      name: document.getElementById('raw-name').value.trim(),
+      unit: document.getElementById('raw-unit').value.trim(),
+      quantity: document.getElementById('raw-qty').value,
+      threshold: document.getElementById('raw-threshold').value,
+      alert_email: document.getElementById('raw-email').value.trim(),
+    }) });
+    closeModal('raw-modal');
+    loadRaw();
+  } catch (e) {
+    document.getElementById('raw-modal-msg').innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+// ── IMPOSTAZIONI ─────────────────────────────────────────────────────────────────
+async function loadSettings() {
+  const s = await api('/api/admin/settings');
+  document.getElementById('set-commercial-email').value = s.commercial_alert_email || '';
+  document.getElementById('set-procurement-email').value = s.procurement_alert_email || '';
+}
+async function saveSettings() {
+  const msg = document.getElementById('settings-msg');
+  try {
+    await api('/api/admin/settings', { method: 'POST', body: JSON.stringify({
+      commercial_alert_email: document.getElementById('set-commercial-email').value.trim(),
+      procurement_alert_email: document.getElementById('set-procurement-email').value.trim(),
+    }) });
+    msg.innerHTML = '<div class="msg success">Impostazioni salvate.</div>';
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+// ── IMPOSTAZIONI: utenti del portale ────────────────────────────────────────────
+async function loadPortalUsers() {
+  const users = await api('/api/admin/portal-users');
+  document.getElementById('portal-users-tbody').innerHTML = users.length ? users.map(u => `
+    <div class="list-row">
+      <div class="list-row-icon">${esc(u.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(u.name)}</div>
+        <div class="list-row-sub">${esc(u.username)} · ${esc(u.email)}</div>
+      </div>
+      <div class="list-row-meta">
+        <span class="badge ${u.active ? 'green' : 'grey'}">${u.active ? 'Attivo' : 'Disattivo'}</span>
+        <button class="btn-outline-pill" onclick='openPortalUserModal(${JSON.stringify(u)})'>Modifica</button>
+        <button class="btn-outline-pill" onclick="togglePortalUserActive(${u.id}, ${u.active ? 0 : 1})">${u.active ? 'Disattiva' : 'Attiva'}</button>
+        <button class="btn-outline-pill danger" onclick="deletePortalUser(${u.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessun utente. Creane uno per dare accesso al gestionale.</div>';
+}
+
+function openPortalUserModal(u) {
+  document.getElementById('portal-user-modal-msg').innerHTML = '';
+  document.getElementById('portal-user-modal-title').textContent = u ? 'Modifica utente' : 'Nuovo utente';
+  document.getElementById('pu-id').value = u ? u.id : '';
+  document.getElementById('pu-name').value = u ? u.name : '';
+  document.getElementById('pu-email').value = u ? u.email : '';
+  document.getElementById('pu-username').value = u ? u.username : '';
+  document.getElementById('pu-password').value = '';
+  document.getElementById('pu-password-field').style.display = u ? 'none' : 'block';
+  openModal('portal-user-modal');
+}
+
+async function savePortalUser() {
+  const id = document.getElementById('pu-id').value;
+  const msg = document.getElementById('portal-user-modal-msg');
+  const body = {
+    name: document.getElementById('pu-name').value.trim(),
+    email: document.getElementById('pu-email').value.trim(),
+    username: document.getElementById('pu-username').value.trim(),
+  };
+  if (!id) body.password = document.getElementById('pu-password').value;
+  try {
+    if (id) await api('/api/admin/portal-users/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+    else await api('/api/admin/portal-users', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('portal-user-modal');
+    loadPortalUsers();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function togglePortalUserActive(id, active) {
+  await api('/api/admin/portal-users/' + id, { method: 'PATCH', body: JSON.stringify({ active }) });
+  loadPortalUsers();
+}
+
+async function deletePortalUser(id) {
+  if (!confirm('Eliminare questo utente? Non potrà più accedere al gestionale.')) return;
+  await api('/api/admin/portal-users/' + id, { method: 'DELETE' });
+  loadPortalUsers();
+}
+
+// ── MAGAZZINO: Kanban ordini ────────────────────────────────────────────────────
+let KANBAN_ORDERS = [];
+const KANBAN_STATUSES = ['nuovo', 'in_lavorazione', 'sospeso', 'evaso'];
+
+async function loadKanban() {
+  KANBAN_ORDERS = await api('/api/admin/orders');
+  KANBAN_STATUSES.forEach(status => {
+    const col = document.getElementById('kanban-col-' + status);
+    const orders = KANBAN_ORDERS.filter(o => o.status === status);
+    document.getElementById('kanban-count-' + status).textContent = orders.length;
+    col.innerHTML = orders.map(o => `
+      <div class="kanban-card" draggable="true" data-order-id="${o.id}" ondragstart="kanbanDragStart(event)">
+        <div class="kanban-card-top">
+          <span class="kanban-order-number">${esc(o.order_number)}</span>
+          ${o.warehouse_note ? '<span class="kanban-note-flag" title="Nota magazziniere presente">!</span>' : ''}
+        </div>
+        <div class="kanban-customer">${esc(o.customer_name)}</div>
+        <div class="kanban-meta">${o.order_date} · € ${fmtEuro(o.total_cents)}</div>
+        <button type="button" class="kanban-note-btn ${o.warehouse_note ? 'has-note' : ''}" onclick='openWarehouseNoteModal(${JSON.stringify({ id: o.id, order_number: o.order_number, warehouse_note: o.warehouse_note })})'>
+          ${o.warehouse_note ? 'Modifica nota' : '+ Aggiungi nota'}
+        </button>
+      </div>
+    `).join('');
+  });
+}
+
+function kanbanDragStart(e) {
+  e.dataTransfer.setData('text/plain', e.target.closest('.kanban-card').dataset.orderId);
+}
+function kanbanDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+async function kanbanDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const orderId = e.dataTransfer.getData('text/plain');
+  const newStatus = e.currentTarget.dataset.status;
+  await api('/api/admin/orders/' + orderId, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
+  loadKanban();
+}
+document.querySelectorAll('.kanban-col-body').forEach(col => {
+  col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+});
+
+function openWarehouseNoteModal(o) {
+  document.getElementById('wh-note-modal-msg').innerHTML = '';
+  document.getElementById('wh-note-order-id').value = o.id;
+  document.getElementById('wh-note-order-number').textContent = o.order_number;
+  document.getElementById('wh-note-text').value = o.warehouse_note || '';
+  openModal('warehouse-note-modal');
+}
+
+async function saveWarehouseNote() {
+  const id = document.getElementById('wh-note-order-id').value;
+  const msg = document.getElementById('wh-note-modal-msg');
+  try {
+    await api('/api/admin/orders/' + id, { method: 'PATCH', body: JSON.stringify({ warehouse_note: document.getElementById('wh-note-text').value.trim() }) });
+    closeModal('warehouse-note-modal');
+    loadKanban();
+    loadOrders();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+async function boot() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  const params = new URLSearchParams(window.location.search);
+  const ws = params.get('workspace');
+  if (ws && ws !== 'commerciale' && WORKSPACE_LABELS[ws]) {
+    switchWorkspace(ws);
+  } else {
+    await loadDashboard();
+  }
+}
+
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('reset')) { showLoginForm('login-form-reset'); return; }
+  const keyFromUrl = params.get('key');
+  const keyFromSession = sessionStorage.getItem('admin_key');
+  if (keyFromUrl) { ADMIN_KEY = keyFromUrl; sessionStorage.setItem('admin_key', keyFromUrl); boot(); }
+  else if (keyFromSession) { ADMIN_KEY = keyFromSession; boot(); }
+})();
+</script>
+</body>
+</html>

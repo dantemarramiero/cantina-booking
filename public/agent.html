@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portale agenti — Nuovo ordine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --wine: #3b6fe0; --wine-dark: #f3f6fb; --gold-light: #3b6fe0;
+    --cream: #f5f6f8; --line: #e6e8ee; --ink: #10131a; --ink-soft: #6b7280; --ok: #16a34a; --bad: #dc2626; --warn: #d97706;
+    --sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --mono: var(--sans);
+    --sidebar-w: 230px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--sans); background: var(--cream); color: var(--ink-soft); font-size: 14px; }
+  h1, h2, h3 { font-family: var(--sans); font-weight: 600; margin: 0; color: var(--ink); }
+  button { font-family: inherit; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; background: #fff; }
+  th, td { padding: 9px 11px; border-bottom: 1px solid var(--line); text-align: left; font-size: 12.5px; }
+  th { background: #fafbfc; color: var(--ink-soft); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  #error-screen, #loading-screen { max-width: 420px; margin: 100px auto; text-align: center; color: var(--ink-soft); }
+
+  #login-screen { max-width: 340px; width: 100%; margin: 90px auto; padding: 0 16px; text-align: center; }
+  #login-screen img { height: 40px; margin-bottom: 18px; }
+  #login-screen h2 { margin-bottom: 6px; }
+  #login-screen p { font-size: 12.5px; margin: 0 0 20px; }
+  #login-screen input { width: 100%; box-sizing: border-box; padding: 10px 12px; margin: 7px 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font-size: 13.5px; font-family: var(--sans); }
+  #login-screen .btn { width: 100%; margin-top: 10px; padding: 10px; }
+
+  /* App shell: sidebar + main area (coerente con admin/portale interno) */
+  .app-shell { display: flex; min-height: 100vh; }
+  .sidebar { width: var(--sidebar-w); flex-shrink: 0; background: #fff; border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 18px 14px; }
+  .sidebar-brand { display: flex; align-items: center; gap: 9px; padding: 4px 8px 10px; }
+  .sidebar-brand img { height: 26px; }
+  .sidebar-greeting { padding: 0 8px 16px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+  .sidebar-greeting .hi { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #9aa0ab; font-weight: 600; }
+  .sidebar-greeting .name { font-size: 14px; font-weight: 700; color: var(--ink); margin-top: 2px; }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+  .sidebar-nav button { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border: none; background: none; border-radius: 8px; font-size: 13.5px; font-weight: 500; color: #444a56; text-align: left; width: 100%; white-space: nowrap; }
+  .sidebar-nav button svg { width: 18px; height: 18px; flex-shrink: 0; color: #8a90a0; }
+  .sidebar-nav button:hover { background: #f2f4f8; }
+  .sidebar-nav button.active { background: rgba(59,111,224,0.09); color: var(--wine); font-weight: 600; }
+  .sidebar-nav button.active svg { color: var(--wine); }
+  .sidebar-footer { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+  .sidebar-footer button { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border: none; background: none; border-radius: 8px; font-size: 13px; color: #444a56; width: 100%; text-align: left; }
+  .sidebar-footer svg { width: 17px; height: 17px; color: #8a90a0; }
+  .sidebar-footer button:hover { background: #f2f4f8; }
+
+  .main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .topbar { height: 58px; flex-shrink: 0; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 26px; }
+  .topbar .crumb { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .topbar .crumb small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  main { padding: 24px 28px; max-width: 1100px; margin: 0 auto; width: 100%; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 28px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(16,19,26,0.03); }
+  .card .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #9aa0ab; font-weight: 600; }
+  .card .value { font-size: 22px; font-family: var(--sans); font-weight: 700; color: var(--ink); margin-top: 6px; }
+
+  .box { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 22px; margin-bottom: 26px; box-shadow: 0 1px 2px rgba(16,19,26,0.03); }
+  .box h2 { font-size: 18px; margin-bottom: 18px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #9aa0ab; margin-bottom: 7px; font-weight: 600; }
+  .field input, .field select, .field textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13.5px; font-family: var(--sans); background: #fff; color: var(--ink); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .btn { background: var(--wine); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: var(--sans); }
+  .btn:hover { background: #2f5fc9; }
+  .btn.secondary { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+  .btn.small { padding: 5px 10px; font-size: 12px; }
+  .btn.danger { background: #fee2e2; color: var(--bad); }
+  .msg { padding: 10px 13px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+  .msg.error { background: #fee2e2; color: var(--bad); }
+  .msg.success { background: #dcfce7; color: var(--ok); }
+
+  .customer-picker { position: relative; }
+  .customer-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid var(--line); border-top: none; max-height: 200px; overflow-y: auto; z-index: 10; display: none; border-radius: 0 0 8px 8px; box-shadow: 0 8px 20px rgba(16,19,26,0.08); }
+  .customer-results.open { display: block; }
+  .customer-results div { padding: 9px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--line); color: var(--ink); }
+  .customer-results div:hover { background: #f5f6f8; }
+  .selected-customer { background: #f5f8ff; border: 1px solid #e1e9fb; border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; color: var(--ink); }
+
+  .items-table th, .items-table td { padding: 8px; }
+  .items-table select, .items-table input { width: 100%; padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; background: #fff; color: var(--ink); }
+  .items-table input[type=number] { text-align: right; }
+  .table-wrap { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; overflow-x: auto; background: #fff; box-shadow: 0 1px 2px rgba(16,19,26,0.03); }
+  .empty { padding: 24px; text-align: center; color: var(--ink-soft); }
+  .badge { padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+  .badge.nuovo { background: #fef3c7; color: var(--warn); }
+  .badge.in_lavorazione { background: rgba(59,111,224,0.1); color: var(--wine); }
+  .badge.evaso { background: #dcfce7; color: var(--ok); }
+  .badge.sospeso { background: #f1f2f4; color: var(--ink-soft); }
+  .badge.pagato { background: #dcfce7; color: var(--ok); }
+  .badge.non_pagato { background: #fee2e2; color: var(--bad); }
+  .badge.overdue { background: #fee2e2; color: var(--bad); }
+  .note-flag { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: var(--bad); color: #fff; font-size: 10px; font-weight: 700; cursor: help; }
+
+  .news-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(16,19,26,0.03); }
+  .news-card h3 { font-size: 15px; margin-bottom: 6px; }
+  .news-card .date { font-size: 11px; color: #9aa0ab; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+  .news-card p { margin: 0; color: var(--ink-soft); font-size: 13.5px; line-height: 1.5; white-space: pre-line; }
+
+  .catalog-card { display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(16,19,26,0.03); }
+  .catalog-card .cat-icon { width: 38px; height: 38px; border-radius: 9px; background: rgba(59,111,224,0.1); color: var(--wine); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .catalog-card .cat-title { font-weight: 600; color: var(--ink); font-size: 13.5px; }
+  .catalog-card .cat-date { font-size: 11.5px; color: #9aa0ab; margin-top: 2px; }
+  .catalog-card a.btn { margin-left: auto; text-decoration: none; }
+
+  .mobile-topbar-toggle { display: none; width: 36px; height: 36px; align-items: center; justify-content: center; border: 1px solid var(--line); background: #fff; border-radius: 8px; color: var(--ink); flex-shrink: 0; }
+  .mobile-topbar-toggle svg { width: 19px; height: 19px; }
+  .sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(16,19,26,0.45); z-index: 190; }
+  .sidebar-backdrop.open { display: block; }
+
+  @media (max-width: 860px) {
+    .sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 200; transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: 10px 0 30px rgba(16,19,26,0.18); overflow-y: auto; }
+    .sidebar.open { transform: translateX(0); }
+    .mobile-topbar-toggle { display: flex; }
+    .topbar { padding: 0 14px; gap: 10px; justify-content: flex-start; }
+    main { padding: 16px; }
+    .modal-box, .box { padding: 16px; }
+  }
+  @media (max-width: 480px) {
+    .cards { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 600px) { .field-row { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) {
+    table { font-size: 11px; }
+    th, td { padding: 6px 7px; }
+    th { font-size: 8.5px; }
+    .badge { padding: 2px 7px; font-size: 9.5px; }
+    table:has(#my-orders-tbody) th:nth-child(3), table:has(#my-orders-tbody) td:nth-child(3),
+    table:has(#my-orders-tbody) th:nth-child(5), table:has(#my-orders-tbody) td:nth-child(5) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-screen">Caricamento…</div>
+
+<div id="error-screen" style="display:none">
+  <h2>Link non valido</h2>
+  <p>Questo link non è valido oppure è stato disattivato. Contatta la cantina per riceverne uno nuovo.</p>
+</div>
+
+<div id="login-screen" style="display:none">
+  <img src="/img/marramiero-logo.webp" alt="Marramiero">
+  <h2>Portale agenti</h2>
+  <p style="color:var(--ink-soft)">Accedi con le credenziali fornite dalla cantina</p>
+  <div id="login-msg"></div>
+  <input type="text" id="login-username" placeholder="Username" autocomplete="username" onkeydown="if(event.key==='Enter')doAgentLogin()">
+  <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAgentLogin()">
+  <button class="btn" onclick="doAgentLogin()">Accedi</button>
+</div>
+
+<div id="app" style="display:none">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <img src="/img/marramiero-logo.webp" alt="Marramiero">
+      </div>
+      <div class="sidebar-greeting">
+        <div class="hi" id="agent-greeting-label">Benvenuto</div>
+        <div class="name" id="agent-name">Agente</div>
+        <div class="date" id="agent-provinces" style="font-size:11px;color:#9aa0ab;margin-top:2px"></div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button data-tab="dashboard" class="active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          Dashboard
+        </button>
+        <button data-tab="nuovo-ordine">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Nuovo ordine
+        </button>
+        <button data-tab="storico-ordini">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
+          Storico ordini
+        </button>
+        <button data-tab="news">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="13" y2="17"/></svg>
+          News
+        </button>
+        <button data-tab="catalogo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 1 4 17.5v-13Z"/><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/></svg>
+          Catalogo
+        </button>
+        <button data-tab="crediti">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          Recupero crediti
+        </button>
+        <button data-tab="venduto">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+          Venduto
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button type="button" onclick="agentLogout()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Esci
+        </button>
+      </div>
+    </aside>
+    <div class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
+    <div class="main-area">
+      <div class="topbar">
+        <button type="button" class="mobile-topbar-toggle" onclick="toggleMobileSidebar()" aria-label="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+        </button>
+        <div class="crumb"><small>Portale agenti</small><span id="topbar-title">Dashboard</span></div>
+      </div>
+
+      <main>
+        <!-- ═══ DASHBOARD ═══ -->
+        <div class="panel active" id="panel-dashboard">
+          <div class="cards" id="agent-stats"></div>
+          <div class="box">
+            <h2>Andamento mensile</h2>
+            <div class="table-wrap">
+              <table><thead><tr><th>Mese</th><th>Ordini</th><th>Fatturato</th></tr></thead>
+              <tbody id="dash-by-month"></tbody></table>
+            </div>
+          </div>
+          <div class="box">
+            <h2>Top clienti</h2>
+            <div class="table-wrap">
+              <table><thead><tr><th>Cliente</th><th>Ordini</th><th>Fatturato</th></tr></thead>
+              <tbody id="dash-top-customers"></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ NUOVO ORDINE ═══ -->
+        <div class="panel" id="panel-nuovo-ordine">
+          <div class="box">
+            <h2>Nuovo ordine</h2>
+            <div id="order-msg"></div>
+
+            <div class="field">
+              <label>Cliente</label>
+              <div id="customer-selected-box"></div>
+              <div class="customer-picker" id="customer-picker-box">
+                <input type="text" id="customer-search" placeholder="Cerca un cliente esistente per nome...">
+                <div class="customer-results" id="customer-results"></div>
+              </div>
+              <button type="button" class="btn secondary small" style="margin-top:8px" id="new-customer-toggle" onclick="toggleNewCustomer()">+ Nuovo cliente</button>
+            </div>
+
+            <div id="new-customer-fields" style="display:none">
+              <div class="field-row">
+                <div class="field"><label>Ragione sociale</label><input id="nc-name"></div>
+                <div class="field"><label>Email</label><input type="email" id="nc-email"></div>
+              </div>
+              <div class="field-row">
+                <div class="field"><label>Telefono</label><input id="nc-phone"></div>
+                <div class="field"><label>Partita IVA</label><input id="nc-vat"></div>
+              </div>
+              <div class="field-row">
+                <div class="field"><label>PEC</label><input type="email" id="nc-pec"></div>
+                <div class="field"><label>Città</label><input id="nc-city"></div>
+              </div>
+              <div class="field-row">
+                <div class="field"><label>CAP</label><input id="nc-postal-code"></div>
+                <div class="field"><label>Provincia</label><input id="nc-province"></div>
+                <div class="field"><label>Paese</label><input id="nc-country" value="Italia"></div>
+              </div>
+              <div class="field"><label>Indirizzo</label><input id="nc-address"></div>
+              <div class="field-row">
+                <div class="field"><label>Codice sconto standard (opzionale)</label><input id="nc-discount-code" placeholder="es. SCONTO10"></div>
+                <div class="field"><label>Sconto automatico (%)</label><input type="number" id="nc-discount-percent" min="0" max="100" step="0.5" placeholder="0"></div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Cliente di fatturazione</label>
+              <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px;margin-bottom:8px">
+                <input type="checkbox" id="same-billing-customer" checked onchange="toggleBillingCustomer()"> Uguale al cliente ordinante
+              </label>
+              <div id="billing-customer-picker" style="display:none">
+                <select id="order-billing-customer"><option value="">— Seleziona cliente fatturazione —</option></select>
+              </div>
+            </div>
+
+            <div class="field-row">
+              <div class="field"><label>Data ordine</label><input type="date" id="order-date"></div>
+              <div class="field"><label>Data consegna</label><input type="date" id="order-delivery-date"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Causale</label>
+                <select id="order-causale">
+                  <option value="ORDCLI">ORDCLI — Ordini clienti</option>
+                  <option value="ORDCAMP">ORDCAMP — Omaggio/campionatura</option>
+                  <option value="ORDRESO">ORDRESO — Reso</option>
+                </select>
+              </div>
+              <div class="field"><label>Listino (opzionale)</label><select id="order-pricelist" onchange="onPriceListChange()"><option value="">— Nessuno —</option></select></div>
+            </div>
+
+            <div class="field">
+              <label>Articoli</label>
+              <div class="table-wrap">
+                <table class="items-table">
+                  <thead><tr><th style="width:32%">Bottiglia</th><th style="width:24%">Etichetta / Variante</th><th style="width:12%">Qtà</th><th style="width:16%">Prezzo unit. (€)</th><th style="width:10%">Totale</th><th></th></tr></thead>
+                  <tbody id="items-tbody"></tbody>
+                </table>
+              </div>
+              <button type="button" class="btn secondary small" style="margin-top:10px" onclick="addItemRow()">+ Aggiungi articolo</button>
+            </div>
+
+            <div class="field"><label>Note</label><textarea id="order-notes" rows="2"></textarea></div>
+
+            <div style="text-align:right;font-size:16px;font-family:Georgia,serif;color:var(--wine);margin-bottom:14px" id="order-total">Totale: € 0,00</div>
+
+            <button class="btn" onclick="submitOrder()">Invia ordine</button>
+          </div>
+        </div>
+
+        <!-- ═══ STORICO ORDINI ═══ -->
+        <div class="panel" id="panel-storico-ordini">
+          <div class="box">
+            <h2>Storico ordini</h2>
+            <div class="table-wrap">
+              <table><thead><tr><th>N. Ordine</th><th>Data</th><th>Consegna</th><th>Cliente</th><th>Articoli</th><th>Totale</th><th>Stato</th><th>Pagamento</th><th>Nota magazzino</th></tr></thead>
+              <tbody id="my-orders-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ NEWS ═══ -->
+        <div class="panel" id="panel-news">
+          <div id="news-list"></div>
+        </div>
+
+        <!-- ═══ CATALOGO ═══ -->
+        <div class="panel" id="panel-catalogo">
+          <div id="catalog-list"></div>
+        </div>
+
+        <!-- ═══ RECUPERO CREDITI ═══ -->
+        <div class="panel" id="panel-crediti">
+          <div class="box">
+            <h2>Recupero crediti</h2>
+            <p style="margin:-8px 0 16px;font-size:12.5px">Ordini dei tuoi clienti non ancora saldati, con relativa scadenza.</p>
+            <div class="table-wrap">
+              <table><thead><tr><th>N. Ordine</th><th>Cliente</th><th>Data ordine</th><th>Scadenza</th><th>Totale</th><th>Contatti</th></tr></thead>
+              <tbody id="credit-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ VENDUTO ═══ -->
+        <div class="panel" id="panel-venduto">
+          <div class="box">
+            <h2>Venduto</h2>
+            <p style="margin:-8px 0 16px;font-size:12.5px">Riepilogo di tutte le bottiglie vendute tramite i tuoi ordini.</p>
+            <div class="table-wrap">
+              <table><thead><tr><th>Bottiglia</th><th>Quantità</th><th>Fatturato</th></tr></thead>
+              <tbody id="sold-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+let TOKEN = params.get('token') || localStorage.getItem('agent_token');
+if (params.get('token')) localStorage.setItem('agent_token', params.get('token'));
+let PRODUCTS = [];
+let PRICE_LISTS = [];
+let SELECTED_CUSTOMER = null;
+let ITEM_ROWS = [];
+let ROW_ID = 0;
+
+function esc(s) { return (s ?? '').toString().replace(/</g, '&lt;'); }
+function fmtEuro(cents) { return ((cents || 0) / 100).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+async function api(path, opts = {}) {
+  opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Errore');
+  return data;
+}
+
+async function doAgentLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const msg = document.getElementById('login-msg');
+  msg.innerHTML = '';
+  if (!username || !password) { msg.innerHTML = '<div class="msg error">Inserisci username e password.</div>'; return; }
+  try {
+    const res = await api('/api/agent/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    TOKEN = res.token;
+    localStorage.setItem('agent_token', TOKEN);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('loading-screen').style.display = 'block';
+    init();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+function agentLogout() {
+  localStorage.removeItem('agent_token');
+  TOKEN = null;
+  window.location.href = '/agent.html';
+}
+
+function showLogin() {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('error-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'block';
+}
+
+async function init() {
+  if (!TOKEN) { showLogin(); return; }
+  try {
+    const agent = await api(`/api/agent/${TOKEN}`);
+    document.getElementById('agent-greeting-label').textContent = agent.gender === 'F' ? 'Benvenuta' : 'Benvenuto';
+    document.getElementById('agent-name').textContent = agent.name;
+    document.getElementById('agent-provinces').textContent = agent.provinces.length ? 'Provincie: ' + agent.provinces.join(', ') : '';
+    document.getElementById('agent-stats').innerHTML = `
+      <div class="card"><div class="label">Clienti</div><div class="value">${agent.customerCount}</div></div>
+      <div class="card"><div class="label">Ordini totali</div><div class="value">${agent.orderCount}</div></div>
+      <div class="card"><div class="label">Fatturato</div><div class="value">€ ${fmtEuro(agent.revenueCents)}</div></div>
+      <div class="card"><div class="label">Valore medio ordine</div><div class="value">€ ${fmtEuro(agent.avgValueCents)}</div></div>
+      <div class="card"><div class="label">Frequenza media</div><div class="value">${agent.avgFrequencyDays != null ? agent.avgFrequencyDays + ' gg' : '—'}</div></div>
+    `;
+    document.getElementById('order-date').value = new Date().toISOString().slice(0, 10);
+
+    PRODUCTS = await api(`/api/agent/${TOKEN}/products`);
+    const plData = await api(`/api/agent/${TOKEN}/price-lists`);
+    PRICE_LISTS = plData;
+    document.getElementById('order-pricelist').innerHTML += plData.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
+
+    addItemRow();
+    loadDashboardExtra();
+
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+  } catch (e) {
+    if (params.get('token')) { showError(); return; }
+    localStorage.removeItem('agent_token');
+    TOKEN = null;
+    showLogin();
+  }
+}
+
+function showError() {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('error-screen').style.display = 'block';
+}
+
+// ── Mobile sidebar drawer ────────────────────────────────────────────────────
+function toggleMobileSidebar() {
+  document.querySelector('.sidebar').classList.toggle('open');
+  document.querySelector('.sidebar-backdrop').classList.toggle('open');
+}
+function closeMobileSidebar() {
+  document.querySelector('.sidebar').classList.remove('open');
+  document.querySelector('.sidebar-backdrop').classList.remove('open');
+}
+
+// ── Sidebar tabs ────────────────────────────────────────────────────────────────
+const TAB_TITLES = { dashboard: 'Dashboard', 'nuovo-ordine': 'Nuovo ordine', 'storico-ordini': 'Storico ordini', news: 'News', catalogo: 'Catalogo', crediti: 'Recupero crediti', venduto: 'Venduto' };
+document.querySelectorAll('.sidebar-nav button[data-tab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sidebar-nav button[data-tab]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    document.getElementById('topbar-title').textContent = TAB_TITLES[btn.dataset.tab];
+    if (btn.dataset.tab === 'storico-ordini') loadMyOrders();
+    if (btn.dataset.tab === 'news') loadNews();
+    if (btn.dataset.tab === 'catalogo') loadCatalogs();
+    if (btn.dataset.tab === 'crediti') loadCreditRecovery();
+    if (btn.dataset.tab === 'venduto') loadSold();
+    closeMobileSidebar();
+  });
+});
+
+async function loadDashboardExtra() {
+  const data = await api(`/api/agent/${TOKEN}/dashboard`);
+  document.getElementById('dash-by-month').innerHTML = data.byMonth.length ? data.byMonth.map(m => `
+    <tr><td>${m.month}</td><td>${m.orderCount}</td><td>€ ${fmtEuro(m.revenueCents)}</td></tr>
+  `).join('') : '<tr><td colspan="3" class="empty">Nessun ordine ancora.</td></tr>';
+  document.getElementById('dash-top-customers').innerHTML = data.topCustomers.length ? data.topCustomers.map(c => `
+    <tr><td>${esc(c.customer_name)}</td><td>${c.orderCount}</td><td>€ ${fmtEuro(c.revenueCents)}</td></tr>
+  `).join('') : '<tr><td colspan="3" class="empty">Nessun ordine ancora.</td></tr>';
+}
+
+async function loadNews() {
+  const items = await api(`/api/agent/${TOKEN}/news`);
+  document.getElementById('news-list').innerHTML = items.length ? items.map(n => `
+    <div class="news-card">
+      <div class="date">${n.created_at}</div>
+      <h3>${esc(n.title)}</h3>
+      ${n.body ? `<p>${esc(n.body)}</p>` : ''}
+    </div>
+  `).join('') : '<div class="box"><p style="margin:0" class="empty">Nessuna news al momento.</p></div>';
+}
+
+async function loadCatalogs() {
+  const items = await api(`/api/agent/${TOKEN}/catalogs`);
+  document.getElementById('catalog-list').innerHTML = items.length ? items.map(c => `
+    <div class="catalog-card">
+      <div class="cat-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="19" height="19"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 1 4 17.5v-13Z"/></svg>
+      </div>
+      <div>
+        <div class="cat-title">${esc(c.name)}</div>
+        <div class="cat-date">${c.created_at}</div>
+      </div>
+      <a class="btn small" href="/api/catalogs/${c.id}/download" target="_blank" rel="noopener">Apri PDF</a>
+    </div>
+  `).join('') : '<div class="box"><p style="margin:0" class="empty">Nessun catalogo disponibile.</p></div>';
+}
+
+async function loadCreditRecovery() {
+  const rows = await api(`/api/agent/${TOKEN}/credit-recovery`);
+  document.getElementById('credit-tbody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td>${esc(r.order_number)}</td><td>${esc(r.customer_name)}</td><td>${r.order_date}</td>
+      <td>${r.payment_due_date ? r.payment_due_date : '—'} ${r.overdue ? '<span class="badge overdue">Scaduto</span>' : ''}</td>
+      <td>€ ${fmtEuro(r.total_cents)}</td>
+      <td>${[r.phone, r.email].filter(Boolean).map(esc).join(' · ') || '—'}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" class="empty">Nessun credito da recuperare.</td></tr>';
+}
+
+async function loadSold() {
+  const rows = await api(`/api/agent/${TOKEN}/sold`);
+  document.getElementById('sold-tbody').innerHTML = rows.length ? rows.map(r => `
+    <tr><td>${esc(r.product_name)}</td><td>${r.quantity}</td><td>€ ${fmtEuro(r.revenue_cents)}</td></tr>
+  `).join('') : '<tr><td colspan="3" class="empty">Nessuna vendita ancora.</td></tr>';
+}
+
+// ── Customer search / selection ────────────────────────────────────────────────
+let searchTimer = null;
+document.getElementById('customer-search').addEventListener('input', (e) => {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  const results = document.getElementById('customer-results');
+  if (!q) { results.classList.remove('open'); return; }
+  searchTimer = setTimeout(async () => {
+    const customers = await api(`/api/agent/${TOKEN}/customers?q=${encodeURIComponent(q)}`);
+    if (!customers.length) {
+      results.innerHTML = '<div style="color:var(--ink-soft)">Nessun cliente trovato.</div>';
+    } else {
+      results.innerHTML = customers.map(c => `<div onclick='selectCustomer(${JSON.stringify(c)})'>${esc(c.name)} ${c.email ? '— ' + esc(c.email) : ''}</div>`).join('');
+    }
+    results.classList.add('open');
+  }, 250);
+});
+
+function selectCustomer(c) {
+  SELECTED_CUSTOMER = c;
+  document.getElementById('customer-results').classList.remove('open');
+  document.getElementById('customer-search').value = '';
+  document.getElementById('customer-picker-box').style.display = 'none';
+  document.getElementById('new-customer-toggle').style.display = 'none';
+  document.getElementById('new-customer-fields').style.display = 'none';
+  document.getElementById('customer-selected-box').innerHTML = `
+    <div class="selected-customer">
+      <span><strong>${esc(c.name)}</strong>${c.email ? ' — ' + esc(c.email) : ''}</span>
+      <button type="button" class="btn small secondary" onclick="clearCustomer()">Cambia</button>
+    </div>`;
+}
+function clearCustomer() {
+  SELECTED_CUSTOMER = null;
+  document.getElementById('customer-selected-box').innerHTML = '';
+  document.getElementById('customer-picker-box').style.display = 'block';
+  document.getElementById('new-customer-toggle').style.display = 'inline-block';
+}
+function toggleNewCustomer() {
+  const fields = document.getElementById('new-customer-fields');
+  const showing = fields.style.display !== 'none';
+  fields.style.display = showing ? 'none' : 'block';
+  document.getElementById('customer-picker-box').style.display = showing ? 'block' : 'none';
+  document.getElementById('new-customer-toggle').textContent = showing ? '+ Nuovo cliente' : 'Cerca un cliente esistente';
+}
+
+async function toggleBillingCustomer() {
+  const same = document.getElementById('same-billing-customer').checked;
+  const picker = document.getElementById('billing-customer-picker');
+  picker.style.display = same ? 'none' : 'block';
+  if (!same) {
+    const customers = await api(`/api/agent/${TOKEN}/customers`);
+    document.getElementById('order-billing-customer').innerHTML = '<option value="">— Seleziona cliente fatturazione —</option>' +
+      customers.map(c => `<option value="${c.id}">${esc(c.name)}${c.vat_number ? ' — P.IVA ' + esc(c.vat_number) : ''}</option>`).join('');
+  }
+}
+
+// ── Order items ────────────────────────────────────────────────────────────────
+function onPriceListChange() {
+  const listId = document.getElementById('order-pricelist').value;
+  const list = PRICE_LISTS.find(l => l.id == listId);
+  ITEM_ROWS.forEach(row => {
+    if (!row.productId) return;
+    if (list) {
+      const item = list.items.find(i => i.product_id == row.productId);
+      if (item) { row.unitPriceCents = item.price_cents; }
+    }
+  });
+  renderItems();
+}
+
+function addItemRow() {
+  ITEM_ROWS.push({ id: ROW_ID++, productId: '', labelVariant: '', quantity: 1, unitPriceCents: 0 });
+  renderItems();
+}
+function removeItemRow(id) {
+  ITEM_ROWS = ITEM_ROWS.filter(r => r.id !== id);
+  renderItems();
+}
+function updateItemRow(id, field, value) {
+  const row = ITEM_ROWS.find(r => r.id === id);
+  if (!row) return;
+  if (field === 'productId') {
+    row.productId = value;
+    const listId = document.getElementById('order-pricelist').value;
+    const list = PRICE_LISTS.find(l => l.id == listId);
+    if (list) {
+      const item = list.items.find(i => i.product_id == value);
+      if (item) row.unitPriceCents = item.price_cents;
+    }
+  } else if (field === 'labelVariant') {
+    row.labelVariant = value;
+  } else if (field === 'quantity') {
+    row.quantity = Math.max(1, parseInt(value) || 1);
+  } else if (field === 'unitPrice') {
+    row.unitPriceCents = Math.round((parseFloat(value) || 0) * 100);
+  }
+  renderItems();
+}
+
+function renderItems() {
+  const tbody = document.getElementById('items-tbody');
+  tbody.innerHTML = ITEM_ROWS.map(row => `
+    <tr>
+      <td>
+        <select onchange="updateItemRow(${row.id}, 'productId', this.value)">
+          <option value="">— Seleziona —</option>
+          ${PRODUCTS.map(p => `<option value="${p.id}" ${row.productId == p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="text" value="${esc(row.labelVariant)}" placeholder="es. Etichetta USA" onchange="updateItemRow(${row.id}, 'labelVariant', this.value)"></td>
+      <td><input type="number" min="1" value="${row.quantity}" onchange="updateItemRow(${row.id}, 'quantity', this.value)"></td>
+      <td><input type="number" step="0.01" value="${(row.unitPriceCents / 100).toFixed(2)}" onchange="updateItemRow(${row.id}, 'unitPrice', this.value)"></td>
+      <td style="text-align:right">€ ${fmtEuro(row.quantity * row.unitPriceCents)}</td>
+      <td><button type="button" class="btn small danger" onclick="removeItemRow(${row.id})">×</button></td>
+    </tr>
+  `).join('');
+  const total = ITEM_ROWS.reduce((s, r) => s + r.quantity * r.unitPriceCents, 0);
+  document.getElementById('order-total').textContent = 'Totale: € ' + fmtEuro(total);
+}
+
+// ── Submit order ──────────────────────────────────────────────────────────────
+async function submitOrder() {
+  const msg = document.getElementById('order-msg');
+  msg.innerHTML = '';
+
+  const validItems = ITEM_ROWS.filter(r => r.productId);
+  if (!validItems.length) { msg.innerHTML = '<div class="msg error">Aggiungi almeno un articolo con una bottiglia selezionata.</div>'; return; }
+
+  const body = {
+    order_date: document.getElementById('order-date').value,
+    delivery_date: document.getElementById('order-delivery-date').value,
+    causale: document.getElementById('order-causale').value,
+    price_list_name: (() => {
+      const listId = document.getElementById('order-pricelist').value;
+      const list = PRICE_LISTS.find(l => l.id == listId);
+      return list ? list.name : null;
+    })(),
+    notes: document.getElementById('order-notes').value.trim(),
+    items: validItems.map(r => ({ product_id: r.productId, label_variant: r.labelVariant, quantity: r.quantity, unit_price_cents: r.unitPriceCents })),
+  };
+
+  if (!document.getElementById('same-billing-customer').checked) {
+    const billingId = document.getElementById('order-billing-customer').value;
+    if (billingId) body.billing_customer_id = billingId;
+  }
+
+  if (SELECTED_CUSTOMER) {
+    body.customer_id = SELECTED_CUSTOMER.id;
+  } else {
+    const name = document.getElementById('nc-name').value.trim();
+    if (!name) { msg.innerHTML = '<div class="msg error">Seleziona un cliente esistente o inserisci la ragione sociale del nuovo cliente.</div>'; return; }
+    body.new_customer = {
+      name, email: document.getElementById('nc-email').value.trim(), phone: document.getElementById('nc-phone').value.trim(),
+      province: document.getElementById('nc-province').value.trim(), country: document.getElementById('nc-country').value.trim(),
+      address: document.getElementById('nc-address').value.trim(), vat_number: document.getElementById('nc-vat').value.trim(),
+      pec: document.getElementById('nc-pec').value.trim(), city: document.getElementById('nc-city').value.trim(),
+      postal_code: document.getElementById('nc-postal-code').value.trim(),
+      discount_code: document.getElementById('nc-discount-code').value.trim(), discount_percent: document.getElementById('nc-discount-percent').value.trim(),
+    };
+  }
+
+  try {
+    const res = await api(`/api/agent/${TOKEN}/orders`, { method: 'POST', body: JSON.stringify(body) });
+    msg.innerHTML = `<div class="msg success">Ordine ${res.order_number} inviato con successo!</div>`;
+    clearCustomer();
+    document.getElementById('customer-picker-box').style.display = 'block';
+    document.getElementById('new-customer-toggle').style.display = 'inline-block';
+    document.getElementById('new-customer-fields').style.display = 'none';
+    ['nc-name','nc-email','nc-phone','nc-province','nc-address','nc-vat','nc-pec','nc-city','nc-postal-code','nc-discount-code','nc-discount-percent'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('nc-country').value = 'Italia';
+    document.getElementById('order-notes').value = '';
+    document.getElementById('order-delivery-date').value = '';
+    document.getElementById('order-causale').value = 'ORDCLI';
+    document.getElementById('same-billing-customer').checked = true;
+    document.getElementById('billing-customer-picker').style.display = 'none';
+    ITEM_ROWS = [];
+    addItemRow();
+    loadDashboardExtra();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function loadMyOrders() {
+  const orders = await api(`/api/agent/${TOKEN}/orders`);
+  document.getElementById('my-orders-tbody').innerHTML = orders.length ? orders.map(o => `
+    <tr>
+      <td>${esc(o.order_number)}</td><td>${o.order_date}</td><td>${o.delivery_date || '—'}</td><td>${esc(o.customer_name)}</td>
+      <td>${o.q}</td><td>€ ${fmtEuro(o.total_cents)}</td>
+      <td><span class="badge ${o.status}">${o.status.replace('_',' ')}</span></td>
+      <td><span class="badge ${o.payment_status || 'non_pagato'}">${(o.payment_status || 'non_pagato').replace('_',' ')}</span></td>
+      <td>${o.warehouse_note ? `<span class="note-flag" title="${esc(o.warehouse_note)}">!</span>` : '—'}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="9" class="empty">Nessun ordine inviato finora.</td></tr>';
+}
+
+init();
+</script>
+</body>
+</html>

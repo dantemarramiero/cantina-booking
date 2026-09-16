@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Prenotazioni Cantina</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --wine: #3b6fe0; --wine-dark: #f3f6fb; --gold: #3b6fe0; --gold-light: #3b6fe0;
+    --cream: #f5f6f8; --line: #e6e8ee; --ink: #10131a; --ink-soft: #6b7280; --ok: #16a34a; --bad: #dc2626;
+    --sidebar-w: 226px;
+    --sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --mono: var(--sans);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--sans); background: var(--cream); color: var(--ink-soft); font-size: 14px; }
+  h1, h2, h3 { font-family: var(--sans); font-weight: 600; margin: 0; color: var(--ink); }
+  button { font-family: inherit; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; background: #fff; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
+  th { background: #fafbfc; color: var(--ink-soft); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+  tr:hover td { background: #fafbfd; }
+
+  #login-screen { max-width: 340px; width: 100%; margin: 90px auto; padding: 0 16px; text-align: center; }
+  #login-screen input { width: 100%; padding: 10px; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+
+  /* App shell: sidebar + main area */
+  .app-shell { display: flex; min-height: 100vh; }
+  .sidebar { width: var(--sidebar-w); flex-shrink: 0; background: #fff; border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 18px 14px; }
+  .sidebar-brand { display: flex; align-items: center; gap: 9px; padding: 4px 8px 18px; }
+  .sidebar-brand img { height: 26px; }
+  .sidebar-section-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: #9aa0ab; font-weight: 600; padding: 14px 10px 6px; }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+  .sidebar-nav button { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border: none; background: none; border-radius: 8px; font-size: 13.5px; font-weight: 500; color: #444a56; text-align: left; width: 100%; white-space: nowrap; }
+  .sidebar-nav button svg { width: 18px; height: 18px; flex-shrink: 0; color: #8a90a0; }
+  .sidebar-nav button:hover { background: #f2f4f8; }
+  .sidebar-nav button.active { background: rgba(59,111,224,0.09); color: var(--wine); font-weight: 600; }
+  .sidebar-nav button.active svg { color: var(--wine); }
+  .sidebar-footer { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+  .sidebar-footer a, .sidebar-footer button { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border: none; background: none; border-radius: 8px; font-size: 13px; color: #444a56; text-decoration: none; width: 100%; text-align: left; }
+  .sidebar-footer svg { width: 17px; height: 17px; color: #8a90a0; }
+
+  /* Workspace switcher (top-level area selector, à la Zoho "Spazio di lavoro") */
+  .workspace-switcher { position: relative; margin: 2px 0 16px; }
+  .workspace-trigger { width: 100%; display: flex; align-items: center; gap: 9px; padding: 6px; border: none; background: none; border-radius: 8px; cursor: pointer; text-align: left; }
+  .workspace-trigger:hover { background: #f2f4f8; }
+  .ws-badge { width: 26px; height: 26px; border-radius: 7px; background: rgba(59,111,224,0.1); color: var(--wine); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ws-badge svg { width: 15px; height: 15px; }
+  .workspace-trigger-text { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .workspace-chevron { width: 15px; height: 15px; color: #9aa0ab; flex-shrink: 0; }
+  .workspace-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(16,19,26,0.14); padding: 5px; display: none; z-index: 30; }
+  .workspace-menu.open { display: block; }
+  .workspace-menu button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 7px 8px; border: none; background: none; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--ink); text-align: left; cursor: pointer; }
+  .workspace-menu button:hover { background: #f2f4f8; }
+  .workspace-menu button.active { background: rgba(59,111,224,0.09); color: var(--wine); font-weight: 600; }
+  .workspace-menu button.active .ws-badge { background: var(--wine); color: #fff; }
+  .ws-icon { font-size: 15px; }
+  .sidebar-footer a:hover, .sidebar-footer button:hover { background: #f2f4f8; }
+
+  .main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .topbar { height: 58px; flex-shrink: 0; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 26px; }
+  .topbar .crumb { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .topbar .crumb small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  main { padding: 26px 32px; max-width: 1600px; margin: 0 auto; width: 100%; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(16,19,26,0.03); }
+  .card .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #9aa0ab; font-weight: 600; }
+  .card .value { font-size: 26px; font-family: var(--sans); font-weight: 700; color: var(--ink); margin-top: 8px; }
+
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .toolbar input, .toolbar select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; background: #fff; color: var(--ink); }
+  .btn { background: var(--wine); color: #fff; border: none; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: var(--sans); }
+  .btn:hover { background: #2f5fc9; }
+  .btn.secondary { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+  .btn.secondary:hover { background: #f5f6f8; }
+  .btn.small { padding: 5px 10px; font-size: 12px; }
+  .btn.danger { background: #fee2e2; color: var(--bad); }
+  .btn.ok { background: #dcfce7; color: var(--ok); }
+  .badge { padding: 3px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+  .badge.confermata { background: #dcfce7; color: var(--ok); }
+  .badge.in_attesa { background: #fef3c7; color: #d97706; }
+  .badge.annullata { background: #fee2e2; color: var(--bad); }
+  .actions-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .table-wrap { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; overflow-x: auto; background: #fff; box-shadow: 0 1px 2px rgba(16,19,26,0.03); }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(16,19,26,0.4); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: #fff; border: 1px solid var(--line); max-width: 560px; width: 100%; max-height: 88vh; overflow-y: auto; border-radius: 16px; padding: 26px; box-shadow: 0 12px 40px rgba(16,19,26,0.18); }
+  .modal-box h3 { margin-bottom: 18px; }
+  .field { margin-bottom: 13px; }
+  .field label { display: block; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #9aa0ab; margin-bottom: 6px; }
+  .field input, .field select, .field textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13.5px; font-family: var(--sans); background: #fff; color: var(--ink); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .checkbox-row { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; }
+  .checkbox-row label { display: flex; align-items: center; gap: 5px; text-transform: none; letter-spacing: 0; font-family: var(--sans); color: var(--ink); }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .msg { padding: 9px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+  .msg.error { background: #fee2e2; color: var(--bad); }
+  .msg.success { background: #dcfce7; color: var(--ok); }
+  .empty { padding: 30px; text-align: center; color: var(--ink-soft); }
+
+  /* Shared list/record UI (shadcn-inspired: rounded cards, list rows, segmented controls) */
+  .list-card { background: #fff; border: 1px solid var(--line); border-radius: 20px; overflow: hidden; box-shadow: 0 1px 3px rgba(16,19,26,0.04); margin-bottom: 24px; }
+  .list-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+  .list-toolbar-title { flex-shrink: 0; }
+  .list-toolbar-title h3 { font-size: 15px; }
+  .list-toolbar-title p { margin: 2px 0 0; font-size: 12px; color: var(--ink-soft); }
+  .list-spacer { flex: 1; }
+  .search-input { position: relative; min-width: 200px; }
+  .search-input svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: #9aa0ab; pointer-events: none; }
+  .search-input input { width: 100%; padding: 9px 14px 9px 36px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; background: #fafbfc; font-family: var(--sans); color: var(--ink); }
+  .search-input input:focus { outline: none; border-color: var(--wine); background: #fff; box-shadow: 0 0 0 3px rgba(59,111,224,0.1); }
+  .segmented { display: inline-flex; background: #f0f2f5; border-radius: 999px; padding: 3px; gap: 2px; flex-shrink: 0; }
+  .segmented button { border: none; background: none; padding: 7px 15px; border-radius: 999px; font-size: 12.5px; font-weight: 500; color: var(--ink-soft); cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+  .segmented button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(16,19,26,0.1); font-weight: 600; }
+  .pill-stat { padding: 6px 13px; border-radius: 999px; background: #f5f6f8; font-size: 11.5px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+  .list-rows { display: flex; flex-direction: column; }
+  .list-row { display: flex; align-items: center; gap: 14px; padding: 15px 22px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .list-row-body { flex-basis: 200px; }
+  .list-row:last-child { border-bottom: none; }
+  .list-row:hover { background: #fafbfd; }
+  .list-row-icon { width: 40px; height: 40px; border-radius: 12px; background: #f0f2f5; display: flex; align-items: center; justify-content: center; color: var(--ink-soft); flex-shrink: 0; font-size: 15px; font-weight: 600; }
+  .list-row-icon svg { width: 18px; height: 18px; }
+  .list-row-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+  .list-row-body { flex: 1; min-width: 0; }
+  .list-row-title { font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-row-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-row-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .list-row-value { font-size: 13.5px; font-weight: 600; color: var(--ink); text-align: right; }
+  .btn-outline-pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 12px; font-weight: 500; color: var(--ink); cursor: pointer; white-space: nowrap; font-family: var(--sans); }
+  .btn-outline-pill:hover { border-color: var(--wine); color: var(--wine); }
+  .btn-outline-pill.danger:hover { border-color: var(--bad); color: var(--bad); }
+  .list-empty { padding: 40px 20px; text-align: center; color: var(--ink-soft); font-size: 13.5px; }
+
+  /* Availability generator (modern, rounded) */
+  .avail-card { background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 28px 30px; margin-bottom: 26px; box-shadow: 0 1px 3px rgba(16,19,26,0.04); }
+  .avail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 26px; }
+  .avail-icon { width: 46px; height: 46px; flex-shrink: 0; border-radius: 50%; background: rgba(59,111,224,0.1); color: var(--wine); display: flex; align-items: center; justify-content: center; }
+  .avail-icon svg { width: 22px; height: 22px; }
+  .avail-header h3 { font-size: 16.5px; margin-bottom: 3px; }
+  .avail-header p { margin: 0; font-size: 12.5px; color: var(--ink-soft); }
+  .avail-row { display: grid; grid-template-columns: 1fr auto; gap: 18px; margin-bottom: 20px; align-items: end; }
+  .avail-field { margin-bottom: 20px; }
+  .avail-field:last-child { margin-bottom: 0; }
+  .avail-field > label { display: block; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #9aa0ab; margin-bottom: 9px; }
+  .avail-select { width: 100%; padding: 11px 16px; border: 1px solid var(--line); border-radius: 999px; font-size: 13.5px; font-family: var(--sans); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 14px center; appearance: none; color: var(--ink); cursor: pointer; }
+  .avail-select:focus { outline: none; border-color: var(--wine); box-shadow: 0 0 0 3px rgba(59,111,224,0.12); }
+
+  .stepper { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: #fafbfc; }
+  .stepper button { width: 34px; height: 40px; border: none; background: none; font-size: 17px; color: var(--wine); cursor: pointer; flex-shrink: 0; }
+  .stepper button:hover { background: rgba(59,111,224,0.08); }
+  .stepper input { width: 100%; border: none; background: none; text-align: center; font-size: 14px; font-weight: 600; color: var(--ink); padding: 0; -moz-appearance: textfield; }
+  .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+  .date-range-picker { display: flex; align-items: center; gap: 12px; }
+  .date-range-picker input { flex: 1; padding: 11px 16px; border: 1px solid var(--line); border-radius: 999px; font-size: 13.5px; font-family: var(--sans); background: #fff; color: var(--ink); }
+  .date-range-picker input:focus { outline: none; border-color: var(--wine); box-shadow: 0 0 0 3px rgba(59,111,224,0.12); }
+  .date-arrow { color: #c7cbd3; font-size: 15px; flex-shrink: 0; }
+
+  .day-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+  .day-pill { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line); background: #fafbfc; color: var(--ink-soft); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; }
+  .day-pill:hover { background: #f0f2f5; }
+  .day-pill.active { background: var(--wine); border-color: var(--wine); color: #fff; box-shadow: 0 4px 10px rgba(59,111,224,0.3); }
+
+  .time-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .time-chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 8px 8px 16px; border-radius: 999px; background: rgba(59,111,224,0.1); color: var(--wine); font-size: 13px; font-weight: 600; }
+  .time-chip button { width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(59,111,224,0.18); color: var(--wine); font-size: 13px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .time-chip button:hover { background: var(--wine); color: #fff; }
+  .time-chip-add { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 999px; border: 1.5px dashed #c7cbd3; background: none; color: var(--ink-soft); font-size: 13px; font-weight: 500; cursor: pointer; }
+  .time-chip-add:hover { border-color: var(--wine); color: var(--wine); }
+  .time-chip-input { padding: 7px 12px; border-radius: 999px; border: 1.5px solid var(--wine); font-size: 13px; font-family: var(--sans); }
+
+  .btn-generate { display: inline-flex; align-items: center; gap: 8px; margin-top: 26px; background: var(--wine); color: #fff; border: none; padding: 13px 26px; border-radius: 999px; font-size: 13.5px; font-weight: 600; font-family: var(--sans); cursor: pointer; box-shadow: 0 6px 16px rgba(59,111,224,0.28); transition: transform 0.1s ease, box-shadow 0.1s ease; }
+  .btn-generate:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(59,111,224,0.35); }
+
+  /* Calendar */
+  .cal-subtabs { display: flex; gap: 8px; margin-bottom: 18px; }
+  .cal-subtabs button { padding: 8px 16px; border: 1px solid var(--line); background: #fff; border-radius: 999px; font-size: 12.5px; font-weight: 500; color: var(--ink-soft); }
+  .cal-subtabs button.active { background: rgba(59,111,224,0.08); color: var(--wine); border-color: rgba(59,111,224,0.35); font-weight: 600; }
+  .cal-view { display: none; }
+  .cal-view.active { display: block; }
+  .cal-toolbar-v2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--cream); border: 1px solid var(--line); border-radius: 12px; padding: 8px; margin-bottom: 16px; }
+  .cal-search-wrap { position: relative; flex: 1 1 200px; min-width: 160px; max-width: 260px; }
+  .cal-search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--ink-soft); pointer-events: none; }
+  .cal-search-input { width: 100%; box-sizing: border-box; padding: 8px 10px 8px 32px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 12.5px; font-family: var(--sans); color: var(--ink); }
+  .cal-search-input:focus { outline: none; border-color: var(--wine); }
+  .cal-pill-btn { display: inline-flex; align-items: center; gap: 5px; background: #fff; border: 1px solid var(--line); color: var(--ink); padding: 8px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600; font-family: var(--sans); cursor: pointer; white-space: nowrap; }
+  .cal-pill-btn:hover { background: #f2f4f8; }
+  .cal-chevron { width: 13px; height: 13px; color: #9aa0ab; flex-shrink: 0; }
+  .cal-toolbar-v2 .cal-range { font-size: 13.5px; font-weight: 700; color: var(--ink); padding: 0 2px; min-width: 120px; text-align: center; white-space: nowrap; }
+  .cal-icon-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: #fff; border-radius: 999px; color: var(--ink-soft); padding: 0; flex-shrink: 0; }
+  .cal-icon-btn:hover { background: #f5f6f8; }
+  .cal-icon-btn svg { width: 15px; height: 15px; }
+  .cal-spacer { flex: 1; }
+  .cal-mode-dropdown { position: relative; }
+  .cal-mode-menu { position: absolute; top: calc(100% + 6px); left: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(16,19,26,0.14); padding: 5px; display: none; z-index: 25; min-width: 140px; }
+  .cal-mode-menu.open { display: block; }
+  .cal-mode-menu button { width: 100%; border: none; background: none; padding: 7px 9px; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--ink); text-align: left; cursor: pointer; }
+  .cal-mode-menu button:hover { background: #f2f4f8; }
+  .cal-mode-menu button.active { background: rgba(59,111,224,0.09); color: var(--wine); font-weight: 600; }
+  .cal-legend { display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--ink-soft); margin-bottom: 14px; flex-wrap: wrap; }
+  .cal-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .cal-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  .cal-grid-wrap { border: 1px solid var(--line); border-radius: 12px; background: #fff; overflow: hidden; box-shadow: 0 1px 2px rgba(16,19,26,0.03); }
+  .cal-header-row { display: grid; grid-template-columns: 56px repeat(var(--cal-cols, 7), 1fr); border-bottom: 1px solid var(--line); }
+  .cal-header-cell { padding: 13px 8px; text-align: center; font-size: 13px; font-weight: 700; color: var(--ink); border-left: 1px solid var(--line); }
+  .cal-header-cell.today { color: var(--wine); }
+  .cal-body-scroll { max-height: 620px; overflow-y: auto; position: relative; }
+  .cal-body-row { display: grid; grid-template-columns: 56px repeat(var(--cal-cols, 7), 1fr); }
+  .cal-time-cell { padding: 0 8px; font-size: 11px; color: var(--ink-soft); text-align: right; transform: translateY(-6px); }
+  .cal-day-col { border-left: 1px solid var(--line); border-top: 1px solid var(--line); position: relative; }
+  .cal-events-layer { position: absolute; inset: 0; }
+  .cal-event { position: absolute; border-radius: 8px; border-left: 3px solid; background: #fff; padding: 7px 9px; overflow: hidden; cursor: pointer; box-shadow: 0 1px 3px rgba(16,19,26,0.08); font-size: 11.5px; line-height: 1.4; transition: box-shadow 0.15s ease; }
+  .cal-event:hover { box-shadow: 0 4px 14px rgba(16,19,26,0.16); z-index: 5; }
+  .cal-event .cal-badge { display: inline-block; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 7px; border-radius: 999px; margin-bottom: 4px; }
+  .cal-event .cal-exp { font-weight: 700; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); font-size: 12px; }
+  .cal-event .cal-cust { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-soft); margin-top: 1px; }
+  .cal-event .cal-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; font-size: 10.5px; font-weight: 600; color: var(--ink-soft); }
+  .cal-event.st-confermata { border-color: #2563eb; }
+  .cal-event.st-confermata .cal-badge { background: #dbeafe; color: #1e3a8a; }
+  .cal-event.st-in_attesa { border-color: #d97706; }
+  .cal-event.st-in_attesa .cal-badge { background: #fef3c7; color: #78350f; }
+  .cal-event.st-annullata { border-color: #9aa0ab; background: #fafbfc; opacity: 0.75; }
+  .cal-event.st-annullata .cal-badge { background: #f1f2f4; color: #6b7280; }
+  .cal-statuses-menu { position: relative; }
+  .cal-statuses-panel { position: absolute; top: calc(100% + 6px); right: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(16,19,26,0.12); padding: 10px; display: none; z-index: 20; min-width: 170px; }
+  .cal-statuses-panel.open { display: block; }
+  .cal-statuses-panel label { display: flex; align-items: center; gap: 8px; padding: 6px 4px; font-size: 13px; color: var(--ink); text-transform: none; font-weight: 400; }
+
+  .mobile-topbar-toggle { display: none; width: 36px; height: 36px; align-items: center; justify-content: center; border: 1px solid var(--line); background: #fff; border-radius: 8px; color: var(--ink); flex-shrink: 0; }
+  .mobile-topbar-toggle svg { width: 19px; height: 19px; }
+  .sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(16,19,26,0.45); z-index: 190; }
+  .sidebar-backdrop.open { display: block; }
+
+  @media (max-width: 860px) {
+    .sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 200; transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: 10px 0 30px rgba(16,19,26,0.18); overflow-y: auto; }
+    .sidebar.open { transform: translateX(0); }
+    .mobile-topbar-toggle { display: flex; }
+    .topbar { padding: 0 14px; gap: 10px; justify-content: flex-start; }
+    main { padding: 16px; }
+    .field-row { grid-template-columns: 1fr; }
+    .avail-row { grid-template-columns: 1fr; }
+    .modal-box { padding: 18px; }
+    .cal-toolbar-v2 .cal-range { min-width: 0; }
+    .list-toolbar { flex-direction: column; align-items: stretch; }
+    .list-toolbar .search-input { width: 100%; min-width: 0; }
+    .list-toolbar .segmented { max-width: 100%; overflow-x: auto; }
+    .list-toolbar .btn-generate, .list-toolbar > select { width: 100%; justify-content: center; }
+  }
+  @media (max-width: 480px) {
+    .cards { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 640px) {
+    table { font-size: 11px; }
+    th, td { padding: 6px 7px; }
+    th { font-size: 8.5px; }
+    .btn.small, .btn-outline-pill { padding: 4px 8px; font-size: 10.5px; }
+    .badge { padding: 2px 7px; font-size: 9.5px; }
+    .actions-cell { gap: 4px; }
+    .cal-header-cell { padding: 8px 3px; font-size: 10.5px; }
+    .cal-time-cell { padding: 0 3px; font-size: 9px; }
+    .cal-body-row, .cal-header-row { grid-template-columns: 34px repeat(var(--cal-cols, 7), 1fr) !important; }
+    .cal-event { padding: 3px 4px; font-size: 9.5px; }
+    .cal-event .cal-exp { font-size: 10px; }
+    .cal-event .cal-badge { font-size: 7px; padding: 1px 4px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <h2>Admin</h2>
+  <p style="color:var(--ink-soft)">Accedi con le tue credenziali</p>
+  <div id="login-msg"></div>
+
+  <div id="login-form-user">
+    <input type="text" id="login-username" placeholder="Username" onkeydown="if(event.key==='Enter')doUserLogin()">
+    <input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key==='Enter')doUserLogin()">
+    <button class="btn" style="width:100%" onclick="doUserLogin()">Accedi</button>
+    <p style="margin-top:12px"><a href="#" onclick="showLoginForm('login-form-forgot');return false" style="font-size:12.5px;color:var(--ink-soft)">Password dimenticata?</a></p>
+    <p style="margin-top:14px;font-size:11.5px"><a href="#" onclick="showLoginForm('login-form-master');return false" style="color:var(--ink-soft)">Accesso con chiave amministratore</a></p>
+  </div>
+
+  <div id="login-form-master" style="display:none">
+    <input type="password" id="login-key" placeholder="Chiave amministratore" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn" style="width:100%" onclick="doLogin()">Accedi</button>
+    <p style="margin-top:14px;font-size:11.5px"><a href="#" onclick="showLoginForm('login-form-user');return false" style="color:var(--ink-soft)">Accedi con username e password</a></p>
+  </div>
+
+  <div id="login-form-forgot" style="display:none">
+    <input type="email" id="forgot-email" placeholder="La tua email" onkeydown="if(event.key==='Enter')doForgotPassword()">
+    <button class="btn" style="width:100%" onclick="doForgotPassword()">Invia link di reset</button>
+    <p style="margin-top:14px;font-size:11.5px"><a href="#" onclick="showLoginForm('login-form-user');return false" style="color:var(--ink-soft)">Torna al login</a></p>
+  </div>
+
+  <div id="login-form-reset" style="display:none">
+    <input type="password" id="reset-password" placeholder="Nuova password" onkeydown="if(event.key==='Enter')doResetPassword()">
+    <button class="btn" style="width:100%" onclick="doResetPassword()">Imposta nuova password</button>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img src="/img/marramiero-logo.webp" alt="Marramiero">
+    </div>
+
+    <div class="workspace-switcher" id="workspace-switcher">
+      <button class="workspace-trigger" onclick="toggleWorkspaceMenu()">
+        <span class="ws-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg>
+        </span>
+        <span class="workspace-trigger-text">Enoturismo</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="workspace-chevron"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="workspace-menu" id="workspace-menu">
+        <button class="active" onclick="toggleWorkspaceMenu()">
+          <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg></span>
+          Enoturismo
+        </button>
+        <button onclick="switchWorkspace('commerciale')">
+          <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg></span>
+          Commerciale
+        </button>
+        <button onclick="switchWorkspace('produzione')">
+          <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg></span>
+          Produzione
+        </button>
+        <button onclick="switchWorkspace('magazzino')">
+          <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/></svg></span>
+          Magazzino
+        </button>
+      </div>
+    </div>
+
+    <div class="sidebar-section-label">Sezioni</div>
+    <nav class="sidebar-nav">
+      <button data-tab="dashboard" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Dashboard
+      </button>
+      <button data-tab="experiences">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg>
+        Esperienze
+      </button>
+      <button data-tab="calendar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+        Calendario
+      </button>
+      <button data-tab="bookings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
+        Prenotazioni
+      </button>
+      <button data-tab="discounts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 12.6 12.6 20.4a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1 0-2.8L11.4 3.6a2 2 0 0 1 1.4-.6H19a2 2 0 0 1 2 2v6.6a2 2 0 0 1-.6 1.4Z"/><circle cx="15" cy="9" r="1.5"/></svg>
+        Codici Sconto
+      </button>
+      <button data-tab="reviews">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.6 5.8 6.4.6-4.8 4.2 1.4 6.2L12 16.9 6.4 19.8l1.4-6.2-4.8-4.2 6.4-.6Z"/></svg>
+        Recensioni
+      </button>
+      <button data-tab="newsletter">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+        Newsletter
+      </button>
+      <button data-tab="operators">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="4.5"/></svg>
+        Operatori
+      </button>
+      <button data-tab="crm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
+        CRM
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button onclick="logout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Esci
+      </button>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button type="button" class="mobile-topbar-toggle" onclick="toggleMobileSidebar()" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+      </button>
+      <div class="crumb"><small>Marramiero</small><span id="topbar-title">Dashboard</span></div>
+    </header>
+
+  <main>
+    <!-- DASHBOARD -->
+    <div class="panel active" id="panel-dashboard">
+      <div class="cards" id="stats-cards"></div>
+      <h3 style="margin-bottom:12px">Ricavi per esperienza</h3>
+      <div class="table-wrap"><table id="stats-by-exp"><thead><tr><th>Esperienza</th><th>Prenotazioni</th><th>Ospiti</th><th>Ricavo</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- EXPERIENCES -->
+    <div class="panel" id="panel-experiences">
+      <div class="toolbar">
+        <button class="btn" onclick="openExpModal()">+ Nuova esperienza</button>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Nome (IT)</th><th>Nome (EN)</th><th>Prezzo</th><th>Durata</th><th>Max ospiti</th><th>Stato</th><th>Azioni</th></tr></thead>
+        <tbody id="experiences-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- CALENDAR / SLOTS -->
+    <div class="panel" id="panel-calendar">
+      <div class="cal-subtabs">
+        <button data-calview="cal-view-calendar" class="active">Calendario</button>
+        <button data-calview="cal-view-availability">Disponibilità</button>
+      </div>
+
+      <div class="cal-view active" id="cal-view-calendar">
+        <div class="cal-toolbar-v2">
+          <div class="cal-search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="cal-search" class="cal-search-input" placeholder="Cerca cliente o esperienza..." oninput="renderCalendar()">
+          </div>
+
+          <button class="cal-pill-btn" onclick="calGoToday()">Oggi</button>
+
+          <button class="cal-icon-btn" onclick="calOpenJumpDate()" title="Vai a data">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+          </button>
+          <input type="date" id="cal-jump-date" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="calJumpToDate(this.value)">
+
+          <button class="cal-icon-btn" onclick="calGoPrev()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div class="cal-range" id="cal-range-label"></div>
+          <button class="cal-icon-btn" onclick="calGoNext()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+
+          <div class="cal-spacer"></div>
+
+          <div class="cal-mode-dropdown" id="cal-mode-dropdown">
+            <button class="cal-pill-btn" onclick="toggleCalModeMenu()">
+              <span id="cal-mode-label">Settimana</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cal-chevron"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="cal-mode-menu" id="cal-mode-menu">
+              <button type="button" data-mode="week" class="active" onclick="calSetMode('week')">Settimana</button>
+              <button type="button" data-mode="day" onclick="calSetMode('day')">Giorno</button>
+            </div>
+          </div>
+
+          <div class="cal-statuses-menu">
+            <button class="cal-pill-btn" onclick="toggleStatusesMenu()">
+              Stati
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cal-chevron"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="cal-statuses-panel" id="cal-statuses-panel">
+              <label><input type="checkbox" class="cal-status-cb" value="confermata" checked onchange="renderCalendar()"> Confermate</label>
+              <label><input type="checkbox" class="cal-status-cb" value="in_attesa" checked onchange="renderCalendar()"> In attesa</label>
+              <label><input type="checkbox" class="cal-status-cb" value="annullata" onchange="renderCalendar()"> Annullate</label>
+            </div>
+          </div>
+
+          <button class="cal-icon-btn" onclick="calExportCsv()" title="Esporta CSV">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/></svg>
+          </button>
+
+          <button class="btn" onclick="openManualBooking()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Aggiungi
+          </button>
+        </div>
+
+        <div class="cal-legend">
+          <span><i style="background:#2563eb"></i> Confermata</span>
+          <span><i style="background:#d97706"></i> In attesa</span>
+          <span><i style="background:#9aa0ab"></i> Annullata</span>
+        </div>
+
+        <div class="cal-grid-wrap">
+          <div class="cal-header-row" id="cal-header-row"></div>
+          <div class="cal-body-scroll">
+            <div class="cal-body-row" id="cal-body-row" style="position:relative"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cal-view" id="cal-view-availability">
+      <div class="avail-card">
+        <div class="avail-header">
+          <div class="avail-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="4"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="12" y1="13" x2="12" y2="17"/><line x1="10" y1="15" x2="14" y2="15"/></svg>
+          </div>
+          <div>
+            <h3>Genera disponibilità ricorrente</h3>
+            <p>Crea automaticamente gli orari prenotabili per un intervallo di date</p>
+          </div>
+        </div>
+
+        <div class="avail-row">
+          <div class="avail-field">
+            <label>Esperienza</label>
+            <select id="bulk-exp" class="avail-select"></select>
+          </div>
+          <div class="avail-field" style="max-width:180px">
+            <label>Capienza per slot</label>
+            <div class="stepper">
+              <button type="button" onclick="stepCapacity(-1)">−</button>
+              <input type="number" id="bulk-capacity" value="10" min="1">
+              <button type="button" onclick="stepCapacity(1)">+</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="avail-field">
+          <label>Periodo</label>
+          <div class="date-range-picker">
+            <input type="date" id="bulk-start">
+            <span class="date-arrow">→</span>
+            <input type="date" id="bulk-end">
+          </div>
+        </div>
+
+        <div class="avail-field">
+          <label>Giorni della settimana</label>
+          <div class="day-picker" id="bulk-day-picker">
+            <button type="button" class="day-pill active" data-day="1">L</button>
+            <button type="button" class="day-pill active" data-day="2">M</button>
+            <button type="button" class="day-pill active" data-day="3">M</button>
+            <button type="button" class="day-pill active" data-day="4">G</button>
+            <button type="button" class="day-pill active" data-day="5">V</button>
+            <button type="button" class="day-pill active" data-day="6">S</button>
+            <button type="button" class="day-pill" data-day="0">D</button>
+          </div>
+        </div>
+
+        <div class="avail-field">
+          <label>Orari delle visite</label>
+          <div class="time-chips" id="bulk-time-chips"></div>
+        </div>
+
+        <div id="bulk-msg"></div>
+        <button class="btn-generate" onclick="generateSlots()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 3v18M3 12h18"/></svg>
+          Genera disponibilità
+        </button>
+      </div>
+
+      <div class="list-card">
+        <div class="list-toolbar">
+          <div class="list-toolbar-title"><h3>Slot esistenti</h3></div>
+          <select id="slots-filter-exp" class="avail-select" style="width:auto;padding:8px 34px 8px 14px"><option value="">Tutte le esperienze</option></select>
+          <input type="date" id="slots-filter-from" style="padding:8px 12px;border:1px solid var(--line);border-radius:999px">
+          <input type="date" id="slots-filter-to" style="padding:8px 12px;border:1px solid var(--line);border-radius:999px">
+          <button class="btn-outline-pill" onclick="loadSlots()">Filtra</button>
+        </div>
+        <div class="list-rows" id="slots-tbody"></div>
+      </div>
+      </div>
+    </div>
+
+    <!-- BOOKINGS -->
+    <div class="panel" id="panel-bookings">
+      <div class="list-card">
+        <div class="list-toolbar">
+          <div class="search-input">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="bk-search" placeholder="Cerca nome o email" oninput="loadBookings()">
+          </div>
+          <div class="segmented" id="bk-status-seg">
+            <button type="button" class="active" data-status="all">Tutte</button>
+            <button type="button" data-status="in_attesa">In attesa</button>
+            <button type="button" data-status="confermata">Confermate</button>
+            <button type="button" data-status="annullata">Annullate</button>
+          </div>
+          <div class="list-spacer"></div>
+          <button class="btn-outline-pill" onclick="syncPayments()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+            Sincronizza
+          </button>
+          <a class="btn-outline-pill" id="export-link" href="#" style="text-decoration:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Esporta CSV
+          </a>
+          <button class="btn-generate" style="margin-top:0;padding:9px 18px" onclick="openManualBooking()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+            Prenotazione
+          </button>
+        </div>
+        <div class="list-rows" id="bookings-tbody"></div>
+      </div>
+    </div>
+
+    <!-- DISCOUNTS -->
+    <div class="panel" id="panel-discounts">
+      <div class="toolbar"><button class="btn" onclick="openDiscountModal()">+ Nuovo codice</button></div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Codice</th><th>Tipo</th><th>Valore</th><th>Usi</th><th>Validità</th><th>Stato</th><th>Azioni</th></tr></thead>
+        <tbody id="discounts-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- REVIEWS -->
+    <div class="panel" id="panel-reviews">
+      <div class="table-wrap">
+        <table><thead><tr><th>Stato</th><th>Nome</th><th>Voto</th><th>Commento</th><th>Data</th><th>Azioni</th></tr></thead>
+        <tbody id="reviews-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- NEWSLETTER -->
+    <div class="panel" id="panel-newsletter">
+      <div class="toolbar"><a class="btn secondary" id="nl-export-link" href="#" style="text-decoration:none">Esporta CSV</a></div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Email</th><th>Iscritto il</th><th>Azioni</th></tr></thead>
+        <tbody id="newsletter-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- OPERATORI -->
+    <div class="panel" id="panel-operators">
+      <div class="list-card">
+        <div class="list-toolbar">
+          <div class="list-toolbar-title"><h3>Operatori</h3><p>Addetti assegnabili alle visite in cantina</p></div>
+          <div class="list-spacer"></div>
+          <button class="btn-generate" style="margin-top:0;padding:9px 18px" onclick="openOperatorModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+            Nuovo operatore
+          </button>
+        </div>
+        <div class="list-rows" id="operators-tbody"></div>
+      </div>
+    </div>
+
+    <!-- CRM B2C -->
+    <div class="panel" id="panel-crm">
+      <div class="list-card">
+        <div class="list-toolbar">
+          <div class="search-input">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="b2c-search" placeholder="Cerca nome o email" oninput="loadB2CCustomers()">
+          </div>
+          <div class="list-spacer"></div>
+          <button class="btn-generate" style="margin-top:0;padding:9px 18px" onclick="openB2CCustomerModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+            Nuovo cliente
+          </button>
+        </div>
+        <div class="list-rows" id="b2c-customers-tbody"></div>
+      </div>
+    </div>
+  </main>
+  </div>
+</div>
+</div>
+
+<!-- Experience modal -->
+<div class="modal-overlay" id="exp-modal">
+  <div class="modal-box">
+    <h3 id="exp-modal-title">Nuova esperienza</h3>
+    <div id="exp-modal-msg"></div>
+    <input type="hidden" id="exp-id">
+    <div class="field-row">
+      <div class="field"><label>Nome (IT)</label><input id="exp-name-it"></div>
+      <div class="field"><label>Nome (EN)</label><input id="exp-name-en"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Descrizione (IT)</label><textarea id="exp-desc-it" rows="3"></textarea></div>
+      <div class="field"><label>Descrizione (EN)</label><textarea id="exp-desc-en" rows="3"></textarea></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Prezzo (€)</label><input type="number" id="exp-price" step="0.01"></div>
+      <div class="field"><label>Durata (min)</label><input type="number" id="exp-duration" value="90"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Max ospiti per slot</label><input type="number" id="exp-max-guests" value="10"></div>
+      <div class="field"><label>Immagine (URL, opzionale)</label><input id="exp-image"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('exp-modal')">Annulla</button>
+      <button class="btn" onclick="saveExperience()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual booking modal -->
+<div class="modal-overlay" id="manual-modal">
+  <div class="modal-box">
+    <h3>Nuova prenotazione manuale</h3>
+    <div id="manual-modal-msg"></div>
+    <div class="field"><label>Esperienza</label><select id="man-exp" onchange="loadManualSlots()"></select></div>
+    <div class="field"><label>Slot</label><select id="man-slot"></select></div>
+    <div class="field-row">
+      <div class="field"><label>Nome cliente</label><input id="man-name"></div>
+      <div class="field"><label>Email</label><input id="man-email"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Telefono</label><input id="man-phone"></div>
+      <div class="field"><label>Ospiti</label><input type="number" id="man-guests" value="1" min="1"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Stato</label>
+        <select id="man-status"><option value="confermata">Confermata</option><option value="in_attesa">In attesa</option></select>
+      </div>
+      <div class="field"><label>Operatore (opzionale)</label><select id="man-operator"><option value="">— Nessuno —</option></select></div>
+    </div>
+    <div class="field"><label>Note</label><textarea id="man-notes" rows="2"></textarea></div>
+    <div class="checkbox-row"><label><input type="checkbox" id="man-send-email" checked> Invia email di conferma</label></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('manual-modal')">Annulla</button>
+      <button class="btn" onclick="saveManualBooking()">Crea prenotazione</button>
+    </div>
+  </div>
+</div>
+
+<!-- Discount modal -->
+<div class="modal-overlay" id="discount-modal">
+  <div class="modal-box">
+    <h3>Nuovo codice sconto</h3>
+    <div id="discount-modal-msg"></div>
+    <div class="field"><label>Codice</label><input id="disc-code" style="text-transform:uppercase"></div>
+    <div class="field-row">
+      <div class="field"><label>Tipo</label><select id="disc-type"><option value="percent">Percentuale (%)</option><option value="fixed">Importo fisso (€)</option></select></div>
+      <div class="field"><label>Valore</label><input type="number" id="disc-value"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Usi massimi (vuoto = illimitato)</label><input type="number" id="disc-max-uses"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Valido da</label><input type="date" id="disc-from"></div>
+      <div class="field"><label>Valido a</label><input type="date" id="disc-to"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('discount-modal')">Annulla</button>
+      <button class="btn" onclick="saveDiscount()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Operator modal -->
+<div class="modal-overlay" id="operator-modal">
+  <div class="modal-box">
+    <h3 id="operator-modal-title">Nuovo operatore</h3>
+    <div id="operator-modal-msg"></div>
+    <input type="hidden" id="op-id">
+    <div class="field"><label>Nome</label><input id="op-name"></div>
+    <div class="field-row">
+      <div class="field"><label>Email</label><input type="email" id="op-email"></div>
+      <div class="field"><label>Telefono</label><input id="op-phone"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('operator-modal')">Annulla</button>
+      <button class="btn" onclick="saveOperator()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- B2C customer detail/edit modal -->
+<div class="modal-overlay" id="b2c-modal">
+  <div class="modal-box" style="max-width:640px">
+    <h3 id="b2c-modal-title">Nuovo cliente</h3>
+    <div id="b2c-modal-msg"></div>
+    <input type="hidden" id="b2c-id">
+    <div class="field-row">
+      <div class="field"><label>Nome</label><input id="b2c-name"></div>
+      <div class="field"><label>Email</label><input type="email" id="b2c-email"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Telefono</label><input id="b2c-phone"></div>
+      <div class="field"><label>Note</label><input id="b2c-notes"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('b2c-modal')">Annulla</button>
+      <button class="btn" onclick="saveB2CCustomer()">Salva</button>
+    </div>
+
+    <div id="b2c-detail-section" style="display:none;margin-top:24px;border-top:1px solid var(--line);padding-top:18px">
+      <h3 style="font-size:15px;margin-bottom:10px">Visite effettuate</h3>
+      <div class="table-wrap" style="margin-bottom:20px">
+        <table><thead><tr><th>Data</th><th>Esperienza</th><th>Operatore</th><th>Stato</th><th>Totale</th></tr></thead>
+        <tbody id="b2c-visits-tbody"></tbody></table>
+      </div>
+      <h3 style="font-size:15px;margin-bottom:10px">Ordini negozio / e-commerce</h3>
+      <div class="table-wrap" style="margin-bottom:14px">
+        <table><thead><tr><th>Data</th><th>Canale</th><th>N. Ordine</th><th>Importo</th><th>Azioni</th></tr></thead>
+        <tbody id="b2c-orders-tbody"></tbody></table>
+      </div>
+      <button class="btn secondary" onclick="openB2COrderModal()">+ Aggiungi ordine</button>
+    </div>
+  </div>
+</div>
+
+<!-- B2C order modal -->
+<div class="modal-overlay" id="b2c-order-modal">
+  <div class="modal-box">
+    <h3>Nuovo ordine</h3>
+    <div id="b2c-order-modal-msg"></div>
+    <div class="field"><label>Canale</label>
+      <select id="bo-channel"><option value="ecommerce">E-commerce</option><option value="negozio">Negozio fisico</option></select>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Data ordine</label><input type="date" id="bo-date"></div>
+      <div class="field"><label>Importo (€)</label><input type="number" step="0.01" id="bo-amount"></div>
+    </div>
+    <div class="field"><label>N. Ordine (opzionale)</label><input id="bo-number"></div>
+    <div class="field"><label>Note</label><textarea id="bo-notes" rows="2"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('b2c-order-modal')">Annulla</button>
+      <button class="btn" onclick="saveB2COrder()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let ADMIN_KEY = null;
+let EXPERIENCES = [];
+let OPERATORS = [];
+
+function doLogin() {
+  const key = document.getElementById('login-key').value.trim();
+  if (!key) return;
+  ADMIN_KEY = key;
+  sessionStorage.setItem('admin_key', key);
+  boot();
+}
+
+function showLoginForm(id) {
+  ['login-form-user', 'login-form-master', 'login-form-forgot', 'login-form-reset'].forEach(f => document.getElementById(f).style.display = f === id ? 'block' : 'none');
+  document.getElementById('login-msg').innerHTML = '';
+}
+
+async function doUserLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const msg = document.getElementById('login-msg');
+  msg.innerHTML = '';
+  if (!username || !password) { msg.innerHTML = '<div class="msg error">Inserisci username e password.</div>'; return; }
+  try {
+    const res = await fetch('/api/portal-users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore');
+    ADMIN_KEY = data.key;
+    sessionStorage.setItem('admin_key', data.key);
+    boot();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${e.message}</div>`;
+  }
+}
+
+async function doForgotPassword() {
+  const email = document.getElementById('forgot-email').value.trim();
+  const msg = document.getElementById('login-msg');
+  msg.innerHTML = '';
+  if (!email) { msg.innerHTML = '<div class="msg error">Inserisci la tua email.</div>'; return; }
+  try {
+    await fetch('/api/portal-users/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+    msg.innerHTML = '<div class="msg success">Se l\'indirizzo è registrato riceverai a breve un\'email con il link per reimpostare la password.</div>';
+  } catch (e) {
+    msg.innerHTML = '<div class="msg error">Errore, riprova.</div>';
+  }
+}
+
+async function doResetPassword() {
+  const password = document.getElementById('reset-password').value;
+  const msg = document.getElementById('login-msg');
+  msg.innerHTML = '';
+  const token = new URLSearchParams(location.search).get('reset');
+  if (!password || password.length < 6) { msg.innerHTML = '<div class="msg error">La password deve avere almeno 6 caratteri.</div>'; return; }
+  try {
+    const res = await fetch('/api/portal-users/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, password }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore');
+    msg.innerHTML = '<div class="msg success">Password aggiornata. Ora puoi accedere.</div>';
+    setTimeout(() => { window.location.href = '/admin.html'; }, 1500);
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${e.message}</div>`;
+  }
+}
+function logout() {
+  sessionStorage.removeItem('admin_key');
+  location.reload();
+}
+
+async function api(path, opts = {}) {
+  opts.headers = Object.assign({ 'x-admin-key': ADMIN_KEY, 'Content-Type': 'application/json' }, opts.headers || {});
+  const res = await fetch(path, opts);
+  if (res.status === 401) { sessionStorage.removeItem('admin_key'); location.reload(); throw new Error('unauthorized'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Errore');
+  return data;
+}
+
+function fmtEuro(cents) { return (cents / 100).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function esc(s) { return (s ?? '').toString().replace(/</g, '&lt;'); }
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+
+// ── Mobile sidebar drawer ────────────────────────────────────────────────────
+function toggleMobileSidebar() {
+  document.querySelector('.sidebar').classList.toggle('open');
+  document.querySelector('.sidebar-backdrop').classList.toggle('open');
+}
+function closeMobileSidebar() {
+  document.querySelector('.sidebar').classList.remove('open');
+  document.querySelector('.sidebar-backdrop').classList.remove('open');
+}
+
+// ── Tabs (sidebar) ──────────────────────────────────────────────────────────────
+const TAB_TITLES = { dashboard: 'Dashboard', experiences: 'Esperienze', calendar: 'Calendario', bookings: 'Prenotazioni', discounts: 'Codici Sconto', reviews: 'Recensioni', newsletter: 'Newsletter', operators: 'Operatori', crm: 'CRM' };
+document.querySelectorAll('.sidebar-nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sidebar-nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    document.getElementById('topbar-title').textContent = TAB_TITLES[btn.dataset.tab];
+    loadPanel(btn.dataset.tab);
+    closeMobileSidebar();
+  });
+});
+
+function loadPanel(tab) {
+  if (tab === 'dashboard') loadDashboard();
+  if (tab === 'experiences') loadExperiences();
+  if (tab === 'calendar') { loadExperiencesForSelects(); loadSlots(); renderCalendar(); }
+  if (tab === 'bookings') loadBookings();
+  if (tab === 'discounts') loadDiscounts();
+  if (tab === 'reviews') loadReviews();
+  if (tab === 'newsletter') loadNewsletter();
+  if (tab === 'operators') loadOperators();
+  if (tab === 'crm') loadB2CCustomers();
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  const s = await api('/api/admin/stats');
+  document.getElementById('stats-cards').innerHTML = `
+    <div class="card"><div class="label">Prenotazioni confermate</div><div class="value">${s.totals.bookings}</div></div>
+    <div class="card"><div class="label">Ospiti totali</div><div class="value">${s.totals.guests}</div></div>
+    <div class="card"><div class="label">Ricavo</div><div class="value">€ ${fmtEuro(s.totals.revenue_cents)}</div></div>
+    <div class="card"><div class="label">In attesa</div><div class="value">${s.pending}</div></div>
+    <div class="card"><div class="label">Prenotazioni future</div><div class="value">${s.upcoming}</div></div>
+    <div class="card"><div class="label">Iscritti newsletter</div><div class="value">${s.newsletterCount}</div></div>
+    <div class="card"><div class="label">Recensioni da moderare</div><div class="value">${s.reviewsPending}</div></div>
+  `;
+  const tbody = document.querySelector('#stats-by-exp tbody');
+  tbody.innerHTML = s.byExperience.length ? s.byExperience.map(e => `
+    <tr><td>${esc(e.name_it)}</td><td>${e.bookings}</td><td>${e.guests}</td><td>€ ${fmtEuro(e.revenue_cents)}</td></tr>
+  `).join('') : '<tr><td colspan="4" class="empty">Nessun dato disponibile.</td></tr>';
+}
+
+// ── Experiences ───────────────────────────────────────────────────────────────
+async function loadExperiences() {
+  EXPERIENCES = await api('/api/admin/experiences');
+  document.getElementById('experiences-tbody').innerHTML = EXPERIENCES.length ? EXPERIENCES.map(e => `
+    <tr>
+      <td>${esc(e.name_it)}</td><td>${esc(e.name_en)}</td>
+      <td>€ ${fmtEuro(e.price_cents)}</td><td>${e.duration_minutes} min</td><td>${e.max_guests}</td>
+      <td><span class="badge ${e.active ? 'confermata' : 'annullata'}">${e.active ? 'Attiva' : 'Disattiva'}</span></td>
+      <td class="actions-cell">
+        <button class="btn small secondary" onclick='openExpModal(${JSON.stringify(e)})'>Modifica</button>
+        <button class="btn small ${e.active ? 'danger' : 'ok'}" onclick="toggleExpActive(${e.id}, ${e.active ? 0 : 1})">${e.active ? 'Disattiva' : 'Attiva'}</button>
+        <button class="btn small danger" onclick="deleteExperience(${e.id})">Elimina</button>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" class="empty">Nessuna esperienza. Creane una.</td></tr>';
+}
+
+function openExpModal(e) {
+  document.getElementById('exp-modal-msg').innerHTML = '';
+  document.getElementById('exp-modal-title').textContent = e ? 'Modifica esperienza' : 'Nuova esperienza';
+  document.getElementById('exp-id').value = e ? e.id : '';
+  document.getElementById('exp-name-it').value = e ? e.name_it : '';
+  document.getElementById('exp-name-en').value = e ? e.name_en : '';
+  document.getElementById('exp-desc-it').value = e ? (e.description_it || '') : '';
+  document.getElementById('exp-desc-en').value = e ? (e.description_en || '') : '';
+  document.getElementById('exp-price').value = e ? (e.price_cents / 100) : '';
+  document.getElementById('exp-duration').value = e ? e.duration_minutes : 90;
+  document.getElementById('exp-max-guests').value = e ? e.max_guests : 10;
+  document.getElementById('exp-image').value = e ? (e.image_url || '') : '';
+  openModal('exp-modal');
+}
+
+async function saveExperience() {
+  const id = document.getElementById('exp-id').value;
+  const body = {
+    name_it: document.getElementById('exp-name-it').value.trim(),
+    name_en: document.getElementById('exp-name-en').value.trim(),
+    description_it: document.getElementById('exp-desc-it').value.trim(),
+    description_en: document.getElementById('exp-desc-en').value.trim(),
+    price_cents: Math.round(parseFloat(document.getElementById('exp-price').value) * 100),
+    duration_minutes: parseInt(document.getElementById('exp-duration').value) || 90,
+    max_guests: parseInt(document.getElementById('exp-max-guests').value) || 10,
+    image_url: document.getElementById('exp-image').value.trim(),
+  };
+  try {
+    if (id) await api('/api/admin/experiences/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+    else await api('/api/admin/experiences', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('exp-modal');
+    loadExperiences();
+  } catch (e) {
+    document.getElementById('exp-modal-msg').innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function toggleExpActive(id, active) {
+  await api('/api/admin/experiences/' + id, { method: 'PATCH', body: JSON.stringify({ active }) });
+  loadExperiences();
+}
+
+async function deleteExperience(id) {
+  if (!confirm('Eliminare questa esperienza e tutti i suoi slot?')) return;
+  await api('/api/admin/experiences/' + id, { method: 'DELETE' });
+  loadExperiences();
+}
+
+// ── Calendar / slots ──────────────────────────────────────────────────────────
+async function loadExperiencesForSelects() {
+  if (!EXPERIENCES.length) EXPERIENCES = await api('/api/admin/experiences');
+  const opts = EXPERIENCES.map(e => `<option value="${e.id}">${esc(e.name_it)}</option>`).join('');
+  document.getElementById('bulk-exp').innerHTML = opts;
+  document.getElementById('slots-filter-exp').innerHTML = '<option value="">Tutte le esperienze</option>' + opts;
+  document.getElementById('man-exp').innerHTML = opts;
+}
+
+// ── Day picker (rounded toggle pills) ──────────────────────────────────────────
+document.querySelectorAll('#bulk-day-picker .day-pill').forEach(btn => {
+  btn.addEventListener('click', () => btn.classList.toggle('active'));
+});
+
+// ── Capacity stepper ────────────────────────────────────────────────────────────
+function stepCapacity(delta) {
+  const input = document.getElementById('bulk-capacity');
+  input.value = Math.max(1, (parseInt(input.value) || 1) + delta);
+}
+
+// ── Time chips ──────────────────────────────────────────────────────────────────
+let BULK_TIMES = ['11:00', '15:30'];
+function renderTimeChips() {
+  const container = document.getElementById('bulk-time-chips');
+  container.innerHTML = BULK_TIMES.map(t => `
+    <span class="time-chip">${t}<button type="button" onclick="removeTimeChip('${t}')">×</button></span>
+  `).join('') + '<button type="button" class="time-chip-add" id="time-chip-add-btn" onclick="showTimeChipInput()">+ Aggiungi orario</button>';
+}
+function removeTimeChip(t) {
+  BULK_TIMES = BULK_TIMES.filter(x => x !== t);
+  renderTimeChips();
+}
+function showTimeChipInput() {
+  const btn = document.getElementById('time-chip-add-btn');
+  const input = document.createElement('input');
+  input.type = 'time';
+  input.className = 'time-chip-input';
+  input.value = '12:00';
+  btn.replaceWith(input);
+  input.focus();
+  const commit = () => {
+    if (input.value && !BULK_TIMES.includes(input.value)) {
+      BULK_TIMES.push(input.value);
+      BULK_TIMES.sort();
+    }
+    renderTimeChips();
+  };
+  input.addEventListener('change', commit);
+  input.addEventListener('blur', commit);
+}
+renderTimeChips();
+
+async function generateSlots() {
+  const msg = document.getElementById('bulk-msg');
+  msg.innerHTML = '';
+  const days_of_week = Array.from(document.querySelectorAll('#bulk-day-picker .day-pill.active')).map(b => parseInt(b.dataset.day));
+  const times = BULK_TIMES;
+  const body = {
+    experience_id: document.getElementById('bulk-exp').value,
+    start_date: document.getElementById('bulk-start').value,
+    end_date: document.getElementById('bulk-end').value,
+    capacity: parseInt(document.getElementById('bulk-capacity').value) || 10,
+    days_of_week, times
+  };
+  if (!body.start_date || !body.end_date || !times.length) {
+    msg.innerHTML = '<div class="msg error">Compila data inizio, data fine e almeno un orario.</div>';
+    return;
+  }
+  try {
+    const res = await api('/api/admin/slots/bulk', { method: 'POST', body: JSON.stringify(body) });
+    msg.innerHTML = `<div class="msg success">${res.created} nuovi slot creati.</div>`;
+    loadSlots();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function loadSlots() {
+  const params = new URLSearchParams();
+  const expId = document.getElementById('slots-filter-exp').value;
+  const from = document.getElementById('slots-filter-from').value;
+  const to = document.getElementById('slots-filter-to').value;
+  if (expId) params.set('experience_id', expId);
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const slots = await api('/api/admin/slots?' + params.toString());
+  document.getElementById('slots-tbody').innerHTML = slots.length ? slots.map(s => `
+    <div class="list-row">
+      <div class="list-row-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+      </div>
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(s.experience_name)}</div>
+        <div class="list-row-sub">${s.date} · ${s.time}</div>
+      </div>
+      <div class="list-row-meta">
+        <span class="pill-stat">${s.available}/${s.capacity} disponibili</span>
+        <span class="badge ${s.active ? 'confermata' : 'annullata'}">${s.active ? 'Attivo' : 'Disattivo'}</span>
+        <button class="btn-outline-pill" onclick="toggleSlotActive(${s.id}, ${s.active ? 0 : 1})">${s.active ? 'Disattiva' : 'Attiva'}</button>
+        <button class="btn-outline-pill danger" onclick="deleteSlot(${s.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessuno slot trovato.</div>';
+}
+
+async function toggleSlotActive(id, active) {
+  await api('/api/admin/slots/' + id, { method: 'PATCH', body: JSON.stringify({ active }) });
+  loadSlots();
+}
+async function deleteSlot(id) {
+  if (!confirm('Eliminare questo slot?')) return;
+  try { await api('/api/admin/slots/' + id, { method: 'DELETE' }); loadSlots(); }
+  catch (e) { alert(e.message); }
+}
+
+// ── Calendario (vista visuale) ──────────────────────────────────────────────────
+document.querySelectorAll('.cal-subtabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cal-subtabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.cal-view').forEach(v => v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.calview).classList.add('active');
+    if (btn.dataset.calview === 'cal-view-calendar') renderCalendar();
+  });
+});
+
+const CAL_HOUR_START = 8;
+const CAL_HOUR_END = 21;
+const CAL_HOUR_PX = 64;
+const CAL_DAY_NAMES_IT = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+let CAL_MODE = 'week';
+let CAL_ANCHOR = new Date();
+let CAL_BOOKINGS_CACHE = [];
+
+function calStartOfWeek(d) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = (day === 0 ? -6 : 1 - day);
+  date.setDate(date.getDate() + diff);
+  date.setHours(0,0,0,0);
+  return date;
+}
+function calFmtISO(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function calSameDay(a,b) { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+function calGoToday() { CAL_ANCHOR = new Date(); renderCalendar(); }
+function calGoPrev() {
+  CAL_ANCHOR = new Date(CAL_ANCHOR);
+  CAL_ANCHOR.setDate(CAL_ANCHOR.getDate() - (CAL_MODE === 'week' ? 7 : 1));
+  renderCalendar();
+}
+function calGoNext() {
+  CAL_ANCHOR = new Date(CAL_ANCHOR);
+  CAL_ANCHOR.setDate(CAL_ANCHOR.getDate() + (CAL_MODE === 'week' ? 7 : 1));
+  renderCalendar();
+}
+function calSetMode(mode) {
+  CAL_MODE = mode;
+  document.getElementById('cal-mode-label').textContent = mode === 'week' ? 'Settimana' : 'Giorno';
+  document.querySelectorAll('#cal-mode-menu button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.getElementById('cal-mode-menu').classList.remove('open');
+  renderCalendar();
+}
+function toggleCalModeMenu() { document.getElementById('cal-mode-menu').classList.toggle('open'); }
+document.addEventListener('click', (e) => {
+  const dd = document.getElementById('cal-mode-dropdown');
+  const menu = document.getElementById('cal-mode-menu');
+  if (dd && menu && !dd.contains(e.target)) menu.classList.remove('open');
+});
+
+function calOpenJumpDate() {
+  const inp = document.getElementById('cal-jump-date');
+  if (inp.showPicker) inp.showPicker(); else inp.click();
+}
+function calJumpToDate(val) {
+  if (!val) return;
+  const [y, m, d] = val.split('-').map(Number);
+  CAL_ANCHOR = new Date(y, m - 1, d);
+  renderCalendar();
+}
+
+function calExportCsv() {
+  const rows = [['Data', 'Ora', 'Esperienza', 'Cliente', 'Email', 'Ospiti', 'Stato', 'Totale (€)']];
+  CAL_BOOKINGS_CACHE.forEach(b => rows.push([b.date, b.time, b.experience_name, b.customer_name, b.email, b.guests, b.status, (b.amount_cents / 100).toFixed(2)]));
+  const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `calendario_${calFmtISO(new Date())}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function toggleStatusesMenu() {
+  document.getElementById('cal-statuses-panel').classList.toggle('open');
+}
+document.addEventListener('click', (e) => {
+  const menu = document.querySelector('.cal-statuses-menu');
+  const panel = document.getElementById('cal-statuses-panel');
+  if (menu && panel && !menu.contains(e.target)) panel.classList.remove('open');
+});
+
+function calSelectedStatuses() {
+  return Array.from(document.querySelectorAll('.cal-status-cb:checked')).map(c => c.value);
+}
+
+async function renderCalendar() {
+  if (!OPERATORS.length) OPERATORS = await api('/api/admin/operators');
+  const days = [];
+  if (CAL_MODE === 'week') {
+    const start = calStartOfWeek(CAL_ANCHOR);
+    for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(start.getDate() + i); days.push(d); }
+  } else {
+    days.push(new Date(CAL_ANCHOR));
+  }
+  document.documentElement.style.setProperty('--cal-cols', days.length);
+
+  const from = calFmtISO(days[0]);
+  const to = calFmtISO(days[days.length - 1]);
+  const label = CAL_MODE === 'week'
+    ? `${days[0].toLocaleDateString('it-IT',{day:'numeric',month:'short'})} – ${days[days.length-1].toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'})}`
+    : days[0].toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('cal-range-label').textContent = label;
+
+  // Header row
+  const today = new Date();
+  document.getElementById('cal-header-row').innerHTML = '<div></div>' + days.map(d => `
+    <div class="cal-header-cell ${calSameDay(d, today) ? 'today' : ''}">
+      ${CAL_DAY_NAMES_IT[d.getDay()]} ${d.getDate()}
+    </div>
+  `).join('');
+
+  // Fetch bookings for the visible range
+  let bookings = [];
+  try { bookings = await api(`/api/admin/bookings?from=${from}&to=${to}`); } catch (e) { console.error(e); }
+  CAL_BOOKINGS_CACHE = bookings;
+  const selectedStatuses = calSelectedStatuses();
+  const searchTerm = (document.getElementById('cal-search')?.value || '').trim().toLowerCase();
+
+  const totalHours = CAL_HOUR_END - CAL_HOUR_START;
+  const bodyHeight = totalHours * CAL_HOUR_PX;
+
+  // Time labels + day columns skeleton
+  let timeLabelsHtml = `<div style="position:relative;height:${bodyHeight}px">`;
+  for (let h = CAL_HOUR_START; h <= CAL_HOUR_END; h++) {
+    timeLabelsHtml += `<div class="cal-time-cell" style="position:absolute;top:${(h-CAL_HOUR_START)*CAL_HOUR_PX}px;right:6px">${String(h).padStart(2,'0')}:00</div>`;
+  }
+  timeLabelsHtml += '</div>';
+
+  const dayColsHtml = days.map(d => {
+    const dateStr = calFmtISO(d);
+    const dayBookings = bookings.filter(b => b.date === dateStr && selectedStatuses.includes(b.status) &&
+      (!searchTerm || (b.customer_name || '').toLowerCase().includes(searchTerm) || (b.experience_name || '').toLowerCase().includes(searchTerm)));
+    return `<div class="cal-day-col" style="height:${bodyHeight}px" data-date="${dateStr}">
+      ${calRenderHourLines(totalHours)}
+      <div class="cal-events-layer">${calRenderEvents(dayBookings, bodyHeight)}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('cal-body-row').innerHTML = timeLabelsHtml + dayColsHtml;
+
+  const scrollEl = document.querySelector('.cal-body-scroll');
+  const scrollbarWidth = scrollEl.offsetWidth - scrollEl.clientWidth;
+  document.getElementById('cal-header-row').style.paddingRight = scrollbarWidth + 'px';
+}
+
+function calRenderHourLines(totalHours) {
+  let html = '';
+  for (let h = 1; h < totalHours; h++) {
+    html += `<div style="position:absolute;left:0;right:0;top:${h*CAL_HOUR_PX}px;border-top:1px solid var(--line)"></div>`;
+  }
+  return html;
+}
+
+function calRenderEvents(dayBookings, bodyHeight) {
+  // Assign side-by-side columns to overlapping events
+  const events = dayBookings.map(b => {
+    const [hh, mm] = b.time.split(':').map(Number);
+    const startMin = hh * 60 + mm;
+    const top = ((startMin - CAL_HOUR_START * 60) / 60) * CAL_HOUR_PX;
+    const height = Math.max(28, ((b.duration_minutes || 60) / 60) * CAL_HOUR_PX - 4);
+    return { b, startMin, endMin: startMin + (b.duration_minutes || 60), top, height };
+  }).sort((a, c) => a.startMin - c.startMin);
+
+  const columns = []; // each holds the endMin of the last event placed
+  events.forEach(ev => {
+    let placed = false;
+    for (let i = 0; i < columns.length; i++) {
+      if (columns[i] <= ev.startMin) { ev.col = i; columns[i] = ev.endMin; placed = true; break; }
+    }
+    if (!placed) { ev.col = columns.length; columns.push(ev.endMin); }
+  });
+  const numCols = Math.max(1, columns.length);
+
+  return events.map(ev => {
+    const b = ev.b;
+    const widthPct = 100 / numCols;
+    const leftPct = ev.col * widthPct;
+    return `<div class="cal-event st-${b.status}" style="top:${ev.top}px;height:${ev.height}px;left:calc(${leftPct}% + 2px);width:calc(${widthPct}% - 4px)" onclick="openCalEventModal(${b.id})">
+      <span class="cal-badge">${b.status.replace('_',' ')}</span>
+      <span class="cal-exp">${esc(b.experience_name)}</span>
+      <span class="cal-cust">${esc(b.customer_name)}</span>
+      <div class="cal-foot"><span>${(b.language||'it').toUpperCase()}</span><span>€ ${fmtEuro(b.amount_cents)}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function openCalEventModal(bookingId) {
+  const b = CAL_BOOKINGS_CACHE.find(x => x.id === bookingId);
+  if (!b) return;
+  const actions = [];
+  if (b.status !== 'confermata') actions.push(`<button class="btn small ok" onclick="calAction(()=>confirmBooking(${b.id}))">Conferma</button>`);
+  if (b.status !== 'annullata') actions.push(`<button class="btn small danger" onclick="calAction(()=>rejectBooking(${b.id}))">Annulla</button>`);
+  if (b.status === 'confermata') actions.push(`<button class="btn small secondary" onclick="calAction(()=>checkinBooking(${b.id}))">${b.checked_in ? 'Annulla check-in' : 'Check-in'}</button>`);
+
+  const box = document.createElement('div');
+  box.className = 'modal-overlay open';
+  box.id = 'cal-event-modal';
+  box.innerHTML = `
+    <div class="modal-box" style="max-width:420px">
+      <h3>${esc(b.experience_name)}</h3>
+      <p style="color:var(--ink-soft);font-size:13px;margin-bottom:16px">${b.date} · ${b.time} · ${b.guests} ${b.guests===1?'ospite':'ospiti'}</p>
+      <div class="field"><label>Cliente</label><div>${esc(b.customer_name)}</div></div>
+      <div class="field"><label>Email</label><div>${esc(b.email)}</div></div>
+      ${b.phone ? `<div class="field"><label>Telefono</label><div>${esc(b.phone)}</div></div>` : ''}
+      <div class="field"><label>Totale</label><div>€ ${fmtEuro(b.amount_cents)}</div></div>
+      <div class="field"><label>Operatore assegnato</label>
+        <select onchange="calUpdateOperator(${b.id}, this.value)">
+          <option value="">— Nessuno —</option>
+          ${OPERATORS.map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="modal-actions" style="justify-content:space-between">
+        <button class="btn secondary" onclick="document.getElementById('cal-event-modal').remove()">Chiudi</button>
+        <div class="actions-cell">${actions.join('')}</div>
+      </div>
+    </div>`;
+  document.body.appendChild(box);
+}
+async function calUpdateOperator(bookingId, operatorId) {
+  await api('/api/admin/bookings/' + bookingId, { method: 'PATCH', body: JSON.stringify({ operator_id: operatorId || '' }) });
+  await renderCalendar();
+}
+async function calAction(fn) {
+  document.getElementById('cal-event-modal')?.remove();
+  await fn();
+  renderCalendar();
+}
+
+// ── Bookings ──────────────────────────────────────────────────────────────────
+let BK_STATUS_FILTER = 'all';
+document.querySelectorAll('#bk-status-seg button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#bk-status-seg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    BK_STATUS_FILTER = btn.dataset.status;
+    loadBookings();
+  });
+});
+
+async function loadBookings() {
+  if (!OPERATORS.length) OPERATORS = await api('/api/admin/operators');
+  const params = new URLSearchParams();
+  const q = document.getElementById('bk-search').value.trim();
+  if (q) params.set('q', q);
+  if (BK_STATUS_FILTER && BK_STATUS_FILTER !== 'all') params.set('status', BK_STATUS_FILTER);
+  const rows = await api('/api/admin/bookings?' + params.toString());
+  document.getElementById('export-link').href = `/api/admin/export?key=${encodeURIComponent(ADMIN_KEY)}`;
+  document.getElementById('bookings-tbody').innerHTML = rows.length ? rows.map(b => `
+    <div class="list-row">
+      <div class="list-row-icon">${esc(b.customer_name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(b.customer_name)} · ${esc(b.experience_name)}</div>
+        <div class="list-row-sub">${b.date} · ${b.time} · ${b.guests} ${b.guests===1?'ospite':'ospiti'} · ${esc(b.email)}</div>
+      </div>
+      <div class="list-row-meta">
+        <span class="badge ${b.status}">${b.status.replace('_',' ')}</span>
+        <select onchange="updateBookingOperator(${b.id}, this.value)" style="padding:6px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;background:#fff">
+          <option value="">— Operatore —</option>
+          ${OPERATORS.map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+        </select>
+        <div class="list-row-value">€ ${fmtEuro(b.amount_cents)}</div>
+        ${b.status !== 'confermata' ? `<button class="btn-outline-pill" onclick="confirmBooking(${b.id})">Conferma</button>` : ''}
+        ${b.status === 'confermata' ? `<button class="btn-outline-pill" onclick="checkinBooking(${b.id})">${b.checked_in ? '✔ Check-in' : 'Check-in'}</button>` : ''}
+        ${b.status !== 'annullata' ? `<button class="btn-outline-pill danger" onclick="rejectBooking(${b.id})">Annulla</button>` : ''}
+        <button class="btn-outline-pill danger" onclick="deleteBooking(${b.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessuna prenotazione trovata.</div>';
+}
+
+async function updateBookingOperator(id, operatorId) {
+  await api('/api/admin/bookings/' + id, { method: 'PATCH', body: JSON.stringify({ operator_id: operatorId || '' }) });
+}
+
+async function confirmBooking(id) {
+  try { await api('/api/admin/bookings/confirm/' + id, { method: 'POST' }); loadBookings(); }
+  catch (e) { alert(e.message); }
+}
+async function rejectBooking(id) {
+  if (!confirm('Annullare la prenotazione? Se pagata via Stripe verrà rimborsata.')) return;
+  try { await api('/api/admin/bookings/reject/' + id, { method: 'POST' }); loadBookings(); }
+  catch (e) { alert(e.message); }
+}
+async function checkinBooking(id) {
+  await api('/api/admin/bookings/checkin/' + id, { method: 'POST' });
+  loadBookings();
+}
+async function deleteBooking(id) {
+  if (!confirm('Eliminare definitivamente questa prenotazione?')) return;
+  await api('/api/admin/bookings/' + id, { method: 'DELETE' });
+  loadBookings();
+}
+async function syncPayments() {
+  const res = await api('/api/admin/sync-payments', { method: 'POST' });
+  alert(`Sincronizzati ${res.synced} di ${res.total} pagamenti in sospeso.`);
+  loadBookings();
+}
+
+async function openManualBooking() {
+  document.getElementById('manual-modal-msg').innerHTML = '';
+  await loadExperiencesForSelects();
+  await loadManualSlots();
+  if (!OPERATORS.length) OPERATORS = await api('/api/admin/operators');
+  document.getElementById('man-operator').innerHTML = '<option value="">— Nessuno —</option>' +
+    OPERATORS.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+  openModal('manual-modal');
+}
+async function loadManualSlots() {
+  const expId = document.getElementById('man-exp').value;
+  if (!expId) return;
+  const slots = await api(`/api/admin/slots?experience_id=${expId}`);
+  document.getElementById('man-slot').innerHTML = slots.filter(s => s.active).map(s =>
+    `<option value="${s.id}">${s.date} ${s.time} (${s.available} disponibili)</option>`).join('') || '<option value="">Nessuno slot disponibile</option>';
+}
+async function saveManualBooking() {
+  const msg = document.getElementById('manual-modal-msg');
+  const body = {
+    experience_id: document.getElementById('man-exp').value,
+    slot_id: document.getElementById('man-slot').value,
+    customer_name: document.getElementById('man-name').value.trim(),
+    email: document.getElementById('man-email').value.trim(),
+    phone: document.getElementById('man-phone').value.trim(),
+    guests: parseInt(document.getElementById('man-guests').value) || 1,
+    status: document.getElementById('man-status').value,
+    notes: document.getElementById('man-notes').value.trim(),
+    send_email: document.getElementById('man-send-email').checked,
+    operator_id: document.getElementById('man-operator').value || null,
+  };
+  try {
+    const res = await api('/api/admin/bookings/manual', { method: 'POST', body: JSON.stringify(body) });
+    if (body.operator_id) await api('/api/admin/bookings/' + res.id, { method: 'PATCH', body: JSON.stringify({ operator_id: body.operator_id }) });
+    closeModal('manual-modal');
+    loadBookings();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+// ── Discount codes ────────────────────────────────────────────────────────────
+async function loadDiscounts() {
+  const rows = await api('/api/admin/discount-codes');
+  document.getElementById('discounts-tbody').innerHTML = rows.length ? rows.map(d => `
+    <tr>
+      <td><strong>${esc(d.code)}</strong></td>
+      <td>${d.type === 'percent' ? 'Percentuale' : 'Importo fisso'}</td>
+      <td>${d.type === 'percent' ? d.value + '%' : '€ ' + fmtEuro(d.value)}</td>
+      <td>${d.used_count}${d.max_uses != null ? ' / ' + d.max_uses : ''}</td>
+      <td>${d.valid_from || '—'} → ${d.valid_to || '—'}</td>
+      <td><span class="badge ${d.active ? 'confermata' : 'annullata'}">${d.active ? 'Attivo' : 'Disattivo'}</span></td>
+      <td class="actions-cell">
+        <button class="btn small ${d.active ? 'danger' : 'ok'}" onclick="toggleDiscountActive(${d.id}, ${d.active ? 0 : 1})">${d.active ? 'Disattiva' : 'Attiva'}</button>
+        <button class="btn small danger" onclick="deleteDiscount(${d.id})">Elimina</button>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" class="empty">Nessun codice sconto creato.</td></tr>';
+}
+
+function openDiscountModal() {
+  document.getElementById('discount-modal-msg').innerHTML = '';
+  document.getElementById('disc-code').value = '';
+  document.getElementById('disc-type').value = 'percent';
+  document.getElementById('disc-value').value = '';
+  document.getElementById('disc-max-uses').value = '';
+  document.getElementById('disc-from').value = '';
+  document.getElementById('disc-to').value = '';
+  openModal('discount-modal');
+}
+
+async function saveDiscount() {
+  const msg = document.getElementById('discount-modal-msg');
+  const body = {
+    code: document.getElementById('disc-code').value.trim(),
+    type: document.getElementById('disc-type').value,
+    value: parseInt(document.getElementById('disc-value').value),
+    max_uses: document.getElementById('disc-max-uses').value || null,
+    valid_from: document.getElementById('disc-from').value || null,
+    valid_to: document.getElementById('disc-to').value || null,
+  };
+  try {
+    await api('/api/admin/discount-codes', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('discount-modal');
+    loadDiscounts();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+async function toggleDiscountActive(id, active) {
+  await api('/api/admin/discount-codes/' + id, { method: 'PATCH', body: JSON.stringify({ active }) });
+  loadDiscounts();
+}
+async function deleteDiscount(id) {
+  if (!confirm('Eliminare questo codice sconto?')) return;
+  await api('/api/admin/discount-codes/' + id, { method: 'DELETE' });
+  loadDiscounts();
+}
+
+// ── Reviews ───────────────────────────────────────────────────────────────────
+async function loadReviews() {
+  const rows = await api('/api/admin/reviews');
+  document.getElementById('reviews-tbody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td><span class="badge ${r.approved ? 'confermata' : 'in_attesa'}">${r.approved ? 'Pubblicata' : 'In moderazione'}</span></td>
+      <td>${esc(r.customer_name)}</td>
+      <td>${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</td>
+      <td>${esc(r.comment)}</td>
+      <td>${r.created_at}</td>
+      <td class="actions-cell">
+        ${!r.approved ? `<button class="btn small ok" onclick="setReviewApproved(${r.id}, 1)">Approva</button>` : `<button class="btn small secondary" onclick="setReviewApproved(${r.id}, 0)">Nascondi</button>`}
+        <button class="btn small danger" onclick="deleteReview(${r.id})">Elimina</button>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" class="empty">Nessuna recensione ricevuta.</td></tr>';
+}
+async function setReviewApproved(id, approved) {
+  await api('/api/admin/reviews/' + id, { method: 'PATCH', body: JSON.stringify({ approved }) });
+  loadReviews();
+}
+async function deleteReview(id) {
+  if (!confirm('Eliminare questa recensione?')) return;
+  await api('/api/admin/reviews/' + id, { method: 'DELETE' });
+  loadReviews();
+}
+
+// ── Newsletter ────────────────────────────────────────────────────────────────
+async function loadNewsletter() {
+  const rows = await api('/api/admin/newsletter');
+  document.getElementById('nl-export-link').href = `/api/admin/newsletter/export?key=${encodeURIComponent(ADMIN_KEY)}`;
+  document.getElementById('newsletter-tbody').innerHTML = rows.length ? rows.map(n => `
+    <tr><td>${esc(n.email)}</td><td>${n.created_at}</td>
+      <td><button class="btn small danger" onclick="deleteSubscriber(${n.id})">Elimina</button></td></tr>
+  `).join('') : '<tr><td colspan="3" class="empty">Nessun iscritto.</td></tr>';
+}
+async function deleteSubscriber(id) {
+  if (!confirm('Rimuovere questo iscritto?')) return;
+  await api('/api/admin/newsletter/' + id, { method: 'DELETE' });
+  loadNewsletter();
+}
+
+// ── Operatori ─────────────────────────────────────────────────────────────────
+async function loadOperators() {
+  OPERATORS = await api('/api/admin/operators');
+  document.getElementById('operators-tbody').innerHTML = OPERATORS.length ? OPERATORS.map(o => `
+    <div class="list-row">
+      <div class="list-row-icon">${esc(o.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(o.name)}</div>
+        <div class="list-row-sub">${esc(o.email) || 'nessuna email'}${o.phone ? ' · ' + esc(o.phone) : ''}</div>
+      </div>
+      <div class="list-row-meta">
+        <span class="pill-stat">${o.visitCount} visite</span>
+        <span class="badge ${o.active ? 'confermata' : 'annullata'}">${o.active ? 'Attivo' : 'Disattivo'}</span>
+        <button class="btn-outline-pill" onclick='openOperatorModal(${JSON.stringify(o)})'>Modifica</button>
+        <button class="btn-outline-pill" onclick="toggleOperatorActive(${o.id}, ${o.active ? 0 : 1})">${o.active ? 'Disattiva' : 'Attiva'}</button>
+        <button class="btn-outline-pill danger" onclick="deleteOperator(${o.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessun operatore. Creane uno per assegnarlo alle visite.</div>';
+}
+function openOperatorModal(o) {
+  document.getElementById('operator-modal-msg').innerHTML = '';
+  document.getElementById('operator-modal-title').textContent = o ? 'Modifica operatore' : 'Nuovo operatore';
+  document.getElementById('op-id').value = o ? o.id : '';
+  document.getElementById('op-name').value = o ? o.name : '';
+  document.getElementById('op-email').value = o ? (o.email || '') : '';
+  document.getElementById('op-phone').value = o ? (o.phone || '') : '';
+  openModal('operator-modal');
+}
+async function saveOperator() {
+  const id = document.getElementById('op-id').value;
+  const body = {
+    name: document.getElementById('op-name').value.trim(),
+    email: document.getElementById('op-email').value.trim(),
+    phone: document.getElementById('op-phone').value.trim(),
+  };
+  try {
+    if (id) await api('/api/admin/operators/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+    else await api('/api/admin/operators', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('operator-modal');
+    loadOperators();
+  } catch (e) {
+    document.getElementById('operator-modal-msg').innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+async function toggleOperatorActive(id, active) {
+  await api('/api/admin/operators/' + id, { method: 'PATCH', body: JSON.stringify({ active }) });
+  loadOperators();
+}
+async function deleteOperator(id) {
+  if (!confirm('Eliminare questo operatore? Le visite assegnate resteranno senza operatore.')) return;
+  await api('/api/admin/operators/' + id, { method: 'DELETE' });
+  loadOperators();
+}
+
+// ── CRM B2C (enoturismo) ─────────────────────────────────────────────────────
+let B2C_CURRENT_ID = null;
+
+async function loadB2CCustomers() {
+  const q = document.getElementById('b2c-search').value.trim();
+  const rows = await api('/api/admin/b2c-customers' + (q ? `?q=${encodeURIComponent(q)}` : ''));
+  document.getElementById('b2c-customers-tbody').innerHTML = rows.length ? rows.map(c => `
+    <div class="list-row">
+      <div class="list-row-icon">${esc(c.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(c.name)}</div>
+        <div class="list-row-sub">${esc(c.email) || 'nessuna email'}${c.phone ? ' · ' + esc(c.phone) : ''}</div>
+      </div>
+      <div class="list-row-meta">
+        <span class="pill-stat">${c.visitCount} visite</span>
+        <span class="pill-stat">E-commerce: ${c.ecommerceCount} · € ${fmtEuro(c.ecommerceTotalCents)}</span>
+        <span class="pill-stat">Negozio: ${c.negozioCount} · € ${fmtEuro(c.negozioTotalCents)}</span>
+        <div class="list-row-value">€ ${fmtEuro(c.ecommerceTotalCents + c.negozioTotalCents)}</div>
+        <button class="btn-outline-pill" onclick="openB2CCustomerModal(${c.id})">Dettaglio</button>
+        <button class="btn-outline-pill danger" onclick="deleteB2CCustomer(${c.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessun cliente trovato.</div>';
+}
+
+async function openB2CCustomerModal(id) {
+  document.getElementById('b2c-modal-msg').innerHTML = '';
+  B2C_CURRENT_ID = id || null;
+  document.getElementById('b2c-modal-title').textContent = id ? 'Dettaglio cliente' : 'Nuovo cliente';
+  document.getElementById('b2c-detail-section').style.display = id ? 'block' : 'none';
+
+  if (id) {
+    const c = await api('/api/admin/b2c-customers/' + id);
+    document.getElementById('b2c-id').value = c.id;
+    document.getElementById('b2c-name').value = c.name;
+    document.getElementById('b2c-email').value = c.email || '';
+    document.getElementById('b2c-phone').value = c.phone || '';
+    document.getElementById('b2c-notes').value = c.notes || '';
+    document.getElementById('b2c-visits-tbody').innerHTML = c.visits.length ? c.visits.map(v => `
+      <tr>
+        <td>${v.date} ${v.time}</td>
+        <td>${esc(v.experience_name)}</td>
+        <td>${esc(v.operator_name) || '—'}</td>
+        <td><span class="badge ${v.status}">${v.status.replace('_',' ')}</span></td>
+        <td>€ ${fmtEuro(v.amount_cents)}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="5" class="empty">Nessuna visita registrata.</td></tr>';
+    document.getElementById('b2c-orders-tbody').innerHTML = c.orders.length ? c.orders.map(o => `
+      <tr>
+        <td>${o.order_date}</td>
+        <td>${o.channel === 'ecommerce' ? 'E-commerce' : 'Negozio'}</td>
+        <td>${esc(o.order_number) || '—'}</td>
+        <td>€ ${fmtEuro(o.amount_cents)}</td>
+        <td><button class="btn small danger" onclick="deleteB2COrder(${o.id})">Elimina</button></td>
+      </tr>
+    `).join('') : '<tr><td colspan="5" class="empty">Nessun ordine registrato.</td></tr>';
+  } else {
+    document.getElementById('b2c-id').value = '';
+    document.getElementById('b2c-name').value = '';
+    document.getElementById('b2c-email').value = '';
+    document.getElementById('b2c-phone').value = '';
+    document.getElementById('b2c-notes').value = '';
+  }
+  openModal('b2c-modal');
+}
+
+async function saveB2CCustomer() {
+  const id = document.getElementById('b2c-id').value;
+  const msg = document.getElementById('b2c-modal-msg');
+  const body = {
+    name: document.getElementById('b2c-name').value.trim(),
+    email: document.getElementById('b2c-email').value.trim(),
+    phone: document.getElementById('b2c-phone').value.trim(),
+    notes: document.getElementById('b2c-notes').value.trim(),
+  };
+  try {
+    if (id) await api('/api/admin/b2c-customers/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+    else await api('/api/admin/b2c-customers', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('b2c-modal');
+    loadB2CCustomers();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+async function deleteB2CCustomer(id) {
+  if (!confirm('Eliminare questo cliente e il suo storico ordini?')) return;
+  await api('/api/admin/b2c-customers/' + id, { method: 'DELETE' });
+  loadB2CCustomers();
+}
+
+function openB2COrderModal() {
+  document.getElementById('b2c-order-modal-msg').innerHTML = '';
+  document.getElementById('bo-channel').value = 'ecommerce';
+  document.getElementById('bo-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('bo-amount').value = '';
+  document.getElementById('bo-number').value = '';
+  document.getElementById('bo-notes').value = '';
+  openModal('b2c-order-modal');
+}
+async function saveB2COrder() {
+  const msg = document.getElementById('b2c-order-modal-msg');
+  const body = {
+    customer_id: B2C_CURRENT_ID,
+    channel: document.getElementById('bo-channel').value,
+    order_date: document.getElementById('bo-date').value,
+    amount_cents: Math.round((parseFloat(document.getElementById('bo-amount').value) || 0) * 100),
+    order_number: document.getElementById('bo-number').value.trim(),
+    notes: document.getElementById('bo-notes').value.trim(),
+  };
+  try {
+    await api('/api/admin/b2c-orders', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('b2c-order-modal');
+    openB2CCustomerModal(B2C_CURRENT_ID);
+    loadB2CCustomers();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+async function deleteB2COrder(id) {
+  if (!confirm('Eliminare questo ordine?')) return;
+  await api('/api/admin/b2c-orders/' + id, { method: 'DELETE' });
+  openB2CCustomerModal(B2C_CURRENT_ID);
+  loadB2CCustomers();
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+async function boot() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  await loadDashboard();
+}
+
+function toggleWorkspaceMenu() { document.getElementById('workspace-menu').classList.toggle('open'); }
+document.addEventListener('click', (e) => {
+  const switcher = document.getElementById('workspace-switcher');
+  if (switcher && !switcher.contains(e.target)) document.getElementById('workspace-menu').classList.remove('open');
+});
+function switchWorkspace(ws) {
+  window.location.href = '/portal.html?key=' + encodeURIComponent(ADMIN_KEY) + '&workspace=' + ws;
+}
+
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('reset')) { showLoginForm('login-form-reset'); return; }
+  const keyFromUrl = params.get('key');
+  const keyFromSession = sessionStorage.getItem('admin_key');
+  if (keyFromUrl) { ADMIN_KEY = keyFromUrl; sessionStorage.setItem('admin_key', keyFromUrl); boot(); }
+  else if (keyFromSession) { ADMIN_KEY = keyFromSession; boot(); }
+})();
+</script>
+</body>
+</html>

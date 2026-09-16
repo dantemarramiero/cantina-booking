@@ -1,0 +1,7 @@
+node_modules/
+*.db
+.env
+public/uploads/products/*
+!public/uploads/products/.gitkeep
+catalogs/*
+!catalogs/.gitkeep
