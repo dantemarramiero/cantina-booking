@@ -1781,13 +1781,14 @@ app.delete('/api/admin/price-lists/:id/items/:productId', authAdmin, (req, res) 
 
 // ── Ordini commerciali ─────────────────────────────────────────────────────────
 app.get('/api/admin/orders', authAdmin, (req, res) => {
-  const { q, from, to, status, customer_id } = req.query;
+  const { q, from, to, status, customer_id, agent_id } = req.query;
   let sql = `
     SELECT o.*, a.name AS agent_name, bc.name AS billing_customer_name
     FROM orders o LEFT JOIN agents a ON a.id = o.agent_id LEFT JOIN customers bc ON bc.id = o.billing_customer_id
     WHERE 1=1`;
   const params = [];
   if (customer_id) { sql += ' AND o.customer_id = ?'; params.push(customer_id); }
+  if (agent_id) { sql += ' AND o.agent_id = ?'; params.push(agent_id); }
   if (status && status !== 'all') { sql += ' AND o.status = ?'; params.push(status); }
   if (from) { sql += ' AND o.order_date >= ?'; params.push(from); }
   if (to)   { sql += ' AND o.order_date <= ?'; params.push(to); }
@@ -2062,10 +2063,12 @@ app.get('/api/admin/customers/:id', authAdmin, (req, res) => {
   const c = db.prepare(`
     SELECT c.*, a.name AS agent_name,
       (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) AS order_count,
-      (SELECT COALESCE(SUM(o.total_cents),0) FROM orders o WHERE o.customer_id = c.id) AS revenue_cents
+      (SELECT COALESCE(SUM(o.total_cents),0) FROM orders o WHERE o.customer_id = c.id) AS revenue_cents,
+      (SELECT MAX(o.order_date) FROM orders o WHERE o.customer_id = c.id) AS last_order_date
     FROM customers c LEFT JOIN agents a ON a.id = c.agent_id WHERE c.id = ?
   `).get(req.params.id);
   if (!c) return res.status(404).json({ error: 'Cliente non trovato.' });
+  c.activity_status = customerActivityStatus(c.last_order_date);
   res.json(c);
 });
 

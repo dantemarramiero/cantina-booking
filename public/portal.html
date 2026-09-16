@@ -293,6 +293,11 @@
   .crm-tc-customer .crm-item-meta { font-size: 11.5px; color: #9aa0ab; margin-top: 2px; }
   .crm-tc-customer-right { text-align: right; font-size: 12px; color: var(--ink-soft); flex-shrink: 0; }
   .crm-tc-empty { font-size: 12.5px; color: #9aa0ab; padding: 4px 2px; }
+  .crm-orders-filters { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .crm-orders-filters input[type="date"] { padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; font-family: var(--sans); color: var(--ink); background: #fff; }
+  .crm-orders-filters .sep { color: #9aa0ab; font-size: 12px; }
+  .btn-outline-pill.active { border-color: var(--wine); color: var(--wine); background: rgba(59,111,224,0.08); font-weight: 600; }
+  .crm-item-title .crm-agent-order-customer { color: var(--ink-soft); font-weight: 500; }
 </style>
 </head>
 <body>
@@ -1276,10 +1281,19 @@
   </div>
 
   <div class="crm-record-panel" id="crm-rtab-clienti-seguiti">
+    <div class="crm-panel-toolbar"><div class="list-spacer"></div><button class="btn-generate" style="margin-top:0" onclick="openNewCustomerForAgent()">+ Nuovo cliente</button></div>
     <div id="crm-tracked-customers"></div>
   </div>
 
   <div class="crm-record-panel" id="crm-rtab-ordini">
+    <div class="crm-orders-filters">
+      <button type="button" class="btn-outline-pill active" data-ordfilter="all" onclick="setCrmOrdersQuickFilter('all')">Tutti</button>
+      <button type="button" class="btn-outline-pill" data-ordfilter="today" onclick="setCrmOrdersQuickFilter('today')">Oggi</button>
+      <button type="button" class="btn-outline-pill" data-ordfilter="week" onclick="setCrmOrdersQuickFilter('week')">Questa settimana</button>
+      <input type="date" id="crm-orders-from" onchange="setCrmOrdersQuickFilter('custom')">
+      <span class="sep">—</span>
+      <input type="date" id="crm-orders-to" onchange="setCrmOrdersQuickFilter('custom')">
+    </div>
     <div id="crm-orders-list"></div>
   </div>
 </div>
@@ -2142,6 +2156,11 @@ async function openCustomerModal(c) {
   openModal('customer-modal');
 }
 
+async function openNewCustomerForAgent() {
+  await openCustomerModal();
+  document.getElementById('cust-agent').value = CRM_CURRENT.id;
+}
+
 async function saveCustomer() {
   const id = document.getElementById('cust-id').value;
   const msg = document.getElementById('customer-modal-msg');
@@ -2159,6 +2178,8 @@ async function saveCustomer() {
     else await api('/api/admin/customers', { method: 'POST', body: JSON.stringify(body) });
     closeModal('customer-modal');
     loadCustomers();
+    if (CRM_CURRENT.type === 'agent') loadCrmTrackedCustomers();
+    if (CRM_CURRENT.type === 'customer' && String(CRM_CURRENT.id) === id) loadCrmRecordData();
   } catch (e) {
     msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
   }
@@ -2340,14 +2361,16 @@ async function openCrmRecord(type, id) {
   CRM_CURRENT = { type, id, data: null };
   document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
   document.getElementById('crm-record-view').style.display = 'block';
-  document.getElementById('crm-tab-ordini-btn').style.display = (type === 'customer' || type === 'importer') ? 'inline-block' : 'none';
+  document.getElementById('crm-tab-ordini-btn').style.display = (type === 'customer' || type === 'importer' || type === 'agent') ? 'inline-block' : 'none';
   document.getElementById('crm-tab-affari-btn').style.display = type === 'agent' ? 'none' : 'inline-block';
+  resetCrmOrdersFilter();
   document.getElementById('crm-tab-clienti-seguiti-btn').style.display = type === 'agent' ? 'inline-block' : 'none';
   switchCrmTab('info');
   await loadCrmRecordData();
 }
 
 const CRM_TC_STATUS_LABELS = { attivo: 'Clienti attivi', semi_attivo: 'Clienti semi attivi', inattivo: 'Clienti inattivi' };
+const CRM_STATUS_LABELS = { attivo: 'Attivo', semi_attivo: 'Semi attivo', inattivo: 'Inattivo' };
 const CRM_TC_STATUS_TIPS = {
   attivo: 'Ha effettuato almeno un ordine negli ultimi 6 mesi.',
   semi_attivo: 'Ultimo ordine tra 6 mesi e 1 anno fa.',
@@ -2491,6 +2514,11 @@ async function loadCrmOverview() {
     el.innerHTML = `<div class="crm-overview-cards">
       <div class="card"><div class="label">Ordini</div><div class="value">${d.order_count ?? 0}</div></div>
       <div class="card"><div class="label">Fatturato</div><div class="value">€ ${fmtEuro(d.revenue_cents || 0)}</div></div>
+      ${d.activity_status ? `
+      <div class="card">
+        <div class="label">Stato attività <i class="crm-info-tip" title="${esc(CRM_TC_STATUS_TIPS[d.activity_status])}">i</i></div>
+        <div class="value" style="display:flex;align-items:center;gap:7px;font-size:15px"><span class="crm-tc-dot ${d.activity_status}"></span>${CRM_STATUS_LABELS[d.activity_status]}</div>
+      </div>` : ''}
     </div>`;
   } else if (type === 'agent') {
     el.innerHTML = `<div class="crm-overview-cards">
@@ -2763,15 +2791,46 @@ async function deleteCrmEmail(emailId) {
   loadCrmEmails();
 }
 
-// ── Ordini (Clienti / Importatori) ────────────────────────────────────────────
+// ── Ordini (Clienti / Agenti / Importatori) ───────────────────────────────────
+function resetCrmOrdersFilter() {
+  document.querySelectorAll('#crm-rtab-ordini [data-ordfilter]').forEach(b => b.classList.toggle('active', b.dataset.ordfilter === 'all'));
+  document.getElementById('crm-orders-from').value = '';
+  document.getElementById('crm-orders-to').value = '';
+}
+
+function setCrmOrdersQuickFilter(filter) {
+  document.querySelectorAll('#crm-rtab-ordini [data-ordfilter]').forEach(b => b.classList.toggle('active', b.dataset.ordfilter === filter));
+  const fromEl = document.getElementById('crm-orders-from'), toEl = document.getElementById('crm-orders-to');
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (filter === 'today') {
+    fromEl.value = todayStr; toEl.value = todayStr;
+  } else if (filter === 'week') {
+    const now = new Date();
+    const monday = new Date(now); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    fromEl.value = monday.toISOString().slice(0, 10);
+    toEl.value = sunday.toISOString().slice(0, 10);
+  } else if (filter === 'all') {
+    fromEl.value = ''; toEl.value = '';
+  }
+  loadCrmOrders();
+}
+
 async function loadCrmOrders() {
   const { type, id } = CRM_CURRENT;
-  if (type !== 'customer' && type !== 'importer') { document.getElementById('crm-orders-list').innerHTML = ''; return; }
-  const rows = type === 'customer' ? await api('/api/admin/orders?customer_id=' + id) : [];
-  document.getElementById('crm-orders-list').innerHTML = rows.length ? rows.map(o => `
+  const listEl = document.getElementById('crm-orders-list');
+  if (type !== 'customer' && type !== 'agent') { listEl.innerHTML = '<p style="color:var(--ink-soft);font-size:13px">Nessun ordine.</p>'; return; }
+  const params = new URLSearchParams();
+  params.set(type === 'agent' ? 'agent_id' : 'customer_id', id);
+  const from = document.getElementById('crm-orders-from').value;
+  const to = document.getElementById('crm-orders-to').value;
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const rows = await api('/api/admin/orders?' + params.toString());
+  listEl.innerHTML = rows.length ? rows.map(o => `
     <div class="crm-activity-item">
       <div class="crm-item-top">
-        <span class="crm-item-title">${esc(o.order_number)}</span>
+        <span class="crm-item-title">${esc(o.order_number)}${type === 'agent' ? ' · <span class="crm-agent-order-customer">' + esc(o.customer_name || '') + '</span>' : ''}</span>
         <span class="badge ${o.status === 'evaso' ? 'green' : 'grey'}">${esc(o.status)}</span>
       </div>
       <span class="crm-item-meta">${o.order_date} · € ${fmtEuro(o.total_cents)}</span>
