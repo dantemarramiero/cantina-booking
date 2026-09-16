@@ -130,6 +130,40 @@ db.exec(`
     created_at        TEXT DEFAULT (datetime('now','localtime'))
   )
 `);
+try { db.exec('ALTER TABLE experiences ADD COLUMN included_it TEXT'); } catch {}
+try { db.exec('ALTER TABLE experiences ADD COLUMN included_en TEXT'); } catch {}
+try { db.exec('ALTER TABLE experiences ADD COLUMN languages TEXT'); } catch {}
+try { db.exec('ALTER TABLE experiences ADD COLUMN facilities TEXT'); } catch {}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS experience_images (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    experience_id  INTEGER NOT NULL,
+    image_url      TEXT NOT NULL,
+    sort_order     INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (experience_id) REFERENCES experiences(id)
+  )
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS experience_products (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    experience_id  INTEGER NOT NULL,
+    product_id     INTEGER NOT NULL,
+    UNIQUE(experience_id, product_id),
+    FOREIGN KEY (experience_id) REFERENCES experiences(id),
+    FOREIGN KEY (product_id) REFERENCES products(id)
+  )
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS experience_availability (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    experience_id  INTEGER NOT NULL,
+    day_of_week    INTEGER NOT NULL,
+    time           TEXT NOT NULL,
+    capacity       INTEGER NOT NULL DEFAULT 10,
+    FOREIGN KEY (experience_id) REFERENCES experiences(id)
+  )
+`);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS slots (
@@ -383,6 +417,160 @@ try { db.exec('ALTER TABLE orders ADD COLUMN payment_status TEXT DEFAULT \'non_p
 try { db.exec('ALTER TABLE orders ADD COLUMN payment_due_date TEXT'); } catch {}
 try { db.exec('ALTER TABLE orders ADD COLUMN paid_at TEXT'); } catch {}
 
+// ── CRM: anagrafica estesa (Informazioni di contatto / indirizzo / business) ──
+try { db.exec('ALTER TABLE customers ADD COLUMN contact_person TEXT'); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN contact_person_secondary TEXT'); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN newsletter_subscribed INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN website TEXT'); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN shipping_address TEXT'); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN shipping_city TEXT'); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN shipping_province TEXT'); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN shipping_postal_code TEXT'); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN shipping_country TEXT'); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN estimated_volume_cents INTEGER'); } catch {}
+
+// ── CRM: Importatori ──────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS importers (
+    id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                      TEXT NOT NULL,
+    contact_person            TEXT,
+    contact_person_secondary  TEXT,
+    newsletter_subscribed     INTEGER DEFAULT 0,
+    phone                     TEXT,
+    mobile                    TEXT,
+    email                     TEXT,
+    website                   TEXT,
+    address                   TEXT,
+    city                      TEXT,
+    province                  TEXT,
+    postal_code               TEXT,
+    country                   TEXT,
+    shipping_address          TEXT,
+    shipping_city             TEXT,
+    shipping_province         TEXT,
+    shipping_postal_code      TEXT,
+    shipping_country          TEXT,
+    discount_code             TEXT,
+    discount_percent          REAL DEFAULT 0,
+    payment_terms             TEXT,
+    sdi_code                  TEXT,
+    vat_number                TEXT,
+    estimated_volume_cents    INTEGER,
+    agent_id                  INTEGER,
+    notes                     TEXT,
+    created_at                TEXT DEFAULT (datetime('now','localtime')),
+    FOREIGN KEY (agent_id) REFERENCES agents(id)
+  )
+`);
+
+// ── CRM: Fornitori ────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS suppliers (
+    id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                      TEXT NOT NULL,
+    contact_person            TEXT,
+    contact_person_secondary  TEXT,
+    newsletter_subscribed     INTEGER DEFAULT 0,
+    phone                     TEXT,
+    mobile                    TEXT,
+    email                     TEXT,
+    website                   TEXT,
+    address                   TEXT,
+    city                      TEXT,
+    province                  TEXT,
+    postal_code               TEXT,
+    country                   TEXT,
+    shipping_address          TEXT,
+    shipping_city             TEXT,
+    shipping_province         TEXT,
+    shipping_postal_code      TEXT,
+    shipping_country          TEXT,
+    category                  TEXT,
+    discount_code             TEXT,
+    discount_percent          REAL DEFAULT 0,
+    payment_terms             TEXT,
+    sdi_code                  TEXT,
+    vat_number                TEXT,
+    estimated_volume_cents    INTEGER,
+    notes                     TEXT,
+    created_at                TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+
+// ── CRM: attività polimorfiche (note/allegati/riunioni/compiti/affari/email) ──
+// entity_type ∈ {'customer','agent','importer','supplier'}, entity_id = id del record
+db.exec(`
+  CREATE TABLE IF NOT EXISTS crm_notes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type TEXT NOT NULL,
+    entity_id   INTEGER NOT NULL,
+    body        TEXT NOT NULL,
+    created_at  TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS crm_attachments (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type   TEXT NOT NULL,
+    entity_id     INTEGER NOT NULL,
+    filename      TEXT NOT NULL,
+    original_name TEXT,
+    created_at    TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS crm_meetings (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type   TEXT NOT NULL,
+    entity_id     INTEGER NOT NULL,
+    title         TEXT NOT NULL,
+    meeting_date  TEXT,
+    participants  TEXT,
+    outcome       TEXT,
+    status        TEXT DEFAULT 'aperta',
+    created_at    TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS crm_tasks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type TEXT NOT NULL,
+    entity_id   INTEGER NOT NULL,
+    title       TEXT NOT NULL,
+    due_date    TEXT,
+    assignee    TEXT,
+    status      TEXT DEFAULT 'aperto',
+    created_at  TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS crm_deals (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type          TEXT NOT NULL,
+    entity_id            INTEGER NOT NULL,
+    name                 TEXT NOT NULL,
+    value_cents          INTEGER DEFAULT 0,
+    stage                TEXT DEFAULT 'nuovo',
+    expected_close_date  TEXT,
+    notes                TEXT,
+    created_at           TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS crm_emails (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type   TEXT NOT NULL,
+    entity_id     INTEGER NOT NULL,
+    subject       TEXT,
+    direction     TEXT DEFAULT 'out',
+    counterparty  TEXT,
+    sent_at       TEXT,
+    body          TEXT,
+    created_at    TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+
 // ── Portale agenti: news e cataloghi condivisi ────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS news (
@@ -612,6 +800,17 @@ fs.mkdirSync(uploadsDir, { recursive: true });
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`),
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|webp|gif)$/.test(file.mimetype)),
+});
+
+const expUploadsDir = path.join(__dirname, 'public', 'uploads', 'experiences');
+fs.mkdirSync(expUploadsDir, { recursive: true });
+const uploadExpImage = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, expUploadsDir),
     filename: (req, file, cb) => cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`),
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -892,29 +1091,58 @@ app.get('/api/admin/stats', authAdmin, (req, res) => {
 });
 
 // ── Admin: experiences ────────────────────────────────────────────────────────
+function attachExperienceExtras(exp) {
+  const images = db.prepare('SELECT id, image_url, sort_order FROM experience_images WHERE experience_id = ? ORDER BY sort_order, id').all(exp.id);
+  const tastingProducts = db.prepare(`
+    SELECT p.id, p.name, p.image_url FROM experience_products ep JOIN products p ON p.id = ep.product_id WHERE ep.experience_id = ?
+  `).all(exp.id);
+  return {
+    ...exp,
+    languages: exp.languages ? exp.languages.split(',').filter(Boolean) : [],
+    facilities: exp.facilities ? exp.facilities.split(',').filter(Boolean) : [],
+    images,
+    tastingProducts,
+  };
+}
+
 app.get('/api/admin/experiences', authAdmin, (req, res) => {
-  res.json(db.prepare('SELECT * FROM experiences ORDER BY sort_order, id').all());
+  const rows = db.prepare('SELECT * FROM experiences ORDER BY sort_order, id').all();
+  res.json(rows.map(attachExperienceExtras));
 });
 
-app.post('/api/admin/experiences', authAdmin, (req, res) => {
-  const { name_it, name_en, description_it, description_en, price_cents, duration_minutes, max_guests, image_url, sort_order } = req.body || {};
+app.get('/api/admin/experiences/:id', authAdmin, (req, res) => {
+  const exp = getExperience(req.params.id);
+  if (!exp) return res.status(404).json({ error: 'Esperienza non trovata.' });
+  res.json(attachExperienceExtras(exp));
+});
+
+app.post('/api/admin/experiences', authAdmin, uploadExpImage.single('image'), (req, res) => {
+  const { name_it, name_en, description_it, description_en, included_it, included_en, price_cents, duration_minutes, max_guests, sort_order, languages, facilities } = req.body || {};
   if (!name_it?.trim() || !name_en?.trim() || !price_cents) {
     return res.status(400).json({ error: 'Nome (IT/EN) e prezzo sono obbligatori.' });
   }
+  const image_url = req.file ? `/uploads/experiences/${req.file.filename}` : null;
+  const langStr = Array.isArray(JSON.parse(languages || '[]')) ? JSON.parse(languages || '[]').join(',') : null;
+  const facStr = Array.isArray(JSON.parse(facilities || '[]')) ? JSON.parse(facilities || '[]').join(',') : null;
   const result = db.prepare(`
-    INSERT INTO experiences (name_it, name_en, description_it, description_en, price_cents, duration_minutes, max_guests, image_url, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO experiences (name_it, name_en, description_it, description_en, included_it, included_en, price_cents, duration_minutes, max_guests, image_url, sort_order, languages, facilities)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(name_it.trim(), name_en.trim(), description_it?.trim() || null, description_en?.trim() || null,
-         parseInt(price_cents), parseInt(duration_minutes) || 90, parseInt(max_guests) || 10, image_url?.trim() || null, parseInt(sort_order) || 0);
+         included_it?.trim() || null, included_en?.trim() || null,
+         parseInt(price_cents), parseInt(duration_minutes) || 90, parseInt(max_guests) || 10, image_url, parseInt(sort_order) || 0,
+         langStr, facStr);
   res.json({ success: true, id: result.lastInsertRowid });
 });
 
-app.patch('/api/admin/experiences/:id', authAdmin, (req, res) => {
-  const fields = ['name_it', 'name_en', 'description_it', 'description_en', 'price_cents', 'duration_minutes', 'max_guests', 'image_url', 'sort_order', 'active'];
+app.patch('/api/admin/experiences/:id', authAdmin, uploadExpImage.single('image'), (req, res) => {
+  const fields = ['name_it', 'name_en', 'description_it', 'description_en', 'included_it', 'included_en', 'price_cents', 'duration_minutes', 'max_guests', 'sort_order', 'active'];
   const updates = [], params = [];
   for (const f of fields) {
     if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }
   }
+  if (req.body.languages !== undefined) { updates.push('languages = ?'); params.push(JSON.parse(req.body.languages || '[]').join(',') || null); }
+  if (req.body.facilities !== undefined) { updates.push('facilities = ?'); params.push(JSON.parse(req.body.facilities || '[]').join(',') || null); }
+  if (req.file) { updates.push('image_url = ?'); params.push(`/uploads/experiences/${req.file.filename}`); }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
   params.push(req.params.id);
   db.prepare(`UPDATE experiences SET ${updates.join(', ')} WHERE id = ?`).run(...params);
@@ -923,8 +1151,69 @@ app.patch('/api/admin/experiences/:id', authAdmin, (req, res) => {
 
 app.delete('/api/admin/experiences/:id', authAdmin, (req, res) => {
   db.prepare('DELETE FROM slots WHERE experience_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM experience_images WHERE experience_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM experience_products WHERE experience_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM experience_availability WHERE experience_id = ?').run(req.params.id);
   db.prepare('DELETE FROM experiences WHERE id = ?').run(req.params.id);
   res.json({ success: true });
+});
+
+// Galleria immagini
+app.post('/api/admin/experiences/:id/images', authAdmin, uploadExpImage.array('images', 12), (req, res) => {
+  if (!req.files?.length) return res.status(400).json({ error: 'Carica almeno un\'immagine.' });
+  const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order),-1) AS m FROM experience_images WHERE experience_id = ?').get(req.params.id).m;
+  const insert = db.prepare('INSERT INTO experience_images (experience_id, image_url, sort_order) VALUES (?, ?, ?)');
+  req.files.forEach((f, i) => insert.run(req.params.id, `/uploads/experiences/${f.filename}`, maxOrder + 1 + i));
+  res.json({ success: true });
+});
+app.delete('/api/admin/experiences/:id/images/:imageId', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM experience_images WHERE id = ? AND experience_id = ?').run(req.params.imageId, req.params.id);
+  res.json({ success: true });
+});
+
+// Prodotti in degustazione
+app.put('/api/admin/experiences/:id/products', authAdmin, (req, res) => {
+  const { product_ids } = req.body || {};
+  if (!Array.isArray(product_ids)) return res.status(400).json({ error: 'Elenco prodotti non valido.' });
+  db.prepare('DELETE FROM experience_products WHERE experience_id = ?').run(req.params.id);
+  const insert = db.prepare('INSERT OR IGNORE INTO experience_products (experience_id, product_id) VALUES (?, ?)');
+  for (const pid of product_ids) insert.run(req.params.id, pid);
+  res.json({ success: true });
+});
+
+// Disponibilità ricorrente per esperienza: genera slot per una finestra scorrevole di giorni
+function generateSlotsFromAvailability(experienceId, windowDays = 90) {
+  const patterns = db.prepare('SELECT * FROM experience_availability WHERE experience_id = ?').all(experienceId);
+  if (!patterns.length) return 0;
+  const insert = db.prepare('INSERT INTO slots (experience_id, date, time, capacity) VALUES (?, ?, ?, ?)');
+  const exists = db.prepare('SELECT id FROM slots WHERE experience_id = ? AND date = ? AND time = ?');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let created = 0;
+  for (let i = 0; i < windowDays; i++) {
+    const d = new Date(today); d.setDate(d.getDate() + i);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    for (const p of patterns) {
+      if (p.day_of_week !== d.getDay()) continue;
+      if (!exists.get(experienceId, dateStr, p.time)) {
+        insert.run(experienceId, dateStr, p.time, p.capacity);
+        created++;
+      }
+    }
+  }
+  return created;
+}
+
+app.get('/api/admin/experiences/:id/availability', authAdmin, (req, res) => {
+  res.json(db.prepare('SELECT * FROM experience_availability WHERE experience_id = ? ORDER BY day_of_week, time').all(req.params.id));
+});
+app.put('/api/admin/experiences/:id/availability', authAdmin, (req, res) => {
+  const { pattern } = req.body || {};
+  if (!Array.isArray(pattern)) return res.status(400).json({ error: 'Pattern non valido.' });
+  db.prepare('DELETE FROM experience_availability WHERE experience_id = ?').run(req.params.id);
+  const insert = db.prepare('INSERT INTO experience_availability (experience_id, day_of_week, time, capacity) VALUES (?, ?, ?, ?)');
+  for (const p of pattern) insert.run(req.params.id, parseInt(p.day_of_week), p.time, parseInt(p.capacity) || 10);
+  const slotsCreated = generateSlotsFromAvailability(req.params.id);
+  res.json({ success: true, slotsCreated });
 });
 
 // ── Admin: slots / availability ───────────────────────────────────────────────
@@ -1479,12 +1768,13 @@ app.delete('/api/admin/price-lists/:id/items/:productId', authAdmin, (req, res) 
 
 // ── Ordini commerciali ─────────────────────────────────────────────────────────
 app.get('/api/admin/orders', authAdmin, (req, res) => {
-  const { q, from, to, status } = req.query;
+  const { q, from, to, status, customer_id } = req.query;
   let sql = `
     SELECT o.*, a.name AS agent_name, bc.name AS billing_customer_name
     FROM orders o LEFT JOIN agents a ON a.id = o.agent_id LEFT JOIN customers bc ON bc.id = o.billing_customer_id
     WHERE 1=1`;
   const params = [];
+  if (customer_id) { sql += ' AND o.customer_id = ?'; params.push(customer_id); }
   if (status && status !== 'all') { sql += ' AND o.status = ?'; params.push(status); }
   if (from) { sql += ' AND o.order_date >= ?'; params.push(from); }
   if (to)   { sql += ' AND o.order_date <= ?'; params.push(to); }
@@ -1691,6 +1981,9 @@ const CUSTOMER_FIELDS = [
   'city', 'postal_code', 'zone', 'mobile', 'fax', 'pec', 'sdi_code', 'vat_number',
   'fiscal_code', 'iban', 'payment_terms', 'price_list_id', 'category', 'closing_days', 'delivery_notes',
   'discount_code', 'discount_percent',
+  'contact_person', 'contact_person_secondary', 'newsletter_subscribed', 'website',
+  'shipping_address', 'shipping_city', 'shipping_province', 'shipping_postal_code', 'shipping_country',
+  'estimated_volume_cents',
 ];
 
 app.get('/api/admin/customers', authAdmin, (req, res) => {
@@ -1736,6 +2029,269 @@ app.patch('/api/admin/customers/:id', authAdmin, (req, res) => {
 app.delete('/api/admin/customers/:id', authAdmin, (req, res) => {
   db.prepare('UPDATE orders SET customer_id = NULL WHERE customer_id = ?').run(req.params.id);
   db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+app.get('/api/admin/customers/:id', authAdmin, (req, res) => {
+  const c = db.prepare(`
+    SELECT c.*, a.name AS agent_name,
+      (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) AS order_count,
+      (SELECT COALESCE(SUM(o.total_cents),0) FROM orders o WHERE o.customer_id = c.id) AS revenue_cents
+    FROM customers c LEFT JOIN agents a ON a.id = c.agent_id WHERE c.id = ?
+  `).get(req.params.id);
+  if (!c) return res.status(404).json({ error: 'Cliente non trovato.' });
+  res.json(c);
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CRM: Importatori
+// ══════════════════════════════════════════════════════════════════════════════
+const IMPORTER_FIELDS = [
+  'name', 'contact_person', 'contact_person_secondary', 'newsletter_subscribed', 'phone', 'mobile', 'email', 'website',
+  'address', 'city', 'province', 'postal_code', 'country',
+  'shipping_address', 'shipping_city', 'shipping_province', 'shipping_postal_code', 'shipping_country',
+  'discount_code', 'discount_percent', 'payment_terms', 'sdi_code', 'vat_number', 'estimated_volume_cents',
+  'agent_id', 'notes',
+];
+
+app.get('/api/admin/importers', authAdmin, (req, res) => {
+  const { q } = req.query;
+  let sql = `SELECT i.*, a.name AS agent_name FROM importers i LEFT JOIN agents a ON a.id = i.agent_id WHERE 1=1`;
+  const params = [];
+  if (q) { sql += ' AND (i.name LIKE ? OR i.email LIKE ?)'; const like = `%${q}%`; params.push(like, like); }
+  sql += ' ORDER BY i.name';
+  res.json(db.prepare(sql).all(...params));
+});
+app.get('/api/admin/importers/:id', authAdmin, (req, res) => {
+  const row = db.prepare('SELECT * FROM importers WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Importatore non trovato.' });
+  res.json(row);
+});
+app.post('/api/admin/importers', authAdmin, (req, res) => {
+  const body = req.body || {};
+  if (!body.name?.trim()) return res.status(400).json({ error: 'La ragione sociale è obbligatoria.' });
+  const cols = [], placeholders = [], values = [];
+  for (const f of IMPORTER_FIELDS) {
+    if (body[f] !== undefined && body[f] !== '') { cols.push(f); placeholders.push('?'); values.push(typeof body[f] === 'string' ? body[f].trim() : body[f]); }
+  }
+  const result = db.prepare(`INSERT INTO importers (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`).run(...values);
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+app.patch('/api/admin/importers/:id', authAdmin, (req, res) => {
+  const updates = [], params = [];
+  for (const f of IMPORTER_FIELDS) {
+    if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
+  }
+  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  params.push(req.params.id);
+  db.prepare(`UPDATE importers SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  res.json({ success: true });
+});
+app.delete('/api/admin/importers/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM importers WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CRM: Fornitori
+// ══════════════════════════════════════════════════════════════════════════════
+const SUPPLIER_FIELDS = [
+  'name', 'contact_person', 'contact_person_secondary', 'newsletter_subscribed', 'phone', 'mobile', 'email', 'website',
+  'address', 'city', 'province', 'postal_code', 'country',
+  'shipping_address', 'shipping_city', 'shipping_province', 'shipping_postal_code', 'shipping_country',
+  'category', 'discount_code', 'discount_percent', 'payment_terms', 'sdi_code', 'vat_number', 'estimated_volume_cents', 'notes',
+];
+
+app.get('/api/admin/suppliers', authAdmin, (req, res) => {
+  const { q } = req.query;
+  let sql = `SELECT * FROM suppliers WHERE 1=1`;
+  const params = [];
+  if (q) { sql += ' AND (name LIKE ? OR email LIKE ?)'; const like = `%${q}%`; params.push(like, like); }
+  sql += ' ORDER BY name';
+  res.json(db.prepare(sql).all(...params));
+});
+app.get('/api/admin/suppliers/:id', authAdmin, (req, res) => {
+  const row = db.prepare('SELECT * FROM suppliers WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Fornitore non trovato.' });
+  res.json(row);
+});
+app.post('/api/admin/suppliers', authAdmin, (req, res) => {
+  const body = req.body || {};
+  if (!body.name?.trim()) return res.status(400).json({ error: 'La ragione sociale è obbligatoria.' });
+  const cols = [], placeholders = [], values = [];
+  for (const f of SUPPLIER_FIELDS) {
+    if (body[f] !== undefined && body[f] !== '') { cols.push(f); placeholders.push('?'); values.push(typeof body[f] === 'string' ? body[f].trim() : body[f]); }
+  }
+  const result = db.prepare(`INSERT INTO suppliers (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`).run(...values);
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+app.patch('/api/admin/suppliers/:id', authAdmin, (req, res) => {
+  const updates = [], params = [];
+  for (const f of SUPPLIER_FIELDS) {
+    if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
+  }
+  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  params.push(req.params.id);
+  db.prepare(`UPDATE suppliers SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  res.json({ success: true });
+});
+app.delete('/api/admin/suppliers/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM suppliers WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CRM: attività collegate a un record (note, allegati, riunioni, compiti, affari, email)
+// ══════════════════════════════════════════════════════════════════════════════
+const CRM_ENTITY_TYPES = ['customer', 'agent', 'importer', 'supplier'];
+function validEntityType(t) { return CRM_ENTITY_TYPES.includes(t); }
+
+const crmAttachmentsDir = path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname, 'crm-attachments');
+fs.mkdirSync(crmAttachmentsDir, { recursive: true });
+const uploadCrmAttachment = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, crmAttachmentsDir),
+    filename: (req, file, cb) => cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`),
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
+
+// Note
+app.get('/api/admin/crm/:entityType/:entityId/notes', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  res.json(db.prepare('SELECT * FROM crm_notes WHERE entity_type = ? AND entity_id = ? ORDER BY created_at DESC').all(req.params.entityType, req.params.entityId));
+});
+app.post('/api/admin/crm/:entityType/:entityId/notes', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  if (!req.body?.body?.trim()) return res.status(400).json({ error: 'La nota non può essere vuota.' });
+  const result = db.prepare('INSERT INTO crm_notes (entity_type, entity_id, body) VALUES (?, ?, ?)').run(req.params.entityType, req.params.entityId, req.body.body.trim());
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+app.delete('/api/admin/crm/notes/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM crm_notes WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// Allegati
+app.get('/api/admin/crm/:entityType/:entityId/attachments', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  res.json(db.prepare('SELECT * FROM crm_attachments WHERE entity_type = ? AND entity_id = ? ORDER BY created_at DESC').all(req.params.entityType, req.params.entityId));
+});
+app.post('/api/admin/crm/:entityType/:entityId/attachments', authAdmin, uploadCrmAttachment.single('file'), (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  if (!req.file) return res.status(400).json({ error: 'Carica un file.' });
+  const result = db.prepare('INSERT INTO crm_attachments (entity_type, entity_id, filename, original_name) VALUES (?, ?, ?, ?)')
+    .run(req.params.entityType, req.params.entityId, req.file.filename, req.file.originalname);
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+app.get('/api/admin/crm/attachments/:id/download', authAdmin, (req, res) => {
+  const a = db.prepare('SELECT * FROM crm_attachments WHERE id = ?').get(req.params.id);
+  if (!a) return res.status(404).json({ error: 'Allegato non trovato.' });
+  res.download(path.join(crmAttachmentsDir, a.filename), a.original_name || a.filename);
+});
+app.delete('/api/admin/crm/attachments/:id', authAdmin, (req, res) => {
+  const a = db.prepare('SELECT * FROM crm_attachments WHERE id = ?').get(req.params.id);
+  if (a) { try { fs.unlinkSync(path.join(crmAttachmentsDir, a.filename)); } catch {} }
+  db.prepare('DELETE FROM crm_attachments WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// Riunioni
+app.get('/api/admin/crm/:entityType/:entityId/meetings', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  res.json(db.prepare('SELECT * FROM crm_meetings WHERE entity_type = ? AND entity_id = ? ORDER BY meeting_date DESC').all(req.params.entityType, req.params.entityId));
+});
+app.post('/api/admin/crm/:entityType/:entityId/meetings', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  const { title, meeting_date, participants, outcome, status } = req.body || {};
+  if (!title?.trim()) return res.status(400).json({ error: 'Il titolo è obbligatorio.' });
+  const result = db.prepare('INSERT INTO crm_meetings (entity_type, entity_id, title, meeting_date, participants, outcome, status) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(req.params.entityType, req.params.entityId, title.trim(), meeting_date || null, participants?.trim() || null, outcome?.trim() || null, status || 'aperta');
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+app.patch('/api/admin/crm/meetings/:id', authAdmin, (req, res) => {
+  const fields = ['title', 'meeting_date', 'participants', 'outcome', 'status'];
+  const updates = [], params = [];
+  for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }
+  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  params.push(req.params.id);
+  db.prepare(`UPDATE crm_meetings SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  res.json({ success: true });
+});
+app.delete('/api/admin/crm/meetings/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM crm_meetings WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// Compiti
+app.get('/api/admin/crm/:entityType/:entityId/tasks', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  res.json(db.prepare('SELECT * FROM crm_tasks WHERE entity_type = ? AND entity_id = ? ORDER BY due_date').all(req.params.entityType, req.params.entityId));
+});
+app.post('/api/admin/crm/:entityType/:entityId/tasks', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  const { title, due_date, assignee, status } = req.body || {};
+  if (!title?.trim()) return res.status(400).json({ error: 'Il titolo è obbligatorio.' });
+  const result = db.prepare('INSERT INTO crm_tasks (entity_type, entity_id, title, due_date, assignee, status) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(req.params.entityType, req.params.entityId, title.trim(), due_date || null, assignee?.trim() || null, status || 'aperto');
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+app.patch('/api/admin/crm/tasks/:id', authAdmin, (req, res) => {
+  const fields = ['title', 'due_date', 'assignee', 'status'];
+  const updates = [], params = [];
+  for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }
+  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  params.push(req.params.id);
+  db.prepare(`UPDATE crm_tasks SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  res.json({ success: true });
+});
+app.delete('/api/admin/crm/tasks/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM crm_tasks WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// Affari
+app.get('/api/admin/crm/:entityType/:entityId/deals', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  res.json(db.prepare('SELECT * FROM crm_deals WHERE entity_type = ? AND entity_id = ? ORDER BY created_at DESC').all(req.params.entityType, req.params.entityId));
+});
+app.post('/api/admin/crm/:entityType/:entityId/deals', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  const { name, value_cents, stage, expected_close_date, notes } = req.body || {};
+  if (!name?.trim()) return res.status(400).json({ error: 'Il nome dell\'affare è obbligatorio.' });
+  const result = db.prepare('INSERT INTO crm_deals (entity_type, entity_id, name, value_cents, stage, expected_close_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(req.params.entityType, req.params.entityId, name.trim(), parseInt(value_cents) || 0, stage || 'nuovo', expected_close_date || null, notes?.trim() || null);
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+app.patch('/api/admin/crm/deals/:id', authAdmin, (req, res) => {
+  const fields = ['name', 'value_cents', 'stage', 'expected_close_date', 'notes'];
+  const updates = [], params = [];
+  for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }
+  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  params.push(req.params.id);
+  db.prepare(`UPDATE crm_deals SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  res.json({ success: true });
+});
+app.delete('/api/admin/crm/deals/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM crm_deals WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// Email (log manuale, nessuna sincronizzazione automatica)
+app.get('/api/admin/crm/:entityType/:entityId/emails', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  res.json(db.prepare('SELECT * FROM crm_emails WHERE entity_type = ? AND entity_id = ? ORDER BY sent_at DESC, created_at DESC').all(req.params.entityType, req.params.entityId));
+});
+app.post('/api/admin/crm/:entityType/:entityId/emails', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  const { subject, direction, counterparty, sent_at, body } = req.body || {};
+  if (!subject?.trim()) return res.status(400).json({ error: 'L\'oggetto è obbligatorio.' });
+  const result = db.prepare('INSERT INTO crm_emails (entity_type, entity_id, subject, direction, counterparty, sent_at, body) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(req.params.entityType, req.params.entityId, subject.trim(), direction || 'out', counterparty?.trim() || null, sent_at || null, body?.trim() || null);
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+app.delete('/api/admin/crm/emails/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM crm_emails WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 

@@ -118,6 +118,60 @@
   .search-input svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: #9aa0ab; pointer-events: none; }
   .search-input input { width: 100%; padding: 9px 14px 9px 36px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; background: #fafbfc; font-family: var(--sans); color: var(--ink); }
   .search-input input:focus { outline: none; border-color: var(--wine); background: #fff; box-shadow: 0 0 0 3px rgba(59,111,224,0.1); }
+
+  /* Experiences: photo card grid */
+  .exp-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .exp-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); cursor: pointer; user-select: none; }
+  .exp-toggle input { accent-color: var(--wine); width: 15px; height: 15px; }
+  .exp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+  .exp-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(16,19,26,0.04); display: flex; flex-direction: column; }
+  .exp-card.inactive { opacity: 0.55; }
+  .exp-photo { position: relative; width: 100%; aspect-ratio: 4/3; background: #f0f2f5; cursor: pointer; overflow: hidden; }
+  .exp-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .exp-photo-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #b7bcc6; }
+  .exp-photo-placeholder svg { width: 26px; height: 26px; }
+  .exp-photo-placeholder span { font-size: 11px; font-weight: 600; }
+  .exp-photo:hover .exp-photo-placeholder { color: var(--wine); }
+  .exp-card-body { padding: 12px 14px 14px; flex: 1; display: flex; flex-direction: column; }
+  .exp-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+  .exp-card-title { font-size: 13.5px; font-weight: 700; color: var(--ink); line-height: 1.3; cursor: pointer; }
+  .exp-card-title:hover { color: var(--wine); }
+  .exp-menu-wrap { position: relative; flex-shrink: 0; }
+  .exp-menu-btn { width: 26px; height: 26px; border: 1px solid var(--line); background: #fff; border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--ink-soft); flex-shrink: 0; }
+  .exp-menu-btn:hover { background: #f5f6f8; }
+  .exp-menu-btn svg { width: 14px; height: 14px; }
+  .exp-menu { position: absolute; top: calc(100% + 4px); right: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(16,19,26,0.14); padding: 5px; display: none; z-index: 30; min-width: 140px; }
+  .exp-menu.open { display: block; }
+  .exp-menu button { width: 100%; display: block; padding: 7px 9px; border: none; background: none; border-radius: 7px; font-size: 12.5px; font-weight: 500; color: var(--ink); text-align: left; cursor: pointer; }
+  .exp-menu button:hover { background: #f2f4f8; }
+  .exp-menu button.danger { color: var(--bad); }
+  .exp-card-meta { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--ink-soft); }
+  .exp-card-meta svg { width: 13px; height: 13px; flex-shrink: 0; color: #9aa0ab; }
+  .exp-card-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 12px; }
+  .exp-card-footer .exp-price { font-size: 15px; font-weight: 700; color: var(--ink); }
+  .exp-status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+  .exp-status-dot.on { background: var(--ok); }
+  .exp-status-dot.off { background: #9aa0ab; }
+
+  /* Experience modal: tabs, chip pickers, gallery, availability */
+  .exp-modal-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .exp-modal-tabs button { padding: 8px 16px; border: 1px solid var(--line); background: #fff; border-radius: 999px; font-size: 12.5px; font-weight: 500; color: var(--ink-soft); cursor: pointer; }
+  .exp-modal-tabs button.active { background: rgba(59,111,224,0.08); color: var(--wine); border-color: rgba(59,111,224,0.35); font-weight: 600; }
+  .exp-tab-panel { display: none; }
+  .exp-tab-panel.active { display: block; }
+  .exp-chip-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+  .exp-chip { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 12.5px; font-weight: 500; color: var(--ink-soft); cursor: pointer; background: #fff; user-select: none; }
+  .exp-chip:has(input:checked) { background: rgba(59,111,224,0.09); border-color: rgba(59,111,224,0.4); color: var(--wine); font-weight: 600; }
+  .exp-chip input { accent-color: var(--wine); width: 14px; height: 14px; }
+  .exp-chip img { width: 20px; height: 26px; object-fit: cover; border-radius: 3px; }
+  .exp-gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; margin-top: 14px; }
+  .exp-gallery-item { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: #f0f2f5; }
+  .exp-gallery-item img { width: 100%; height: 100%; object-fit: cover; }
+  .exp-gallery-item button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(16,19,26,0.6); color: #fff; font-size: 12px; line-height: 1; cursor: pointer; }
+  .exp-avail-row { display: grid; grid-template-columns: 1fr 110px 100px 32px; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .exp-avail-row select, .exp-avail-row input { padding: 8px 9px; border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; background: #fff; color: var(--ink); font-family: var(--sans); }
+  .exp-avail-row button { width: 28px; height: 28px; border: 1px solid var(--line); background: #fff; border-radius: 7px; color: var(--bad); cursor: pointer; }
+  @media (max-width: 640px) { .exp-avail-row { grid-template-columns: 1fr 1fr; } }
   .segmented { display: inline-flex; background: #f0f2f5; border-radius: 999px; padding: 3px; gap: 2px; flex-shrink: 0; }
   .segmented button { border: none; background: none; padding: 7px 15px; border-radius: 999px; font-size: 12.5px; font-weight: 500; color: var(--ink-soft); cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
   .segmented button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(16,19,26,0.1); font-weight: 600; }
@@ -214,7 +268,7 @@
   .cal-header-row { display: grid; grid-template-columns: 56px repeat(var(--cal-cols, 7), 1fr); border-bottom: 1px solid var(--line); }
   .cal-header-cell { padding: 13px 8px; text-align: center; font-size: 13px; font-weight: 700; color: var(--ink); border-left: 1px solid var(--line); }
   .cal-header-cell.today { color: var(--wine); }
-  .cal-body-scroll { max-height: 620px; overflow-y: auto; position: relative; }
+  .cal-body-scroll { max-height: 620px; overflow-y: auto; overflow-x: hidden; position: relative; padding-top: 10px; }
   .cal-body-row { display: grid; grid-template-columns: 56px repeat(var(--cal-cols, 7), 1fr); }
   .cal-time-cell { padding: 0 8px; font-size: 11px; color: var(--ink-soft); text-align: right; transform: translateY(-6px); }
   .cal-day-col { border-left: 1px solid var(--line); border-top: 1px solid var(--line); position: relative; }
@@ -255,8 +309,13 @@
     .list-toolbar .search-input { width: 100%; min-width: 0; }
     .list-toolbar .segmented { max-width: 100%; overflow-x: auto; }
     .list-toolbar .btn-generate, .list-toolbar > select { width: 100%; justify-content: center; }
+    .exp-toolbar { flex-direction: column; align-items: stretch; }
+    .exp-toolbar .search-input { width: 100%; min-width: 0; }
+    .exp-toolbar .btn { width: 100%; }
+    .exp-grid { grid-template-columns: repeat(2, 1fr); }
   }
   @media (max-width: 480px) {
+    .exp-grid { grid-template-columns: 1fr; }
     .cards { grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 640px) {
@@ -410,13 +469,22 @@
 
     <!-- EXPERIENCES -->
     <div class="panel" id="panel-experiences">
-      <div class="toolbar">
-        <button class="btn" onclick="openExpModal()">+ Nuova esperienza</button>
+      <div class="exp-toolbar">
+        <div class="search-input">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="exp-search" placeholder="Cerca esperienza..." oninput="loadExperiences()">
+        </div>
+        <label class="exp-toggle">
+          <input type="checkbox" id="exp-show-inactive" onchange="loadExperiences()">
+          Mostra disattivate
+        </label>
+        <div class="list-spacer"></div>
+        <button class="btn" onclick="openExpModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;margin-right:4px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nuova esperienza
+        </button>
       </div>
-      <div class="table-wrap">
-        <table><thead><tr><th>Nome (IT)</th><th>Nome (EN)</th><th>Prezzo</th><th>Durata</th><th>Max ospiti</th><th>Stato</th><th>Azioni</th></tr></thead>
-        <tbody id="experiences-tbody"></tbody></table>
-      </div>
+      <div class="exp-grid" id="experiences-grid"></div>
     </div>
 
     <!-- CALENDAR / SLOTS -->
@@ -668,26 +736,92 @@
 
 <!-- Experience modal -->
 <div class="modal-overlay" id="exp-modal">
-  <div class="modal-box">
+  <div class="modal-box" style="max-width:740px">
     <h3 id="exp-modal-title">Nuova esperienza</h3>
     <div id="exp-modal-msg"></div>
     <input type="hidden" id="exp-id">
-    <div class="field-row">
-      <div class="field"><label>Nome (IT)</label><input id="exp-name-it"></div>
-      <div class="field"><label>Nome (EN)</label><input id="exp-name-en"></div>
+
+    <div class="exp-modal-tabs" id="exp-modal-tabs">
+      <button type="button" data-exptab="generale" class="active">Generale</button>
+      <button type="button" data-exptab="descrizione">Descrizione</button>
+      <button type="button" data-exptab="galleria" class="exp-tab-needs-id" style="display:none">Galleria</button>
+      <button type="button" data-exptab="prodotti" class="exp-tab-needs-id" style="display:none">In degustazione</button>
+      <button type="button" data-exptab="disponibilita" class="exp-tab-needs-id" style="display:none">Disponibilità</button>
     </div>
-    <div class="field-row">
-      <div class="field"><label>Descrizione (IT)</label><textarea id="exp-desc-it" rows="3"></textarea></div>
-      <div class="field"><label>Descrizione (EN)</label><textarea id="exp-desc-en" rows="3"></textarea></div>
+
+    <!-- GENERALE -->
+    <div class="exp-tab-panel active" id="exp-tab-generale">
+      <div class="field-row">
+        <div class="field"><label>Nome (IT)</label><input id="exp-name-it"></div>
+        <div class="field"><label>Nome (EN)</label><input id="exp-name-en"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Prezzo (€)</label><input type="number" id="exp-price" step="0.01"></div>
+        <div class="field"><label>Durata (min)</label><input type="number" id="exp-duration" value="90"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Max ospiti per slot</label><input type="number" id="exp-max-guests" value="10"></div>
+        <div class="field">
+          <label>Foto di copertina</label>
+          <input type="file" id="exp-image" accept="image/*">
+          <img id="exp-image-preview" style="display:none;margin-top:8px;width:100%;max-height:100px;object-fit:cover;border-radius:8px">
+        </div>
+      </div>
+      <div class="field">
+        <label>Lingue disponibili</label>
+        <div class="exp-chip-picker" id="exp-languages-picker">
+          <label class="exp-chip"><input type="checkbox" value="it"> Italiano</label>
+          <label class="exp-chip"><input type="checkbox" value="en"> English</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Facility services</label>
+        <div class="exp-chip-picker" id="exp-facilities-picker">
+          <label class="exp-chip"><input type="checkbox" value="credit_cards"> Accept Credit Cards</label>
+          <label class="exp-chip"><input type="checkbox" value="parking"> Parking</label>
+          <label class="exp-chip"><input type="checkbox" value="wifi"> Wi-Fi</label>
+          <label class="exp-chip"><input type="checkbox" value="wine_sales"> Wine Sales</label>
+          <label class="exp-chip"><input type="checkbox" value="accessible"> Accessibile</label>
+          <label class="exp-chip"><input type="checkbox" value="restaurant"> Ristorante</label>
+          <label class="exp-chip"><input type="checkbox" value="gift_shop"> Gift Shop</label>
+        </div>
+      </div>
     </div>
-    <div class="field-row">
-      <div class="field"><label>Prezzo (€)</label><input type="number" id="exp-price" step="0.01"></div>
-      <div class="field"><label>Durata (min)</label><input type="number" id="exp-duration" value="90"></div>
+
+    <!-- DESCRIZIONE -->
+    <div class="exp-tab-panel" id="exp-tab-descrizione">
+      <div class="field-row">
+        <div class="field"><label>Descrizione (IT)</label><textarea id="exp-desc-it" rows="4"></textarea></div>
+        <div class="field"><label>Descrizione (EN)</label><textarea id="exp-desc-en" rows="4"></textarea></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Cosa include (IT)</label><textarea id="exp-included-it" rows="4"></textarea></div>
+        <div class="field"><label>Cosa include (EN)</label><textarea id="exp-included-en" rows="4"></textarea></div>
+      </div>
     </div>
-    <div class="field-row">
-      <div class="field"><label>Max ospiti per slot</label><input type="number" id="exp-max-guests" value="10"></div>
-      <div class="field"><label>Immagine (URL, opzionale)</label><input id="exp-image"></div>
+
+    <!-- GALLERIA -->
+    <div class="exp-tab-panel" id="exp-tab-galleria">
+      <div class="field">
+        <label>Aggiungi immagini</label>
+        <input type="file" id="exp-gallery-upload" accept="image/*" multiple onchange="uploadExpGalleryImages()">
+      </div>
+      <div class="exp-gallery-grid" id="exp-gallery-grid"></div>
     </div>
+
+    <!-- PRODOTTI IN DEGUSTAZIONE -->
+    <div class="exp-tab-panel" id="exp-tab-prodotti">
+      <p style="margin:0 0 12px;font-size:12.5px;color:var(--ink-soft)">Seleziona le bottiglie (dal catalogo Commerciale) proposte in degustazione durante questa esperienza.</p>
+      <div class="exp-chip-picker" id="exp-products-picker"></div>
+    </div>
+
+    <!-- DISPONIBILITÀ -->
+    <div class="exp-tab-panel" id="exp-tab-disponibilita">
+      <p style="margin:0 0 12px;font-size:12.5px;color:var(--ink-soft)">Imposta il pattern settimanale ricorrente: gli slot vengono generati automaticamente per i prossimi 90 giorni. Per aggiungere una data eccezionale fuori pattern, usa "+ Aggiungi" nel Calendario.</p>
+      <div id="exp-availability-rows"></div>
+      <button type="button" class="btn secondary small" onclick="addExpAvailabilityRow()">+ Aggiungi orario</button>
+    </div>
+
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('exp-modal')">Annulla</button>
       <button class="btn" onclick="saveExperience()">Salva</button>
@@ -894,7 +1028,9 @@ function logout() {
 }
 
 async function api(path, opts = {}) {
-  opts.headers = Object.assign({ 'x-admin-key': ADMIN_KEY, 'Content-Type': 'application/json' }, opts.headers || {});
+  const headers = Object.assign({ 'x-admin-key': ADMIN_KEY }, opts.headers || {});
+  if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+  opts.headers = headers;
   const res = await fetch(path, opts);
   if (res.status === 401) { sessionStorage.removeItem('admin_key'); location.reload(); throw new Error('unauthorized'); }
   const data = await res.json().catch(() => ({}));
@@ -904,6 +1040,7 @@ async function api(path, opts = {}) {
 
 function fmtEuro(cents) { return (cents / 100).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function esc(s) { return (s ?? '').toString().replace(/</g, '&lt;'); }
+function jsonAttr(obj) { return JSON.stringify(obj).replace(/'/g, '&#39;'); }
 
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -965,21 +1102,79 @@ async function loadDashboard() {
 // ── Experiences ───────────────────────────────────────────────────────────────
 async function loadExperiences() {
   EXPERIENCES = await api('/api/admin/experiences');
-  document.getElementById('experiences-tbody').innerHTML = EXPERIENCES.length ? EXPERIENCES.map(e => `
-    <tr>
-      <td>${esc(e.name_it)}</td><td>${esc(e.name_en)}</td>
-      <td>€ ${fmtEuro(e.price_cents)}</td><td>${e.duration_minutes} min</td><td>${e.max_guests}</td>
-      <td><span class="badge ${e.active ? 'confermata' : 'annullata'}">${e.active ? 'Attiva' : 'Disattiva'}</span></td>
-      <td class="actions-cell">
-        <button class="btn small secondary" onclick='openExpModal(${JSON.stringify(e)})'>Modifica</button>
-        <button class="btn small ${e.active ? 'danger' : 'ok'}" onclick="toggleExpActive(${e.id}, ${e.active ? 0 : 1})">${e.active ? 'Disattiva' : 'Attiva'}</button>
-        <button class="btn small danger" onclick="deleteExperience(${e.id})">Elimina</button>
-      </td>
-    </tr>
-  `).join('') : '<tr><td colspan="7" class="empty">Nessuna esperienza. Creane una.</td></tr>';
+  const q = document.getElementById('exp-search').value.trim().toLowerCase();
+  const showInactive = document.getElementById('exp-show-inactive').checked;
+  const rows = EXPERIENCES.filter(e =>
+    (showInactive || e.active) &&
+    (!q || e.name_it.toLowerCase().includes(q) || e.name_en.toLowerCase().includes(q))
+  );
+  document.getElementById('experiences-grid').innerHTML = rows.length ? rows.map(e => `
+    <div class="exp-card ${e.active ? '' : 'inactive'}">
+      <div class="exp-photo" onclick='openExpModal(${jsonAttr(e)})'>
+        ${e.image_url
+          ? `<img src="${e.image_url}" alt="${esc(e.name_it)}">`
+          : `<div class="exp-photo-placeholder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
+              <span>Carica foto</span>
+            </div>`}
+      </div>
+      <div class="exp-card-body">
+        <div class="exp-card-top">
+          <div class="exp-card-title" onclick='openExpModal(${jsonAttr(e)})'>${esc(e.name_it)}</div>
+          <div class="exp-menu-wrap">
+            <button type="button" class="exp-menu-btn" onclick="toggleExpMenu(event, ${e.id})">
+              <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+            </button>
+            <div class="exp-menu" id="exp-menu-${e.id}">
+              <button onclick='openExpModal(${jsonAttr(e)})'>Modifica</button>
+              <button onclick="toggleExpActive(${e.id}, ${e.active ? 0 : 1})">${e.active ? 'Disattiva' : 'Attiva'}</button>
+              <button class="danger" onclick="deleteExperience(${e.id})">Elimina</button>
+            </div>
+          </div>
+        </div>
+        <div class="exp-card-meta">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          Durata: ${e.duration_minutes} min
+        </div>
+        <div class="exp-card-meta">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
+          Max ${e.max_guests} ospiti
+        </div>
+        <div class="exp-card-meta">
+          <span class="exp-status-dot ${e.active ? 'on' : 'off'}"></span>${e.active ? 'Attiva' : 'Disattiva'}
+        </div>
+      </div>
+      <div class="exp-card-footer">
+        <span>Adulti</span>
+        <span class="exp-price">€ ${fmtEuro(e.price_cents)}</span>
+      </div>
+    </div>
+  `).join('') : '<div class="empty">Nessuna esperienza. Creane una.</div>';
 }
 
-function openExpModal(e) {
+function toggleExpMenu(event, id) {
+  event.stopPropagation();
+  const menu = document.getElementById('exp-menu-' + id);
+  const wasOpen = menu.classList.contains('open');
+  document.querySelectorAll('.exp-menu.open').forEach(m => m.classList.remove('open'));
+  if (!wasOpen) menu.classList.add('open');
+}
+document.addEventListener('click', () => document.querySelectorAll('.exp-menu.open').forEach(m => m.classList.remove('open')));
+
+const EXP_FACILITY_LABELS = { credit_cards: 'Accept Credit Cards', parking: 'Parking', wifi: 'Wi-Fi', wine_sales: 'Wine Sales', accessible: 'Accessibile', restaurant: 'Ristorante', gift_shop: 'Gift Shop' };
+const EXP_DAY_LABELS = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+let ALL_PRODUCTS = [];
+
+document.querySelectorAll('#exp-modal-tabs button[data-exptab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#exp-modal-tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.exp-tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('exp-tab-' + btn.dataset.exptab).classList.add('active');
+  });
+});
+
+async function openExpModal(e) {
   document.getElementById('exp-modal-msg').innerHTML = '';
   document.getElementById('exp-modal-title').textContent = e ? 'Modifica esperienza' : 'Nuova esperienza';
   document.getElementById('exp-id').value = e ? e.id : '';
@@ -987,30 +1182,68 @@ function openExpModal(e) {
   document.getElementById('exp-name-en').value = e ? e.name_en : '';
   document.getElementById('exp-desc-it').value = e ? (e.description_it || '') : '';
   document.getElementById('exp-desc-en').value = e ? (e.description_en || '') : '';
+  document.getElementById('exp-included-it').value = e ? (e.included_it || '') : '';
+  document.getElementById('exp-included-en').value = e ? (e.included_en || '') : '';
   document.getElementById('exp-price').value = e ? (e.price_cents / 100) : '';
   document.getElementById('exp-duration').value = e ? e.duration_minutes : 90;
   document.getElementById('exp-max-guests').value = e ? e.max_guests : 10;
-  document.getElementById('exp-image').value = e ? (e.image_url || '') : '';
+  document.getElementById('exp-image').value = '';
+  const preview = document.getElementById('exp-image-preview');
+  if (e && e.image_url) { preview.src = e.image_url; preview.style.display = 'block'; }
+  else { preview.style.display = 'none'; }
+
+  const langs = e ? (e.languages || []) : [];
+  document.querySelectorAll('#exp-languages-picker input').forEach(cb => cb.checked = langs.includes(cb.value));
+  const facs = e ? (e.facilities || []) : [];
+  document.querySelectorAll('#exp-facilities-picker input').forEach(cb => cb.checked = facs.includes(cb.value));
+
+  // Reset to first tab
+  document.querySelectorAll('#exp-modal-tabs button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.exp-tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector('#exp-modal-tabs button[data-exptab="generale"]').classList.add('active');
+  document.getElementById('exp-tab-generale').classList.add('active');
+
+  document.querySelectorAll('.exp-tab-needs-id').forEach(b => b.style.display = e ? 'inline-block' : 'none');
+
+  if (e) {
+    renderExpGallery(e.images || []);
+    await loadExpProductsPicker(e.tastingProducts || []);
+    await loadExpAvailability(e.id);
+  }
+
   openModal('exp-modal');
 }
 
 async function saveExperience() {
   const id = document.getElementById('exp-id').value;
-  const body = {
-    name_it: document.getElementById('exp-name-it').value.trim(),
-    name_en: document.getElementById('exp-name-en').value.trim(),
-    description_it: document.getElementById('exp-desc-it').value.trim(),
-    description_en: document.getElementById('exp-desc-en').value.trim(),
-    price_cents: Math.round(parseFloat(document.getElementById('exp-price').value) * 100),
-    duration_minutes: parseInt(document.getElementById('exp-duration').value) || 90,
-    max_guests: parseInt(document.getElementById('exp-max-guests').value) || 10,
-    image_url: document.getElementById('exp-image').value.trim(),
-  };
+  const fd = new FormData();
+  fd.append('name_it', document.getElementById('exp-name-it').value.trim());
+  fd.append('name_en', document.getElementById('exp-name-en').value.trim());
+  fd.append('description_it', document.getElementById('exp-desc-it').value.trim());
+  fd.append('description_en', document.getElementById('exp-desc-en').value.trim());
+  fd.append('included_it', document.getElementById('exp-included-it').value.trim());
+  fd.append('included_en', document.getElementById('exp-included-en').value.trim());
+  fd.append('price_cents', Math.round(parseFloat(document.getElementById('exp-price').value) * 100));
+  fd.append('duration_minutes', parseInt(document.getElementById('exp-duration').value) || 90);
+  fd.append('max_guests', parseInt(document.getElementById('exp-max-guests').value) || 10);
+  const languages = [...document.querySelectorAll('#exp-languages-picker input:checked')].map(cb => cb.value);
+  const facilities = [...document.querySelectorAll('#exp-facilities-picker input:checked')].map(cb => cb.value);
+  fd.append('languages', JSON.stringify(languages));
+  fd.append('facilities', JSON.stringify(facilities));
+  const imageFile = document.getElementById('exp-image').files[0];
+  if (imageFile) fd.append('image', imageFile);
   try {
-    if (id) await api('/api/admin/experiences/' + id, { method: 'PATCH', body: JSON.stringify(body) });
-    else await api('/api/admin/experiences', { method: 'POST', body: JSON.stringify(body) });
-    closeModal('exp-modal');
-    loadExperiences();
+    if (id) {
+      await api('/api/admin/experiences/' + id, { method: 'PATCH', body: fd });
+      closeModal('exp-modal');
+      loadExperiences();
+    } else {
+      const res = await api('/api/admin/experiences', { method: 'POST', body: fd });
+      await loadExperiences();
+      const created = EXPERIENCES.find(x => x.id === res.id);
+      document.getElementById('exp-modal-msg').innerHTML = '<div class="msg success">Esperienza creata. Ora puoi aggiungere galleria, prodotti in degustazione e disponibilità.</div>';
+      await openExpModal(created);
+    }
   } catch (e) {
     document.getElementById('exp-modal-msg').innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
   }
@@ -1025,6 +1258,109 @@ async function deleteExperience(id) {
   if (!confirm('Eliminare questa esperienza e tutti i suoi slot?')) return;
   await api('/api/admin/experiences/' + id, { method: 'DELETE' });
   loadExperiences();
+}
+
+// ── Experience: gallery ──────────────────────────────────────────────────────
+function renderExpGallery(images) {
+  document.getElementById('exp-gallery-grid').innerHTML = images.map(img => `
+    <div class="exp-gallery-item">
+      <img src="${img.image_url}">
+      <button type="button" onclick="deleteExpGalleryImage(${img.id})">×</button>
+    </div>
+  `).join('');
+}
+
+async function uploadExpGalleryImages() {
+  const id = document.getElementById('exp-id').value;
+  const input = document.getElementById('exp-gallery-upload');
+  if (!id || !input.files.length) return;
+  const fd = new FormData();
+  [...input.files].forEach(f => fd.append('images', f));
+  try {
+    await api('/api/admin/experiences/' + id + '/images', { method: 'POST', body: fd });
+    input.value = '';
+    const exp = await api('/api/admin/experiences/' + id);
+    renderExpGallery(exp.images);
+  } catch (e) {
+    document.getElementById('exp-modal-msg').innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function deleteExpGalleryImage(imageId) {
+  const id = document.getElementById('exp-id').value;
+  await api(`/api/admin/experiences/${id}/images/${imageId}`, { method: 'DELETE' });
+  const exp = await api('/api/admin/experiences/' + id);
+  renderExpGallery(exp.images);
+}
+
+// ── Experience: tasting products ─────────────────────────────────────────────
+async function loadExpProductsPicker(selected) {
+  if (!ALL_PRODUCTS.length) ALL_PRODUCTS = await api('/api/admin/products');
+  const selectedIds = new Set(selected.map(p => p.id));
+  document.getElementById('exp-products-picker').innerHTML = ALL_PRODUCTS.length ? ALL_PRODUCTS.map(p => `
+    <label class="exp-chip">
+      <input type="checkbox" value="${p.id}" ${selectedIds.has(p.id) ? 'checked' : ''} onchange="saveExpProducts()">
+      ${p.image_url ? `<img src="${p.image_url}">` : ''}
+      ${esc(p.name)}
+    </label>
+  `).join('') : '<p style="font-size:12.5px;color:var(--ink-soft);margin:0">Nessuna bottiglia in catalogo. Aggiungine una dal Portale ERP → Commerciale → Bottiglie.</p>';
+}
+
+async function saveExpProducts() {
+  const id = document.getElementById('exp-id').value;
+  const product_ids = [...document.querySelectorAll('#exp-products-picker input:checked')].map(cb => parseInt(cb.value));
+  await api(`/api/admin/experiences/${id}/products`, { method: 'PUT', body: JSON.stringify({ product_ids }) });
+}
+
+// ── Experience: recurring availability ───────────────────────────────────────
+let EXP_AVAIL_ROWS = [];
+let EXP_AVAIL_ROW_ID = 0;
+
+async function loadExpAvailability(experienceId) {
+  const rows = await api(`/api/admin/experiences/${experienceId}/availability`);
+  EXP_AVAIL_ROWS = rows.map(r => ({ id: EXP_AVAIL_ROW_ID++, day_of_week: r.day_of_week, time: r.time, capacity: r.capacity }));
+  renderExpAvailabilityRows();
+}
+
+function addExpAvailabilityRow() {
+  EXP_AVAIL_ROWS.push({ id: EXP_AVAIL_ROW_ID++, day_of_week: 1, time: '11:00', capacity: parseInt(document.getElementById('exp-max-guests').value) || 10 });
+  renderExpAvailabilityRows();
+}
+
+function removeExpAvailabilityRow(id) {
+  EXP_AVAIL_ROWS = EXP_AVAIL_ROWS.filter(r => r.id !== id);
+  renderExpAvailabilityRows();
+  saveExpAvailability();
+}
+
+function updateExpAvailabilityRow(id, field, value) {
+  const row = EXP_AVAIL_ROWS.find(r => r.id === id);
+  if (!row) return;
+  row[field] = field === 'day_of_week' || field === 'capacity' ? parseInt(value) : value;
+}
+
+function renderExpAvailabilityRows() {
+  document.getElementById('exp-availability-rows').innerHTML = EXP_AVAIL_ROWS.length ? EXP_AVAIL_ROWS.map(r => `
+    <div class="exp-avail-row">
+      <select onchange="updateExpAvailabilityRow(${r.id}, 'day_of_week', this.value)">
+        ${EXP_DAY_LABELS.map((d, i) => `<option value="${i}" ${r.day_of_week === i ? 'selected' : ''}>${d}</option>`).join('')}
+      </select>
+      <input type="time" value="${r.time}" onchange="updateExpAvailabilityRow(${r.id}, 'time', this.value)">
+      <input type="number" min="1" value="${r.capacity}" placeholder="Capienza" onchange="updateExpAvailabilityRow(${r.id}, 'capacity', this.value)">
+      <button type="button" onclick="removeExpAvailabilityRow(${r.id})">×</button>
+    </div>
+  `).join('') : '<p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 10px">Nessun orario ricorrente impostato.</p>';
+  if (EXP_AVAIL_ROWS.length) {
+    document.getElementById('exp-availability-rows').insertAdjacentHTML('beforeend',
+      '<button type="button" class="btn small" style="margin-top:4px" onclick="saveExpAvailability()">Salva disponibilità</button>');
+  }
+}
+
+async function saveExpAvailability() {
+  const id = document.getElementById('exp-id').value;
+  const pattern = EXP_AVAIL_ROWS.map(r => ({ day_of_week: r.day_of_week, time: r.time, capacity: r.capacity }));
+  const res = await api(`/api/admin/experiences/${id}/availability`, { method: 'PUT', body: JSON.stringify({ pattern }) });
+  document.getElementById('exp-modal-msg').innerHTML = `<div class="msg success">Disponibilità salvata${res.slotsCreated ? ' — ' + res.slotsCreated + ' nuovi slot generati' : ''}.</div>`;
 }
 
 // ── Calendar / slots ──────────────────────────────────────────────────────────

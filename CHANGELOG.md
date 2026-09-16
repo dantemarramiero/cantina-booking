@@ -47,6 +47,20 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - Toolbar, form e modali impilati su schermi stretti
 - Tabelle: font/padding ridotti e colonne meno critiche nascoste sotto i 640px, per ridurre al minimo lo scroll orizzontale
 
+## 2026-09-16 (2) — Esperienze avanzate + CRM come workspace madre
+
+**Esperienze (Enoturismo)**
+- Modello esperienza esteso: galleria immagini, descrizione, prodotti in degustazione (selezionati dal catalogo Commerciale), durata, lingue disponibili, facility services, "cosa include"
+- Disponibilità ricorrente spostata dentro ogni esperienza (pattern settimanale → generazione automatica slot su 90 giorni), al posto del generatore bulk separato
+- Fix bug: apostrofi nei nomi (es. "L'Eredità...") rompevano il rendering dell'intera griglia esperienze; fix editing esperienza che non si apriva più
+- Fix calendario: etichetta "08:00" tagliata in alto
+
+**CRM come workspace top-level**
+- CRM promosso da sotto-sezione di Commerciale a workspace principale (sidebar propria), con tab figlie: Clienti, Agenti, Importatori, Fornitori
+- Nuove anagrafiche Importatori e Fornitori, stesso modello dati completo di Clienti (contatti, indirizzi fatturazione/spedizione, dati business)
+- Pagina anagrafica in stile Zoho CRM per ogni record: Informazioni di base, Overview (ordini/fatturato), Email (log manuale, nessuna sincronizzazione Outlook per ora), Note, Allegati, Riunioni, Compiti, Affari, Ordini
+- Fix: pagina anagrafica invisibile (mancava il posizionamento CSS), modali (riunioni/compiti/affari/email) nascosti dietro la pagina anagrafica (z-index), "Torna alla lista" che riportava al workspace sbagliato
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

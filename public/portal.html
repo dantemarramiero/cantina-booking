@@ -178,7 +178,7 @@
   .help { font-size: 12.5px; color: var(--ink-soft); line-height: 1.6; background: #f5f8ff; border: 1px solid #e1e9fb; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
   code { background: #eef1f6; padding: 1px 5px; border-radius: 3px; font-size: 11.5px; color: var(--wine); }
 
-  .modal-overlay { position: fixed; inset: 0; background: rgba(16,19,26,0.4); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(16,19,26,0.4); display: none; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
   .modal-overlay.open { display: flex; }
   .modal-box { background: #fff; border: 1px solid var(--line); max-width: 560px; width: 100%; max-height: 88vh; overflow-y: auto; border-radius: 16px; padding: 26px; box-shadow: 0 12px 40px rgba(16,19,26,0.18); }
   .modal-box h3 { margin-bottom: 18px; }
@@ -224,6 +224,7 @@
     .mobile-topbar-toggle { display: flex; }
     .topbar { padding: 0 14px; gap: 10px; justify-content: flex-start; }
     main { padding: 16px; }
+    #crm-record-view { padding: 16px; }
     .field-row, .field-row:has(> :nth-child(3)) { grid-template-columns: 1fr; }
     .avail-row { grid-template-columns: 1fr !important; }
     .dash-two-col { grid-template-columns: 1fr !important; }
@@ -249,6 +250,34 @@
     .badge { padding: 2px 7px; font-size: 9.5px; }
     .prod-thumb { width: 26px !important; height: 34px !important; }
   }
+
+  /* CRM: record detail page */
+  #crm-record-view { position: fixed; inset: 0; z-index: 150; background: var(--cream); overflow-y: auto; padding: 24px 32px; }
+  .crm-record-topbar { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+  .crm-record-topbar h2 { font-size: 19px; margin: 0; }
+  .crm-record-tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 22px; padding-bottom: 0; }
+  .crm-record-tabs button { padding: 10px 14px; border: none; background: none; font-size: 13px; font-weight: 500; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .crm-record-tabs button:hover { color: var(--ink); }
+  .crm-record-tabs button.active { color: var(--wine); font-weight: 600; border-bottom-color: var(--wine); }
+  .crm-record-panel { display: none; }
+  .crm-record-panel.active { display: block; }
+  .crm-panel-toolbar { display: flex; align-items: center; margin-bottom: 6px; }
+  .crm-info-section { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px; margin-bottom: 18px; }
+  .crm-info-section h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--wine); margin: 0 0 16px; }
+  .crm-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; }
+  .crm-info-field label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #9aa0ab; margin-bottom: 6px; font-weight: 600; }
+  .crm-info-field input, .crm-info-field select, .crm-info-field textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-family: var(--sans); background: #fff; color: var(--ink); box-sizing: border-box; }
+  .crm-info-field.checkbox { display: flex; align-items: center; gap: 8px; flex-direction: row; padding-top: 22px; }
+  .crm-info-field.checkbox label { margin: 0; text-transform: none; font-size: 13px; color: var(--ink); font-weight: 500; }
+  .crm-save-bar { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+  .crm-activity-item { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+  .crm-activity-item .crm-item-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 4px; }
+  .crm-activity-item .crm-item-title { font-weight: 600; color: var(--ink); font-size: 13.5px; }
+  .crm-activity-item .crm-item-meta { font-size: 11.5px; color: #9aa0ab; }
+  .crm-activity-item .crm-item-body { font-size: 13px; color: var(--ink-soft); white-space: pre-line; margin-top: 4px; }
+  .crm-activity-item .crm-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .crm-overview-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+  @media (max-width: 700px) { .crm-info-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -316,6 +345,10 @@
           <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/></svg></span>
           Magazzino
         </button>
+        <button data-ws="crm" onclick="switchWorkspace('crm')">
+          <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg></span>
+          CRM
+        </button>
       </div>
     </div>
 
@@ -340,10 +373,6 @@
       <button data-sub="com-listini">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 12.6 12.6 20.4a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1 0-2.8L11.4 3.6a2 2 0 0 1 1.4-.6H19a2 2 0 0 1 2 2v6.6a2 2 0 0 1-.6 1.4Z"/><circle cx="15" cy="9" r="1.5"/></svg>
         Listini
-      </button>
-      <button data-sub="com-crm">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
-        CRM
       </button>
       <button data-sub="com-news">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="13" y2="17"/></svg>
@@ -382,6 +411,25 @@
       <button data-sub="mag-materie">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
         Materie prime
+      </button>
+    </nav>
+
+    <nav class="sidebar-nav" data-workspace-nav="crm" style="display:none">
+      <button data-sub="crm-clienti" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
+        Clienti
+      </button>
+      <button data-sub="crm-agenti">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/></svg>
+        Agenti
+      </button>
+      <button data-sub="crm-importatori">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M2.5 9h19M2.5 15h19M11.5 3a15 15 0 0 0 0 18M12.5 3a15 15 0 0 1 0 18"/></svg>
+        Importatori
+      </button>
+      <button data-sub="crm-fornitori">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
+        Fornitori
       </button>
     </nav>
 
@@ -475,45 +523,6 @@
       <div class="subpanel" id="sub-com-listini">
         <div class="toolbar"><button class="btn" onclick="openPriceListModal()">+ Nuovo listino</button></div>
         <div id="price-lists-container"></div>
-      </div>
-
-      <div class="subpanel" id="sub-com-crm">
-        <div class="subtabs crm-tabs">
-          <button data-crm="crm-agenti" class="active">Agenti</button>
-          <button data-crm="crm-clienti">Clienti</button>
-        </div>
-
-        <div class="crm-panel active" id="crm-agenti">
-          <div class="list-card">
-            <div class="list-toolbar">
-              <div class="list-toolbar-title"><h3>Agenti</h3><p>Rete vendita con link personale di accesso</p></div>
-              <div class="list-spacer"></div>
-              <button class="btn-generate" onclick="openAgentModal()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
-                Nuovo agente
-              </button>
-            </div>
-            <div class="list-rows" id="agents-tbody"></div>
-          </div>
-        </div>
-
-        <div class="crm-panel" id="crm-clienti">
-          <div class="list-card">
-            <div class="list-toolbar">
-              <div class="search-input">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" id="cust-search" placeholder="Cerca cliente" oninput="loadCustomers()">
-              </div>
-              <select id="cust-agent-filter" onchange="loadCustomers()" style="padding:9px 30px 9px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:13px"><option value="">Tutti gli agenti</option></select>
-              <div class="list-spacer"></div>
-              <button class="btn-generate" onclick="openCustomerModal()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
-                Nuovo cliente
-              </button>
-            </div>
-            <div class="list-rows" id="customers-tbody"></div>
-          </div>
-        </div>
       </div>
 
       <div class="subpanel" id="sub-com-news">
@@ -618,6 +627,75 @@
         <div class="table-wrap">
           <table><thead><tr><th>SKU</th><th>Referenza</th><th>Quantità</th><th>Unità</th><th>Soglia</th><th>Stato</th><th>Email alert</th><th>Azioni</th></tr></thead>
           <tbody id="raw-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CRM ═══ -->
+    <div class="module" id="module-crm">
+      <div class="subpanel active" id="sub-crm-clienti">
+        <div class="list-card">
+          <div class="list-toolbar">
+            <div class="search-input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="cust-search" placeholder="Cerca cliente" oninput="loadCustomers()">
+            </div>
+            <select id="cust-agent-filter" onchange="loadCustomers()" style="padding:9px 30px 9px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:13px"><option value="">Tutti gli agenti</option></select>
+            <div class="list-spacer"></div>
+            <button class="btn-generate" onclick="openCustomerModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+              Nuovo cliente
+            </button>
+          </div>
+          <div class="list-rows" id="customers-tbody"></div>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-crm-agenti">
+        <div class="list-card">
+          <div class="list-toolbar">
+            <div class="list-toolbar-title"><h3>Agenti</h3><p>Rete vendita con accesso proprio al portale ordini</p></div>
+            <div class="list-spacer"></div>
+            <button class="btn-generate" onclick="openAgentModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+              Nuovo agente
+            </button>
+          </div>
+          <div class="list-rows" id="agents-tbody"></div>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-crm-importatori">
+        <div class="list-card">
+          <div class="list-toolbar">
+            <div class="search-input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="importer-search" placeholder="Cerca importatore" oninput="loadImporters()">
+            </div>
+            <div class="list-spacer"></div>
+            <button class="btn-generate" onclick="openImporterModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+              Nuovo importatore
+            </button>
+          </div>
+          <div class="list-rows" id="importers-tbody"></div>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-crm-fornitori">
+        <div class="list-card">
+          <div class="list-toolbar">
+            <div class="search-input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="supplier-search" placeholder="Cerca fornitore" oninput="loadSuppliers()">
+            </div>
+            <div class="list-spacer"></div>
+            <button class="btn-generate" onclick="openSupplierModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+              Nuovo fornitore
+            </button>
+          </div>
+          <div class="list-rows" id="suppliers-tbody"></div>
         </div>
       </div>
     </div>
@@ -811,9 +889,21 @@
       <div class="field"><label>Fax</label><input id="cust-fax"></div>
       <div class="field"><label>PEC</label><input type="email" id="cust-pec"></div>
     </div>
+    <div class="field-row">
+      <div class="field"><label>Referente principale</label><input id="cust-contact-person"></div>
+      <div class="field"><label>Referente secondario</label><input id="cust-contact-person-secondary"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Sito web</label><input id="cust-website" placeholder="https://..."></div>
+      <div class="field" style="display:flex;align-items:flex-end;padding-bottom:9px">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px">
+          <input type="checkbox" id="cust-newsletter-subscribed"> Iscritto a Newsletter
+        </label>
+      </div>
+    </div>
 
     <div class="form-section-title">Localizzazione</div>
-    <div class="field"><label>Indirizzo</label><input id="cust-address"></div>
+    <div class="field"><label>Indirizzo di fatturazione</label><input id="cust-address"></div>
     <div class="field-row">
       <div class="field"><label>CAP</label><input id="cust-postal-code"></div>
       <div class="field"><label>Città</label><input id="cust-city"></div>
@@ -822,6 +912,15 @@
       <div class="field"><label>Provincia</label><input id="cust-province"></div>
       <div class="field"><label>Paese</label><input id="cust-country" value="Italia"></div>
       <div class="field"><label>Zona</label><input id="cust-zone"></div>
+    </div>
+    <div class="field"><label>Indirizzo di spedizione (se diverso)</label><input id="cust-shipping-address"></div>
+    <div class="field-row">
+      <div class="field"><label>CAP di spedizione</label><input id="cust-shipping-postal-code"></div>
+      <div class="field"><label>Città di spedizione</label><input id="cust-shipping-city"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Provincia di spedizione</label><input id="cust-shipping-province"></div>
+      <div class="field"><label>Paese di spedizione</label><input id="cust-shipping-country"></div>
     </div>
 
     <div class="form-section-title">Dati fiscali</div>
@@ -847,6 +946,7 @@
       <div class="field"><label>Codice sconto standard</label><input id="cust-discount-code" placeholder="es. SCONTO10"></div>
       <div class="field"><label>Sconto automatico (%)</label><input type="number" id="cust-discount-percent" min="0" max="100" step="0.5" placeholder="0"></div>
     </div>
+    <div class="field"><label>Volume d'affari stimato (€/anno)</label><input type="number" id="cust-estimated-volume" step="0.01"></div>
 
     <div class="form-section-title">Operativo</div>
     <div class="field-row">
@@ -925,6 +1025,144 @@
   </div>
 </div>
 
+<!-- Importer modal (create + edit) -->
+<div class="modal-overlay" id="importer-modal">
+  <div class="modal-box" style="max-width:640px">
+    <h3 id="importer-modal-title">Nuovo importatore</h3>
+    <div id="importer-modal-msg"></div>
+    <input type="hidden" id="imp-id">
+
+    <div class="form-section-title">Informazioni di contatto</div>
+    <div class="field"><label>Ragione sociale</label><input id="imp-name"></div>
+    <div class="field-row">
+      <div class="field"><label>Referente principale</label><input id="imp-contact-person"></div>
+      <div class="field"><label>Referente secondario</label><input id="imp-contact-person-secondary"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Telefono</label><input id="imp-phone"></div>
+      <div class="field"><label>Cellulare</label><input id="imp-mobile"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Email</label><input type="email" id="imp-email"></div>
+      <div class="field"><label>Sito web</label><input id="imp-website"></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px;margin-bottom:14px">
+      <input type="checkbox" id="imp-newsletter-subscribed"> Iscritto a Newsletter
+    </label>
+
+    <div class="form-section-title">Informazioni di indirizzo</div>
+    <div class="field-row">
+      <div class="field"><label>Via fatturazione</label><input id="imp-address"></div>
+      <div class="field"><label>Via spedizione</label><input id="imp-shipping-address"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Città di fatturazione</label><input id="imp-city"></div>
+      <div class="field"><label>Città di spedizione</label><input id="imp-shipping-city"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Provincia/regione di fatturazione</label><input id="imp-province"></div>
+      <div class="field"><label>Provincia/regione di spedizione</label><input id="imp-shipping-province"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>CAP</label><input id="imp-postal-code"></div>
+      <div class="field"><label>CAP di spedizione</label><input id="imp-shipping-postal-code"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Paese di fatturazione</label><input id="imp-country"></div>
+      <div class="field"><label>Paese di spedizione</label><input id="imp-shipping-country"></div>
+    </div>
+
+    <div class="form-section-title">Informazioni di business</div>
+    <div class="field-row">
+      <div class="field"><label>Agente collegato</label><select id="imp-agent"><option value="">— Nessuno —</option></select></div>
+      <div class="field"><label>Volume d'affari stimato (€/anno)</label><input type="number" id="imp-estimated-volume" step="0.01"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Sconto standard (%)</label><input type="number" id="imp-discount-percent" step="0.5"></div>
+      <div class="field"><label>Condizioni di pagamento</label><input id="imp-payment-terms"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Partita IVA</label><input id="imp-vat"></div>
+      <div class="field"><label>SDI</label><input id="imp-sdi"></div>
+    </div>
+    <div class="field"><label>Note</label><textarea id="imp-notes" rows="2"></textarea></div>
+
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('importer-modal')">Annulla</button>
+      <button class="btn" onclick="saveImporter()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Supplier modal (create + edit) -->
+<div class="modal-overlay" id="supplier-modal">
+  <div class="modal-box" style="max-width:640px">
+    <h3 id="supplier-modal-title">Nuovo fornitore</h3>
+    <div id="supplier-modal-msg"></div>
+    <input type="hidden" id="sup-id">
+
+    <div class="form-section-title">Informazioni di contatto</div>
+    <div class="field"><label>Ragione sociale</label><input id="sup-name"></div>
+    <div class="field-row">
+      <div class="field"><label>Referente principale</label><input id="sup-contact-person"></div>
+      <div class="field"><label>Referente secondario</label><input id="sup-contact-person-secondary"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Telefono</label><input id="sup-phone"></div>
+      <div class="field"><label>Cellulare</label><input id="sup-mobile"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Email</label><input type="email" id="sup-email"></div>
+      <div class="field"><label>Sito web</label><input id="sup-website"></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px;margin-bottom:14px">
+      <input type="checkbox" id="sup-newsletter-subscribed"> Iscritto a Newsletter
+    </label>
+
+    <div class="form-section-title">Informazioni di indirizzo</div>
+    <div class="field-row">
+      <div class="field"><label>Via fatturazione</label><input id="sup-address"></div>
+      <div class="field"><label>Via spedizione</label><input id="sup-shipping-address"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Città di fatturazione</label><input id="sup-city"></div>
+      <div class="field"><label>Città di spedizione</label><input id="sup-shipping-city"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Provincia/regione di fatturazione</label><input id="sup-province"></div>
+      <div class="field"><label>Provincia/regione di spedizione</label><input id="sup-shipping-province"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>CAP</label><input id="sup-postal-code"></div>
+      <div class="field"><label>CAP di spedizione</label><input id="sup-shipping-postal-code"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Paese di fatturazione</label><input id="sup-country"></div>
+      <div class="field"><label>Paese di spedizione</label><input id="sup-shipping-country"></div>
+    </div>
+
+    <div class="form-section-title">Informazioni di business</div>
+    <div class="field-row">
+      <div class="field"><label>Categoria fornitura</label><input id="sup-category" placeholder="es. Vetro, tappi, etichette, trasporti..."></div>
+      <div class="field"><label>Volume d'affari stimato (€/anno)</label><input type="number" id="sup-estimated-volume" step="0.01"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Sconto standard (%)</label><input type="number" id="sup-discount-percent" step="0.5"></div>
+      <div class="field"><label>Condizioni di pagamento</label><input id="sup-payment-terms"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Partita IVA</label><input id="sup-vat"></div>
+      <div class="field"><label>SDI</label><input id="sup-sdi"></div>
+    </div>
+    <div class="field"><label>Note</label><textarea id="sup-notes" rows="2"></textarea></div>
+
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('supplier-modal')">Annulla</button>
+      <button class="btn" onclick="saveSupplier()">Salva</button>
+    </div>
+  </div>
+</div>
+
 <!-- Finished warehouse modal -->
 <div class="modal-overlay" id="finished-modal">
   <div class="modal-box">
@@ -963,6 +1201,156 @@
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('raw-modal')">Annulla</button>
       <button class="btn" onclick="saveRaw()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- CRM record detail (full page, shared layout for Clienti/Agenti/Importatori/Fornitori) -->
+<div id="crm-record-view" style="display:none">
+  <div class="crm-record-topbar">
+    <button class="btn secondary small" onclick="closeCrmRecord()">← Torna alla lista</button>
+    <h2 id="crm-record-title">—</h2>
+  </div>
+  <div class="crm-record-tabs" id="crm-record-tabs">
+    <button type="button" data-rtab="info" class="active">Informazioni di base</button>
+    <button type="button" data-rtab="overview">Overview</button>
+    <button type="button" data-rtab="email">Email</button>
+    <button type="button" data-rtab="note">Note</button>
+    <button type="button" data-rtab="allegati">Allegati</button>
+    <button type="button" data-rtab="riunioni">Riunioni</button>
+    <button type="button" data-rtab="compiti">Compiti</button>
+    <button type="button" data-rtab="affari">Affari</button>
+    <button type="button" data-rtab="ordini" id="crm-tab-ordini-btn" style="display:none">Ordini</button>
+  </div>
+
+  <div class="crm-record-panel active" id="crm-rtab-info"></div>
+
+  <div class="crm-record-panel" id="crm-rtab-overview"></div>
+
+  <div class="crm-record-panel" id="crm-rtab-email">
+    <div class="crm-panel-toolbar"><div class="list-spacer"></div><button class="btn-generate" style="margin-top:0" onclick="openCrmEmailModal()">+ Registra email</button></div>
+    <p style="margin:0 0 14px;font-size:12px;color:var(--ink-soft)">Log manuale — nessuna sincronizzazione automatica con Outlook.</p>
+    <div id="crm-emails-list"></div>
+  </div>
+
+  <div class="crm-record-panel" id="crm-rtab-note">
+    <div class="field"><textarea id="crm-note-input" rows="2" placeholder="Scrivi una nota..."></textarea></div>
+    <button class="btn small" onclick="addCrmNote()">Aggiungi nota</button>
+    <div id="crm-notes-list" style="margin-top:16px"></div>
+  </div>
+
+  <div class="crm-record-panel" id="crm-rtab-allegati">
+    <input type="file" id="crm-attachment-input" onchange="uploadCrmAttachmentFile()">
+    <div id="crm-attachments-list" style="margin-top:16px"></div>
+  </div>
+
+  <div class="crm-record-panel" id="crm-rtab-riunioni">
+    <div class="crm-panel-toolbar"><div class="list-spacer"></div><button class="btn-generate" style="margin-top:0" onclick="openCrmMeetingModal()">+ Nuova riunione</button></div>
+    <div id="crm-meetings-list"></div>
+  </div>
+
+  <div class="crm-record-panel" id="crm-rtab-compiti">
+    <div class="crm-panel-toolbar"><div class="list-spacer"></div><button class="btn-generate" style="margin-top:0" onclick="openCrmTaskModal()">+ Nuovo compito</button></div>
+    <div id="crm-tasks-list"></div>
+  </div>
+
+  <div class="crm-record-panel" id="crm-rtab-affari">
+    <div class="crm-panel-toolbar"><div class="list-spacer"></div><button class="btn-generate" style="margin-top:0" onclick="openCrmDealModal()">+ Nuovo affare</button></div>
+    <div id="crm-deals-list"></div>
+  </div>
+
+  <div class="crm-record-panel" id="crm-rtab-ordini">
+    <div id="crm-orders-list"></div>
+  </div>
+</div>
+
+<!-- CRM: meeting modal -->
+<div class="modal-overlay" id="crm-meeting-modal">
+  <div class="modal-box">
+    <h3>Nuova riunione</h3>
+    <div id="crm-meeting-modal-msg"></div>
+    <input type="hidden" id="crm-meeting-id">
+    <div class="field"><label>Titolo</label><input id="crm-meeting-title"></div>
+    <div class="field-row">
+      <div class="field"><label>Data e ora</label><input type="datetime-local" id="crm-meeting-date"></div>
+      <div class="field"><label>Partecipanti</label><input id="crm-meeting-participants"></div>
+    </div>
+    <div class="field"><label>Esito / note</label><textarea id="crm-meeting-outcome" rows="2"></textarea></div>
+    <div class="field"><label>Stato</label>
+      <select id="crm-meeting-status"><option value="aperta">Aperta</option><option value="chiusa">Chiusa</option></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('crm-meeting-modal')">Annulla</button>
+      <button class="btn" onclick="saveCrmMeeting()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- CRM: task modal -->
+<div class="modal-overlay" id="crm-task-modal">
+  <div class="modal-box">
+    <h3>Nuovo compito</h3>
+    <div id="crm-task-modal-msg"></div>
+    <input type="hidden" id="crm-task-id">
+    <div class="field"><label>Titolo</label><input id="crm-task-title"></div>
+    <div class="field-row">
+      <div class="field"><label>Scadenza</label><input type="date" id="crm-task-due"></div>
+      <div class="field"><label>Assegnato a</label><input id="crm-task-assignee"></div>
+    </div>
+    <div class="field"><label>Stato</label>
+      <select id="crm-task-status"><option value="aperto">Aperto</option><option value="chiuso">Chiuso</option></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('crm-task-modal')">Annulla</button>
+      <button class="btn" onclick="saveCrmTask()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- CRM: deal modal -->
+<div class="modal-overlay" id="crm-deal-modal">
+  <div class="modal-box">
+    <h3>Nuovo affare</h3>
+    <div id="crm-deal-modal-msg"></div>
+    <input type="hidden" id="crm-deal-id">
+    <div class="field"><label>Nome affare</label><input id="crm-deal-name"></div>
+    <div class="field-row">
+      <div class="field"><label>Valore stimato (€)</label><input type="number" id="crm-deal-value" step="0.01"></div>
+      <div class="field"><label>Chiusura prevista</label><input type="date" id="crm-deal-close-date"></div>
+    </div>
+    <div class="field"><label>Fase</label>
+      <select id="crm-deal-stage">
+        <option value="nuovo">Nuovo</option>
+        <option value="qualificato">Qualificato</option>
+        <option value="proposta">Proposta inviata</option>
+        <option value="negoziazione">Negoziazione</option>
+        <option value="vinto">Vinto</option>
+        <option value="perso">Perso</option>
+      </select>
+    </div>
+    <div class="field"><label>Note</label><textarea id="crm-deal-notes" rows="2"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('crm-deal-modal')">Annulla</button>
+      <button class="btn" onclick="saveCrmDeal()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- CRM: email log modal -->
+<div class="modal-overlay" id="crm-email-modal">
+  <div class="modal-box">
+    <h3>Registra email</h3>
+    <div id="crm-email-modal-msg"></div>
+    <div class="field"><label>Oggetto</label><input id="crm-email-subject"></div>
+    <div class="field-row">
+      <div class="field"><label>Direzione</label><select id="crm-email-direction"><option value="out">Inviata</option><option value="in">Ricevuta</option></select></div>
+      <div class="field"><label>Data e ora</label><input type="datetime-local" id="crm-email-sent-at"></div>
+    </div>
+    <div class="field"><label>Da / a</label><input id="crm-email-counterparty" placeholder="nome@azienda.it"></div>
+    <div class="field"><label>Testo email</label><textarea id="crm-email-body" rows="4"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('crm-email-modal')">Annulla</button>
+      <button class="btn" onclick="saveCrmEmail()">Salva</button>
     </div>
   </div>
 </div>
@@ -1064,14 +1452,15 @@ function stockBadge(qty, threshold) {
 }
 
 // ── Workspace switcher (top-level area selector) ───────────────────────────────
-const WORKSPACE_LABELS = { enoturismo: 'Enoturismo', commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino' };
+const WORKSPACE_LABELS = { enoturismo: 'Enoturismo', commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino', crm: 'CRM' };
 const WORKSPACE_ICONS = {
   enoturismo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg>',
   commerciale: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>',
   produzione: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg>',
-  magazzino: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/></svg>'
+  magazzino: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/></svg>',
+  crm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>'
 };
-const MODULE_TITLES = { commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino', impostazioni: 'Impostazioni' };
+const MODULE_TITLES = { commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino', crm: 'CRM', impostazioni: 'Impostazioni' };
 
 function toggleWorkspaceMenu() { document.getElementById('workspace-menu').classList.toggle('open'); }
 document.addEventListener('click', (e) => {
@@ -1124,41 +1513,21 @@ document.querySelectorAll('[data-workspace-nav] button[data-sub]').forEach(btn =
   });
 });
 
-// ── CRM inner tabs (Agenti / Clienti) ──────────────────────────────────────────
-document.querySelectorAll('.crm-tabs button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.crm-tabs button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.crm-panel').forEach(p => p.classList.remove('active'));
-    document.getElementById(btn.dataset.crm).classList.add('active');
-    if (btn.dataset.crm === 'crm-agenti') loadAgents();
-    if (btn.dataset.crm === 'crm-clienti') loadCustomers();
-  });
-});
-
-// ── CRM inner tabs (Agenti / Clienti) ──────────────────────────────────────────
-document.querySelectorAll('.crm-tabs button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.crm-tabs button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.crm-panel').forEach(p => p.classList.remove('active'));
-    document.getElementById(btn.dataset.crm).classList.add('active');
-    if (btn.dataset.crm === 'crm-agenti') loadAgents();
-    if (btn.dataset.crm === 'crm-clienti') loadCustomers();
-  });
-});
 
 function loadSubpanel(sub) {
   if (sub === 'com-dashboard') loadDashboard();
   if (sub === 'com-ordini') loadOrders();
   if (sub === 'com-prodotti') loadProducts();
   if (sub === 'com-listini') loadPriceLists();
-  if (sub === 'com-crm') loadAgents();
   if (sub === 'com-news') loadNews();
   if (sub === 'com-catalogo') loadCatalogs();
   if (sub === 'prod-riepilogo') loadProductionSummary();
   if (sub === 'prod-clienti') loadProductionSummary();
   if (sub === 'prod-righe') loadProductionItems();
+  if (sub === 'crm-clienti') loadCustomers();
+  if (sub === 'crm-agenti') loadAgents();
+  if (sub === 'crm-importatori') loadImporters();
+  if (sub === 'crm-fornitori') loadSuppliers();
 }
 
 // ── COMMERCIALE: dashboard ─────────────────────────────────────────────────────
@@ -1458,8 +1827,8 @@ async function loadAgents() {
   AGENTS = await api('/api/admin/agents');
   document.getElementById('agents-tbody').innerHTML = AGENTS.length ? AGENTS.map(a => `
     <div class="list-row">
-      <div class="list-row-icon">${a.code ? esc(a.code) : esc(a.name).charAt(0).toUpperCase()}</div>
-      <div class="list-row-body">
+      <div class="list-row-icon" style="cursor:pointer" onclick="openCrmRecord('agent', ${a.id})">${a.code ? esc(a.code) : esc(a.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body" style="cursor:pointer" onclick="openCrmRecord('agent', ${a.id})">
         <div class="list-row-title">${esc(a.name)}</div>
         <div class="list-row-sub">${a.username ? esc(a.username) : 'nessuna credenziale'} · ${a.provinces.length ? a.provinces.map(esc).join(', ') : 'nessuna provincia'}</div>
       </div>
@@ -1705,8 +2074,8 @@ async function loadCustomers() {
   const rows = await api('/api/admin/customers?' + params.toString());
   document.getElementById('customers-tbody').innerHTML = rows.length ? rows.map(c => `
     <div class="list-row">
-      <div class="list-row-icon">${esc(c.name).charAt(0).toUpperCase()}</div>
-      <div class="list-row-body">
+      <div class="list-row-icon" style="cursor:pointer" onclick="openCrmRecord('customer', ${c.id})">${esc(c.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body" style="cursor:pointer" onclick="openCrmRecord('customer', ${c.id})">
         <div class="list-row-title">${esc(c.name)}</div>
         <div class="list-row-sub">${esc(c.vat_number) ? 'P.IVA ' + esc(c.vat_number) + ' · ' : ''}${esc(c.city) || esc(c.province) || 'nessuna località'} · ${esc(c.agent_name) || 'nessun agente'}</div>
       </div>
@@ -1725,7 +2094,10 @@ async function loadCustomers() {
 
 const CUSTOMER_FIELD_MAP = {
   name: 'cust-name', email: 'cust-email', phone: 'cust-phone', mobile: 'cust-mobile', fax: 'cust-fax', pec: 'cust-pec',
+  contact_person: 'cust-contact-person', contact_person_secondary: 'cust-contact-person-secondary', website: 'cust-website',
   address: 'cust-address', postal_code: 'cust-postal-code', city: 'cust-city', province: 'cust-province', country: 'cust-country', zone: 'cust-zone',
+  shipping_address: 'cust-shipping-address', shipping_postal_code: 'cust-shipping-postal-code', shipping_city: 'cust-shipping-city',
+  shipping_province: 'cust-shipping-province', shipping_country: 'cust-shipping-country',
   vat_number: 'cust-vat', fiscal_code: 'cust-fiscal-code', sdi_code: 'cust-sdi', iban: 'cust-iban',
   payment_terms: 'cust-payment-terms', category: 'cust-category',
   discount_code: 'cust-discount-code', discount_percent: 'cust-discount-percent',
@@ -1739,6 +2111,8 @@ async function openCustomerModal(c) {
   for (const [field, elId] of Object.entries(CUSTOMER_FIELD_MAP)) {
     document.getElementById(elId).value = c ? (c[field] || '') : (field === 'country' ? 'Italia' : '');
   }
+  document.getElementById('cust-newsletter-subscribed').checked = !!(c && c.newsletter_subscribed);
+  document.getElementById('cust-estimated-volume').value = c && c.estimated_volume_cents != null ? (c.estimated_volume_cents / 100) : '';
   if (!AGENTS.length) AGENTS = await api('/api/admin/agents');
   document.getElementById('cust-agent').innerHTML = '<option value="">— Nessuno —</option>' +
     AGENTS.map(a => `<option value="${a.id}" ${c && c.agent_id === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('');
@@ -1755,6 +2129,9 @@ async function saveCustomer() {
   for (const [field, elId] of Object.entries(CUSTOMER_FIELD_MAP)) {
     body[field] = document.getElementById(elId).value.trim();
   }
+  body.newsletter_subscribed = document.getElementById('cust-newsletter-subscribed').checked ? 1 : 0;
+  const volVal = document.getElementById('cust-estimated-volume').value;
+  body.estimated_volume_cents = volVal ? Math.round(parseFloat(volVal) * 100) : '';
   body.agent_id = document.getElementById('cust-agent').value || '';
   body.price_list_id = document.getElementById('cust-price-list').value || '';
   try {
@@ -1770,6 +2147,571 @@ async function deleteCustomer(id) {
   if (!confirm('Eliminare questo cliente?')) return;
   await api('/api/admin/customers/' + id, { method: 'DELETE' });
   loadCustomers();
+}
+
+// ── CRM: Importatori ────────────────────────────────────────────────────────────
+async function loadImporters() {
+  const q = document.getElementById('importer-search').value.trim();
+  const rows = await api('/api/admin/importers' + (q ? '?q=' + encodeURIComponent(q) : ''));
+  document.getElementById('importers-tbody').innerHTML = rows.length ? rows.map(i => `
+    <div class="list-row">
+      <div class="list-row-icon" style="cursor:pointer" onclick="openCrmRecord('importer', ${i.id})">${esc(i.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body" style="cursor:pointer" onclick="openCrmRecord('importer', ${i.id})">
+        <div class="list-row-title">${esc(i.name)}</div>
+        <div class="list-row-sub">${esc(i.country) || 'nessun paese'} · ${esc(i.agent_name) || 'nessun agente'}</div>
+      </div>
+      <div class="list-row-meta">
+        <button class="btn-outline-pill" onclick='openImporterModal(${jsonAttrP(i)})'>Modifica</button>
+        <button class="btn-outline-pill danger" onclick="deleteImporter(${i.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessun importatore. Creane uno.</div>';
+}
+
+const IMPORTER_FIELD_MAP = {
+  name: 'imp-name', contact_person: 'imp-contact-person', contact_person_secondary: 'imp-contact-person-secondary',
+  phone: 'imp-phone', mobile: 'imp-mobile', email: 'imp-email', website: 'imp-website',
+  address: 'imp-address', city: 'imp-city', province: 'imp-province', postal_code: 'imp-postal-code', country: 'imp-country',
+  shipping_address: 'imp-shipping-address', shipping_city: 'imp-shipping-city', shipping_province: 'imp-shipping-province',
+  shipping_postal_code: 'imp-shipping-postal-code', shipping_country: 'imp-shipping-country',
+  payment_terms: 'imp-payment-terms', vat_number: 'imp-vat', sdi_code: 'imp-sdi', notes: 'imp-notes',
+};
+
+async function openImporterModal(i) {
+  document.getElementById('importer-modal-msg').innerHTML = '';
+  document.getElementById('importer-modal-title').textContent = i ? 'Modifica importatore' : 'Nuovo importatore';
+  document.getElementById('imp-id').value = i ? i.id : '';
+  for (const [field, elId] of Object.entries(IMPORTER_FIELD_MAP)) document.getElementById(elId).value = i ? (i[field] || '') : '';
+  document.getElementById('imp-newsletter-subscribed').checked = !!(i && i.newsletter_subscribed);
+  document.getElementById('imp-estimated-volume').value = i && i.estimated_volume_cents != null ? (i.estimated_volume_cents / 100) : '';
+  document.getElementById('imp-discount-percent').value = i ? (i.discount_percent || '') : '';
+  if (!AGENTS.length) AGENTS = await api('/api/admin/agents');
+  document.getElementById('imp-agent').innerHTML = '<option value="">— Nessuno —</option>' +
+    AGENTS.map(a => `<option value="${a.id}" ${i && i.agent_id === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('');
+  openModal('importer-modal');
+}
+
+async function saveImporter() {
+  const id = document.getElementById('imp-id').value;
+  const msg = document.getElementById('importer-modal-msg');
+  const body = {};
+  for (const [field, elId] of Object.entries(IMPORTER_FIELD_MAP)) body[field] = document.getElementById(elId).value.trim();
+  body.newsletter_subscribed = document.getElementById('imp-newsletter-subscribed').checked ? 1 : 0;
+  const vol = document.getElementById('imp-estimated-volume').value;
+  body.estimated_volume_cents = vol ? Math.round(parseFloat(vol) * 100) : '';
+  body.discount_percent = document.getElementById('imp-discount-percent').value || 0;
+  body.agent_id = document.getElementById('imp-agent').value || '';
+  try {
+    if (id) await api('/api/admin/importers/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+    else await api('/api/admin/importers', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('importer-modal');
+    loadImporters();
+    if (CRM_CURRENT.type === 'importer' && String(CRM_CURRENT.id) === id) loadCrmRecordData();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function deleteImporter(id) {
+  if (!confirm('Eliminare questo importatore?')) return;
+  await api('/api/admin/importers/' + id, { method: 'DELETE' });
+  loadImporters();
+}
+
+// ── CRM: Fornitori ───────────────────────────────────────────────────────────────
+async function loadSuppliers() {
+  const q = document.getElementById('supplier-search').value.trim();
+  const rows = await api('/api/admin/suppliers' + (q ? '?q=' + encodeURIComponent(q) : ''));
+  document.getElementById('suppliers-tbody').innerHTML = rows.length ? rows.map(s => `
+    <div class="list-row">
+      <div class="list-row-icon" style="cursor:pointer" onclick="openCrmRecord('supplier', ${s.id})">${esc(s.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body" style="cursor:pointer" onclick="openCrmRecord('supplier', ${s.id})">
+        <div class="list-row-title">${esc(s.name)}</div>
+        <div class="list-row-sub">${esc(s.category) || 'nessuna categoria'} · ${esc(s.city) || 'nessuna località'}</div>
+      </div>
+      <div class="list-row-meta">
+        <button class="btn-outline-pill" onclick='openSupplierModal(${jsonAttrP(s)})'>Modifica</button>
+        <button class="btn-outline-pill danger" onclick="deleteSupplier(${s.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessun fornitore. Creane uno.</div>';
+}
+
+const SUPPLIER_FIELD_MAP = {
+  name: 'sup-name', contact_person: 'sup-contact-person', contact_person_secondary: 'sup-contact-person-secondary',
+  phone: 'sup-phone', mobile: 'sup-mobile', email: 'sup-email', website: 'sup-website',
+  address: 'sup-address', city: 'sup-city', province: 'sup-province', postal_code: 'sup-postal-code', country: 'sup-country',
+  shipping_address: 'sup-shipping-address', shipping_city: 'sup-shipping-city', shipping_province: 'sup-shipping-province',
+  shipping_postal_code: 'sup-shipping-postal-code', shipping_country: 'sup-shipping-country',
+  category: 'sup-category', payment_terms: 'sup-payment-terms', vat_number: 'sup-vat', sdi_code: 'sup-sdi', notes: 'sup-notes',
+};
+
+async function openSupplierModal(s) {
+  document.getElementById('supplier-modal-msg').innerHTML = '';
+  document.getElementById('supplier-modal-title').textContent = s ? 'Modifica fornitore' : 'Nuovo fornitore';
+  document.getElementById('sup-id').value = s ? s.id : '';
+  for (const [field, elId] of Object.entries(SUPPLIER_FIELD_MAP)) document.getElementById(elId).value = s ? (s[field] || '') : '';
+  document.getElementById('sup-newsletter-subscribed').checked = !!(s && s.newsletter_subscribed);
+  document.getElementById('sup-estimated-volume').value = s && s.estimated_volume_cents != null ? (s.estimated_volume_cents / 100) : '';
+  document.getElementById('sup-discount-percent').value = s ? (s.discount_percent || '') : '';
+  openModal('supplier-modal');
+}
+
+async function saveSupplier() {
+  const id = document.getElementById('sup-id').value;
+  const msg = document.getElementById('supplier-modal-msg');
+  const body = {};
+  for (const [field, elId] of Object.entries(SUPPLIER_FIELD_MAP)) body[field] = document.getElementById(elId).value.trim();
+  body.newsletter_subscribed = document.getElementById('sup-newsletter-subscribed').checked ? 1 : 0;
+  const vol = document.getElementById('sup-estimated-volume').value;
+  body.estimated_volume_cents = vol ? Math.round(parseFloat(vol) * 100) : '';
+  body.discount_percent = document.getElementById('sup-discount-percent').value || 0;
+  try {
+    if (id) await api('/api/admin/suppliers/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+    else await api('/api/admin/suppliers', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('supplier-modal');
+    loadSuppliers();
+    if (CRM_CURRENT.type === 'supplier' && String(CRM_CURRENT.id) === id) loadCrmRecordData();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function deleteSupplier(id) {
+  if (!confirm('Eliminare questo fornitore?')) return;
+  await api('/api/admin/suppliers/' + id, { method: 'DELETE' });
+  loadSuppliers();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CRM: scheda anagrafica condivisa (Clienti / Agenti / Importatori / Fornitori)
+// ══════════════════════════════════════════════════════════════════════════════
+function jsonAttrP(obj) { return JSON.stringify(obj).replace(/'/g, '&#39;'); }
+
+const CRM_ENDPOINT_MAP = { customer: 'customers', agent: 'agents', importer: 'importers', supplier: 'suppliers' };
+const CRM_SUBPANEL_MAP = { customer: 'crm-clienti', agent: 'crm-agenti', importer: 'crm-importatori', supplier: 'crm-fornitori' };
+const CRM_DEAL_STAGE_LABELS = { nuovo: 'Nuovo', qualificato: 'Qualificato', proposta: 'Proposta inviata', negoziazione: 'Negoziazione', vinto: 'Vinto', perso: 'Perso' };
+let CRM_CURRENT = { type: null, id: null, data: null };
+
+document.querySelectorAll('#crm-record-tabs button[data-rtab]').forEach(btn => {
+  btn.addEventListener('click', () => switchCrmTab(btn.dataset.rtab));
+});
+
+function switchCrmTab(tab) {
+  document.querySelectorAll('#crm-record-tabs button').forEach(b => b.classList.toggle('active', b.dataset.rtab === tab));
+  document.querySelectorAll('.crm-record-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('crm-rtab-' + tab).classList.add('active');
+  if (tab === 'overview') loadCrmOverview();
+  if (tab === 'email') loadCrmEmails();
+  if (tab === 'note') loadCrmNotes();
+  if (tab === 'allegati') loadCrmAttachments();
+  if (tab === 'riunioni') loadCrmMeetings();
+  if (tab === 'compiti') loadCrmTasks();
+  if (tab === 'affari') loadCrmDeals();
+  if (tab === 'ordini') loadCrmOrders();
+}
+
+async function openCrmRecord(type, id) {
+  CRM_CURRENT = { type, id, data: null };
+  document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+  document.getElementById('crm-record-view').style.display = 'block';
+  document.getElementById('crm-tab-ordini-btn').style.display = (type === 'customer' || type === 'importer') ? 'inline-block' : 'none';
+  switchCrmTab('info');
+  await loadCrmRecordData();
+}
+
+function closeCrmRecord() {
+  document.getElementById('crm-record-view').style.display = 'none';
+  switchWorkspace('crm');
+  const sub = CRM_SUBPANEL_MAP[CRM_CURRENT.type];
+  const btn = document.querySelector(`[data-workspace-nav="crm"] button[data-sub="${sub}"]`);
+  if (btn) btn.click();
+}
+
+async function loadCrmRecordData() {
+  const { type, id } = CRM_CURRENT;
+  const data = await api(`/api/admin/${CRM_ENDPOINT_MAP[type]}/${id}`);
+  CRM_CURRENT.data = data;
+  document.getElementById('crm-record-title').textContent = data.name || '—';
+  renderCrmInfoTab();
+}
+
+function crmField(label, value) {
+  return `<div class="crm-info-field"><label>${esc(label)}</label><div style="font-size:13.5px;color:var(--ink);font-weight:600">${value != null && value !== '' ? esc(value) : '—'}</div></div>`;
+}
+
+function renderCrmInfoTab() {
+  const { type, data: d } = CRM_CURRENT;
+  const el = document.getElementById('crm-rtab-info');
+  if (type === 'agent') {
+    el.innerHTML = `
+      <div class="crm-save-bar"><button class="btn secondary" onclick='openAgentModal(${jsonAttrP(d)})'>Modifica</button></div>
+      <div class="crm-info-section">
+        <h4>Informazioni di contatto</h4>
+        <div class="crm-info-grid">
+          ${crmField('Nome e cognome', d.name)}
+          ${crmField('Codice', d.code)}
+          ${crmField('Email', d.email)}
+          ${crmField('Telefono', d.phone)}
+          ${crmField('Username', d.username)}
+          ${crmField('Provincie di competenza', (d.provinces || []).join(', '))}
+        </div>
+      </div>
+      <div class="crm-info-section">
+        <h4>Overview vendite</h4>
+        <div class="crm-info-grid">
+          ${crmField('Clienti', d.customerCount)}
+          ${crmField('Ordini totali', d.orderCount)}
+          ${crmField('Fatturato', '€ ' + fmtEuro(d.revenueCents))}
+          ${crmField('Stato', d.active ? 'Attivo' : 'Disattivo')}
+        </div>
+      </div>
+    `;
+  } else {
+    const editFn = type === 'customer' ? 'openCustomerModal' : type === 'importer' ? 'openImporterModal' : 'openSupplierModal';
+    el.innerHTML = `
+      <div class="crm-save-bar"><button class="btn secondary" onclick='${editFn}(${jsonAttrP(d)})'>Modifica</button></div>
+      <div class="crm-info-section">
+        <h4>Informazioni di Contatto</h4>
+        <div class="crm-info-grid">
+          ${crmField('Ragione Sociale', d.name)}
+          ${crmField('Telefono', d.phone)}
+          ${crmField('Referente principale', d.contact_person)}
+          ${crmField('Cellulare', d.mobile)}
+          ${crmField('Referente secondario', d.contact_person_secondary)}
+          ${crmField('Email', d.email)}
+          ${crmField('Iscritto a Newsletter', d.newsletter_subscribed ? 'Sì' : 'No')}
+          ${crmField('Sito Web', d.website)}
+        </div>
+      </div>
+      <div class="crm-info-section">
+        <h4>Informazioni di Indirizzo</h4>
+        <div class="crm-info-grid">
+          ${crmField('Via fatturazione', d.address)}
+          ${crmField('Via spedizione', d.shipping_address)}
+          ${crmField('Città di fatturazione', d.city)}
+          ${crmField('Città di spedizione', d.shipping_city)}
+          ${crmField('Provincia di fatturazione', d.province)}
+          ${crmField('Provincia di spedizione', d.shipping_province)}
+          ${crmField('CAP', d.postal_code)}
+          ${crmField('CAP di spedizione', d.shipping_postal_code)}
+          ${crmField('Paese di fatturazione', d.country)}
+          ${crmField('Paese di spedizione', d.shipping_country)}
+        </div>
+      </div>
+      <div class="crm-info-section">
+        <h4>Informazioni Di Business</h4>
+        <div class="crm-info-grid">
+          ${crmField('Sconto standard (%)', d.discount_percent)}
+          ${crmField("Volume d'Affari Stimato", d.estimated_volume_cents != null ? '€ ' + fmtEuro(d.estimated_volume_cents) : null)}
+          ${crmField('Condizioni di pagamento', d.payment_terms)}
+          ${crmField('Partita IVA', d.vat_number)}
+          ${crmField('SDI', d.sdi_code)}
+          ${type === 'supplier' ? crmField('Categoria fornitura', d.category) : ''}
+          ${type === 'importer' ? crmField('Agente collegato', d.agent_name) : ''}
+        </div>
+      </div>
+    `;
+  }
+}
+
+async function loadCrmOverview() {
+  const { type, data: d } = CRM_CURRENT;
+  const el = document.getElementById('crm-rtab-overview');
+  if (type === 'customer' || type === 'importer') {
+    el.innerHTML = `<div class="crm-overview-cards">
+      <div class="card"><div class="label">Ordini</div><div class="value">${d.order_count ?? 0}</div></div>
+      <div class="card"><div class="label">Fatturato</div><div class="value">€ ${fmtEuro(d.revenue_cents || 0)}</div></div>
+    </div>`;
+  } else if (type === 'agent') {
+    el.innerHTML = `<div class="crm-overview-cards">
+      <div class="card"><div class="label">Clienti</div><div class="value">${d.customerCount}</div></div>
+      <div class="card"><div class="label">Ordini</div><div class="value">${d.orderCount}</div></div>
+      <div class="card"><div class="label">Fatturato</div><div class="value">€ ${fmtEuro(d.revenueCents)}</div></div>
+    </div>`;
+  } else {
+    el.innerHTML = '<p style="color:var(--ink-soft);font-size:13px">Nessun dato riepilogativo disponibile per i fornitori.</p>';
+  }
+}
+
+// ── Note ──────────────────────────────────────────────────────────────────────
+async function loadCrmNotes() {
+  const { type, id } = CRM_CURRENT;
+  const rows = await api(`/api/admin/crm/${type}/${id}/notes`);
+  document.getElementById('crm-notes-list').innerHTML = rows.length ? rows.map(n => `
+    <div class="crm-activity-item">
+      <div class="crm-item-top"><span class="crm-item-meta">${n.created_at}</span>
+        <button class="btn-outline-pill danger" onclick="deleteCrmNote(${n.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+      <div class="crm-item-body">${esc(n.body)}</div>
+    </div>
+  `).join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessuna nota.</p>';
+}
+async function addCrmNote() {
+  const { type, id } = CRM_CURRENT;
+  const input = document.getElementById('crm-note-input');
+  if (!input.value.trim()) return;
+  await api(`/api/admin/crm/${type}/${id}/notes`, { method: 'POST', body: JSON.stringify({ body: input.value.trim() }) });
+  input.value = '';
+  loadCrmNotes();
+}
+async function deleteCrmNote(noteId) {
+  await api('/api/admin/crm/notes/' + noteId, { method: 'DELETE' });
+  loadCrmNotes();
+}
+
+// ── Allegati ──────────────────────────────────────────────────────────────────
+async function loadCrmAttachments() {
+  const { type, id } = CRM_CURRENT;
+  const rows = await api(`/api/admin/crm/${type}/${id}/attachments`);
+  document.getElementById('crm-attachments-list').innerHTML = rows.length ? rows.map(a => `
+    <div class="crm-activity-item">
+      <div class="crm-item-top">
+        <span class="crm-item-title">${esc(a.original_name || a.filename)}</span>
+        <div class="crm-item-actions">
+          <a class="btn-outline-pill" href="/api/admin/crm/attachments/${a.id}/download?key=${encodeURIComponent(ADMIN_KEY)}" target="_blank" rel="noopener">Apri</a>
+          <button class="btn-outline-pill danger" onclick="deleteCrmAttachment(${a.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </div>
+      </div>
+      <span class="crm-item-meta">${a.created_at}</span>
+    </div>
+  `).join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessun allegato.</p>';
+}
+async function uploadCrmAttachmentFile() {
+  const { type, id } = CRM_CURRENT;
+  const input = document.getElementById('crm-attachment-input');
+  if (!input.files.length) return;
+  const fd = new FormData();
+  fd.append('file', input.files[0]);
+  await api(`/api/admin/crm/${type}/${id}/attachments`, { method: 'POST', body: fd });
+  input.value = '';
+  loadCrmAttachments();
+}
+async function deleteCrmAttachment(attId) {
+  await api('/api/admin/crm/attachments/' + attId, { method: 'DELETE' });
+  loadCrmAttachments();
+}
+
+// ── Riunioni ──────────────────────────────────────────────────────────────────
+async function loadCrmMeetings() {
+  const { type, id } = CRM_CURRENT;
+  const rows = await api(`/api/admin/crm/${type}/${id}/meetings`);
+  document.getElementById('crm-meetings-list').innerHTML = rows.length ? rows.map(m => `
+    <div class="crm-activity-item">
+      <div class="crm-item-top">
+        <span class="crm-item-title">${esc(m.title)}</span>
+        <div class="crm-item-actions">
+          <span class="badge ${m.status === 'chiusa' ? 'grey' : 'green'}">${m.status === 'chiusa' ? 'Chiusa' : 'Aperta'}</span>
+          <button class="btn-outline-pill danger" onclick="deleteCrmMeeting(${m.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </div>
+      </div>
+      <span class="crm-item-meta">${m.meeting_date ? new Date(m.meeting_date).toLocaleString('it-IT') : 'data non impostata'}${m.participants ? ' · ' + esc(m.participants) : ''}</span>
+      ${m.outcome ? `<div class="crm-item-body">${esc(m.outcome)}</div>` : ''}
+    </div>
+  `).join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessuna riunione.</p>';
+}
+function openCrmMeetingModal() {
+  document.getElementById('crm-meeting-modal-msg').innerHTML = '';
+  document.getElementById('crm-meeting-id').value = '';
+  document.getElementById('crm-meeting-title').value = '';
+  document.getElementById('crm-meeting-date').value = '';
+  document.getElementById('crm-meeting-participants').value = '';
+  document.getElementById('crm-meeting-outcome').value = '';
+  document.getElementById('crm-meeting-status').value = 'aperta';
+  openModal('crm-meeting-modal');
+}
+async function saveCrmMeeting() {
+  const { type, id } = CRM_CURRENT;
+  const title = document.getElementById('crm-meeting-title').value.trim();
+  if (!title) { document.getElementById('crm-meeting-modal-msg').innerHTML = '<div class="msg error">Il titolo è obbligatorio.</div>'; return; }
+  await api(`/api/admin/crm/${type}/${id}/meetings`, { method: 'POST', body: JSON.stringify({
+    title, meeting_date: document.getElementById('crm-meeting-date').value || null,
+    participants: document.getElementById('crm-meeting-participants').value.trim(),
+    outcome: document.getElementById('crm-meeting-outcome').value.trim(),
+    status: document.getElementById('crm-meeting-status').value,
+  }) });
+  closeModal('crm-meeting-modal');
+  loadCrmMeetings();
+}
+async function deleteCrmMeeting(meetingId) {
+  await api('/api/admin/crm/meetings/' + meetingId, { method: 'DELETE' });
+  loadCrmMeetings();
+}
+
+// ── Compiti ───────────────────────────────────────────────────────────────────
+async function loadCrmTasks() {
+  const { type, id } = CRM_CURRENT;
+  const rows = await api(`/api/admin/crm/${type}/${id}/tasks`);
+  document.getElementById('crm-tasks-list').innerHTML = rows.length ? rows.map(t => `
+    <div class="crm-activity-item">
+      <div class="crm-item-top">
+        <span class="crm-item-title">${esc(t.title)}</span>
+        <div class="crm-item-actions">
+          <button class="btn-outline-pill" onclick="toggleCrmTaskStatus(${t.id}, '${t.status === 'aperto' ? 'chiuso' : 'aperto'}')">${t.status === 'aperto' ? 'Segna come fatto' : 'Riapri'}</button>
+          <button class="btn-outline-pill danger" onclick="deleteCrmTask(${t.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </div>
+      </div>
+      <span class="crm-item-meta">
+        <span class="badge ${t.status === 'chiuso' ? 'grey' : 'yellow'}">${t.status === 'chiuso' ? 'Chiuso' : 'Aperto'}</span>
+        ${t.due_date ? ' · scade ' + t.due_date : ''}${t.assignee ? ' · ' + esc(t.assignee) : ''}
+      </span>
+    </div>
+  `).join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessun compito.</p>';
+}
+function openCrmTaskModal() {
+  document.getElementById('crm-task-modal-msg').innerHTML = '';
+  document.getElementById('crm-task-id').value = '';
+  document.getElementById('crm-task-title').value = '';
+  document.getElementById('crm-task-due').value = '';
+  document.getElementById('crm-task-assignee').value = '';
+  document.getElementById('crm-task-status').value = 'aperto';
+  openModal('crm-task-modal');
+}
+async function saveCrmTask() {
+  const { type, id } = CRM_CURRENT;
+  const title = document.getElementById('crm-task-title').value.trim();
+  if (!title) { document.getElementById('crm-task-modal-msg').innerHTML = '<div class="msg error">Il titolo è obbligatorio.</div>'; return; }
+  await api(`/api/admin/crm/${type}/${id}/tasks`, { method: 'POST', body: JSON.stringify({
+    title, due_date: document.getElementById('crm-task-due').value || null,
+    assignee: document.getElementById('crm-task-assignee').value.trim(),
+    status: document.getElementById('crm-task-status').value,
+  }) });
+  closeModal('crm-task-modal');
+  loadCrmTasks();
+}
+async function toggleCrmTaskStatus(taskId, status) {
+  await api('/api/admin/crm/tasks/' + taskId, { method: 'PATCH', body: JSON.stringify({ status }) });
+  loadCrmTasks();
+}
+async function deleteCrmTask(taskId) {
+  await api('/api/admin/crm/tasks/' + taskId, { method: 'DELETE' });
+  loadCrmTasks();
+}
+
+// ── Affari ────────────────────────────────────────────────────────────────────
+async function loadCrmDeals() {
+  const { type, id } = CRM_CURRENT;
+  const rows = await api(`/api/admin/crm/${type}/${id}/deals`);
+  document.getElementById('crm-deals-list').innerHTML = rows.length ? rows.map(dl => `
+    <div class="crm-activity-item">
+      <div class="crm-item-top">
+        <span class="crm-item-title">${esc(dl.name)} — € ${fmtEuro(dl.value_cents)}</span>
+        <div class="crm-item-actions">
+          <select onchange="updateCrmDealStage(${dl.id}, this.value)" style="padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:11.5px">
+            ${Object.entries(CRM_DEAL_STAGE_LABELS).map(([v, l]) => `<option value="${v}" ${dl.stage === v ? 'selected' : ''}>${l}</option>`).join('')}
+          </select>
+          <button class="btn-outline-pill danger" onclick="deleteCrmDeal(${dl.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </div>
+      </div>
+      <span class="crm-item-meta">${dl.expected_close_date ? 'chiusura prevista ' + dl.expected_close_date : ''}</span>
+      ${dl.notes ? `<div class="crm-item-body">${esc(dl.notes)}</div>` : ''}
+    </div>
+  `).join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessun affare.</p>';
+}
+function openCrmDealModal() {
+  document.getElementById('crm-deal-modal-msg').innerHTML = '';
+  document.getElementById('crm-deal-id').value = '';
+  document.getElementById('crm-deal-name').value = '';
+  document.getElementById('crm-deal-value').value = '';
+  document.getElementById('crm-deal-close-date').value = '';
+  document.getElementById('crm-deal-stage').value = 'nuovo';
+  document.getElementById('crm-deal-notes').value = '';
+  openModal('crm-deal-modal');
+}
+async function saveCrmDeal() {
+  const { type, id } = CRM_CURRENT;
+  const name = document.getElementById('crm-deal-name').value.trim();
+  if (!name) { document.getElementById('crm-deal-modal-msg').innerHTML = '<div class="msg error">Il nome è obbligatorio.</div>'; return; }
+  const value = document.getElementById('crm-deal-value').value;
+  await api(`/api/admin/crm/${type}/${id}/deals`, { method: 'POST', body: JSON.stringify({
+    name, value_cents: value ? Math.round(parseFloat(value) * 100) : 0,
+    stage: document.getElementById('crm-deal-stage').value,
+    expected_close_date: document.getElementById('crm-deal-close-date').value || null,
+    notes: document.getElementById('crm-deal-notes').value.trim(),
+  }) });
+  closeModal('crm-deal-modal');
+  loadCrmDeals();
+}
+async function updateCrmDealStage(dealId, stage) {
+  await api('/api/admin/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ stage }) });
+}
+async function deleteCrmDeal(dealId) {
+  await api('/api/admin/crm/deals/' + dealId, { method: 'DELETE' });
+  loadCrmDeals();
+}
+
+// ── Email (log manuale) ───────────────────────────────────────────────────────
+async function loadCrmEmails() {
+  const { type, id } = CRM_CURRENT;
+  const rows = await api(`/api/admin/crm/${type}/${id}/emails`);
+  document.getElementById('crm-emails-list').innerHTML = rows.length ? rows.map(em => `
+    <div class="crm-activity-item">
+      <div class="crm-item-top">
+        <span class="crm-item-title">${em.direction === 'in' ? '↓' : '↑'} ${esc(em.subject)}</span>
+        <button class="btn-outline-pill danger" onclick="deleteCrmEmail(${em.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+      <span class="crm-item-meta">${esc(em.counterparty) || ''} ${em.sent_at ? '· ' + new Date(em.sent_at).toLocaleString('it-IT') : ''}</span>
+      ${em.body ? `<div class="crm-item-body">${esc(em.body)}</div>` : ''}
+    </div>
+  `).join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessuna email registrata.</p>';
+}
+function openCrmEmailModal() {
+  document.getElementById('crm-email-modal-msg').innerHTML = '';
+  document.getElementById('crm-email-subject').value = '';
+  document.getElementById('crm-email-direction').value = 'out';
+  document.getElementById('crm-email-sent-at').value = '';
+  document.getElementById('crm-email-counterparty').value = '';
+  document.getElementById('crm-email-body').value = '';
+  openModal('crm-email-modal');
+}
+async function saveCrmEmail() {
+  const { type, id } = CRM_CURRENT;
+  const subject = document.getElementById('crm-email-subject').value.trim();
+  if (!subject) { document.getElementById('crm-email-modal-msg').innerHTML = '<div class="msg error">L\'oggetto è obbligatorio.</div>'; return; }
+  await api(`/api/admin/crm/${type}/${id}/emails`, { method: 'POST', body: JSON.stringify({
+    subject, direction: document.getElementById('crm-email-direction').value,
+    sent_at: document.getElementById('crm-email-sent-at').value || null,
+    counterparty: document.getElementById('crm-email-counterparty').value.trim(),
+    body: document.getElementById('crm-email-body').value.trim(),
+  }) });
+  closeModal('crm-email-modal');
+  loadCrmEmails();
+}
+async function deleteCrmEmail(emailId) {
+  await api('/api/admin/crm/emails/' + emailId, { method: 'DELETE' });
+  loadCrmEmails();
+}
+
+// ── Ordini (Clienti / Importatori) ────────────────────────────────────────────
+async function loadCrmOrders() {
+  const { type, id } = CRM_CURRENT;
+  if (type !== 'customer' && type !== 'importer') { document.getElementById('crm-orders-list').innerHTML = ''; return; }
+  const rows = type === 'customer' ? await api('/api/admin/orders?customer_id=' + id) : [];
+  document.getElementById('crm-orders-list').innerHTML = rows.length ? rows.map(o => `
+    <div class="crm-activity-item">
+      <div class="crm-item-top">
+        <span class="crm-item-title">${esc(o.order_number)}</span>
+        <span class="badge ${o.status === 'evaso' ? 'green' : 'grey'}">${esc(o.status)}</span>
+      </div>
+      <span class="crm-item-meta">${o.order_date} · € ${fmtEuro(o.total_cents)}</span>
+    </div>
+  `).join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessun ordine.</p>';
 }
 
 // ── PRODUZIONE ──────────────────────────────────────────────────────────────────
