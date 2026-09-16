@@ -113,18 +113,25 @@
   .catalog-card .cat-date { font-size: 11.5px; color: #9aa0ab; margin-top: 2px; }
   .catalog-card a.btn { margin-left: auto; text-decoration: none; }
 
-  .mobile-topbar-toggle { display: none; width: 36px; height: 36px; align-items: center; justify-content: center; border: 1px solid var(--line); background: #fff; border-radius: 8px; color: var(--ink); flex-shrink: 0; }
-  .mobile-topbar-toggle svg { width: 19px; height: 19px; }
-  .sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(16,19,26,0.45); z-index: 190; }
-  .sidebar-backdrop.open { display: block; }
+  .mobile-topbar-toggle { display: none; }
+  .sidebar-backdrop { display: none; }
+  .mobile-settings-btn { display: none; width: 34px; height: 34px; align-items: center; justify-content: center; border: 1px solid var(--line); background: #fff; border-radius: 50%; color: var(--ink); flex-shrink: 0; }
+  .mobile-settings-btn svg { width: 17px; height: 17px; }
+  .mobile-section-tabs { display: none; }
 
   @media (max-width: 860px) {
-    .sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 200; transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: 10px 0 30px rgba(16,19,26,0.18); overflow-y: auto; }
-    .sidebar.open { transform: translateX(0); }
-    .mobile-topbar-toggle { display: flex; }
-    .topbar { padding: 0 14px; gap: 10px; justify-content: flex-start; }
+    .sidebar { display: none !important; }
+    .mobile-settings-btn { display: flex; }
+    .topbar { padding: 12px 16px; gap: 10px; justify-content: space-between; }
     main { padding: 16px; }
     .modal-box, .box { padding: 16px; }
+
+    .mobile-section-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px; border-bottom: 1px solid var(--line); background: #fff; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .mobile-section-tabs::-webkit-scrollbar { display: none; }
+    .mobile-section-tabs button { flex-shrink: 0; padding: 7px 15px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 12.5px; font-weight: 500; color: var(--ink-soft); white-space: nowrap; font-family: var(--sans); cursor: pointer; }
+    .mobile-section-tabs button.active { background: var(--wine); border-color: var(--wine); color: #fff; font-weight: 600; }
+
+    .list-row-icon { border-radius: 50%; }
   }
   @media (max-width: 480px) {
     .cards { grid-template-columns: 1fr 1fr; }
@@ -213,11 +220,13 @@
 
     <div class="main-area">
       <div class="topbar">
-        <button type="button" class="mobile-topbar-toggle" onclick="toggleMobileSidebar()" aria-label="Menu">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
-        </button>
         <div class="crumb"><small>Portale agenti</small><span id="topbar-title">Dashboard</span></div>
+        <button type="button" class="mobile-settings-btn" onclick="agentLogout()" aria-label="Esci">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
       </div>
+
+      <nav class="mobile-section-tabs" id="mobile-section-tabs"></nav>
 
       <main>
         <!-- ═══ DASHBOARD ═══ -->
@@ -489,8 +498,23 @@ document.querySelectorAll('.sidebar-nav button[data-tab]').forEach(btn => {
     if (btn.dataset.tab === 'crediti') loadCreditRecovery();
     if (btn.dataset.tab === 'venduto') loadSold();
     closeMobileSidebar();
+    renderMobileSectionTabs();
   });
 });
+
+// ── Navigazione mobile (tab di sezione orizzontali, stile app social) ────────
+function clickSidebarTab(tab) {
+  const btn = document.querySelector(`.sidebar-nav button[data-tab="${tab}"]`);
+  if (btn) btn.click();
+}
+
+function renderMobileSectionTabs() {
+  const strip = document.getElementById('mobile-section-tabs');
+  strip.innerHTML = [...document.querySelectorAll('.sidebar-nav button[data-tab]')].map(btn => `
+    <button type="button" class="${btn.classList.contains('active') ? 'active' : ''}" onclick="clickSidebarTab('${btn.dataset.tab}')">${esc(btn.textContent.trim())}</button>
+  `).join('');
+}
+renderMobileSectionTabs();
 
 async function loadDashboardExtra() {
   const data = await api(`/api/agent/${TOKEN}/dashboard`);

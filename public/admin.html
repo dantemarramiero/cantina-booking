@@ -290,17 +290,18 @@
   .cal-statuses-panel.open { display: block; }
   .cal-statuses-panel label { display: flex; align-items: center; gap: 8px; padding: 6px 4px; font-size: 13px; color: var(--ink); text-transform: none; font-weight: 400; }
 
-  .mobile-topbar-toggle { display: none; width: 36px; height: 36px; align-items: center; justify-content: center; border: 1px solid var(--line); background: #fff; border-radius: 8px; color: var(--ink); flex-shrink: 0; }
-  .mobile-topbar-toggle svg { width: 19px; height: 19px; }
-  .sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(16,19,26,0.45); z-index: 190; }
-  .sidebar-backdrop.open { display: block; }
+  .mobile-topbar-toggle { display: none; }
+  .sidebar-backdrop { display: none; }
+  .mobile-settings-btn { display: none; width: 34px; height: 34px; align-items: center; justify-content: center; border: 1px solid var(--line); background: #fff; border-radius: 50%; color: var(--ink); flex-shrink: 0; }
+  .mobile-settings-btn svg { width: 17px; height: 17px; }
+  .mobile-section-tabs { display: none; }
+  .mobile-bottom-tabbar { display: none; }
 
   @media (max-width: 860px) {
-    .sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 200; transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: 10px 0 30px rgba(16,19,26,0.18); overflow-y: auto; }
-    .sidebar.open { transform: translateX(0); }
-    .mobile-topbar-toggle { display: flex; }
-    .topbar { padding: 0 14px; gap: 10px; justify-content: flex-start; }
-    main { padding: 16px; }
+    .sidebar { display: none !important; }
+    .mobile-settings-btn { display: flex; }
+    .topbar { padding: 12px 16px; gap: 10px; justify-content: space-between; }
+    main { padding: 16px 16px 88px; }
     .field-row { grid-template-columns: 1fr; }
     .avail-row { grid-template-columns: 1fr; }
     .modal-box { padding: 18px; }
@@ -313,6 +314,19 @@
     .exp-toolbar .search-input { width: 100%; min-width: 0; }
     .exp-toolbar .btn { width: 100%; }
     .exp-grid { grid-template-columns: repeat(2, 1fr); }
+
+    .mobile-section-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px; border-bottom: 1px solid var(--line); background: #fff; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .mobile-section-tabs::-webkit-scrollbar { display: none; }
+    .mobile-section-tabs button { flex-shrink: 0; padding: 7px 15px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 12.5px; font-weight: 500; color: var(--ink-soft); white-space: nowrap; font-family: var(--sans); cursor: pointer; }
+    .mobile-section-tabs button.active { background: var(--wine); border-color: var(--wine); color: #fff; font-weight: 600; }
+
+    .mobile-bottom-tabbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 210; background: #fff; border-top: 1px solid var(--line); padding: 6px 2px calc(6px + env(safe-area-inset-bottom)); justify-content: space-around; align-items: stretch; }
+    .mobile-bottom-tabbar button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: none; border: none; color: #9aa0ab; font-size: 9px; padding: 4px 2px; flex: 1; min-width: 0; font-family: var(--sans); cursor: pointer; }
+    .mobile-bottom-tabbar button svg { width: 21px; height: 21px; }
+    .mobile-bottom-tabbar button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .mobile-bottom-tabbar button.active { color: var(--wine); }
+
+    .list-row-icon { border-radius: 50%; }
   }
   @media (max-width: 480px) {
     .exp-grid { grid-template-columns: 1fr; }
@@ -457,11 +471,13 @@
 
   <div class="main-area">
     <header class="topbar">
-      <button type="button" class="mobile-topbar-toggle" onclick="toggleMobileSidebar()" aria-label="Menu">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
-      </button>
       <div class="crumb"><small>Marramiero</small><span id="topbar-title">Dashboard</span></div>
+      <button type="button" class="mobile-settings-btn" onclick="logout()" aria-label="Esci">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
     </header>
+
+    <nav class="mobile-section-tabs" id="mobile-section-tabs"></nav>
 
   <main>
     <!-- DASHBOARD -->
@@ -738,6 +754,29 @@
   </main>
   </div>
 </div>
+
+<nav class="mobile-bottom-tabbar" id="mobile-bottom-tabbar">
+  <button type="button" class="active" onclick="return false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg>
+    <span>Enoturismo</span>
+  </button>
+  <button type="button" onclick="switchWorkspace('commerciale')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+    <span>Commerciale</span>
+  </button>
+  <button type="button" onclick="switchWorkspace('produzione')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
+    <span>Produzione</span>
+  </button>
+  <button type="button" onclick="switchWorkspace('magazzino')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/></svg>
+    <span>Magazzino</span>
+  </button>
+  <button type="button" onclick="switchWorkspace('crm')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
+    <span>CRM</span>
+  </button>
+</nav>
 </div>
 
 <!-- Experience modal -->
@@ -1072,8 +1111,22 @@ document.querySelectorAll('.sidebar-nav button').forEach(btn => {
     document.getElementById('topbar-title').textContent = TAB_TITLES[btn.dataset.tab];
     loadPanel(btn.dataset.tab);
     closeMobileSidebar();
+    renderMobileSectionTabs();
   });
 });
+
+// ── Navigazione mobile (bottom tab bar + tab di sezione, stile app social) ────
+function clickSidebarTab(tab) {
+  const btn = document.querySelector(`.sidebar-nav button[data-tab="${tab}"]`);
+  if (btn) btn.click();
+}
+
+function renderMobileSectionTabs() {
+  const strip = document.getElementById('mobile-section-tabs');
+  strip.innerHTML = [...document.querySelectorAll('.sidebar-nav button[data-tab]')].map(btn => `
+    <button type="button" class="${btn.classList.contains('active') ? 'active' : ''}" onclick="clickSidebarTab('${btn.dataset.tab}')">${esc(btn.textContent.trim())}</button>
+  `).join('');
+}
 
 function loadPanel(tab) {
   if (tab === 'dashboard') loadDashboard();
@@ -2140,11 +2193,12 @@ async function boot() {
     return;
   }
   if (me.permittedWorkspaces) {
-    document.querySelectorAll('#workspace-menu button[onclick^="switchWorkspace"]').forEach(b => {
+    document.querySelectorAll('#workspace-menu button[onclick^="switchWorkspace"], #mobile-bottom-tabbar button[onclick^="switchWorkspace"]').forEach(b => {
       const ws = b.getAttribute('onclick').match(/switchWorkspace\('(\w+)'\)/)?.[1];
       if (ws && !me.permittedWorkspaces.includes(ws)) b.style.display = 'none';
     });
   }
+  renderMobileSectionTabs();
   await loadDashboard();
 }
 
