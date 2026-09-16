@@ -2119,6 +2119,17 @@ async function deleteB2COrder(id) {
 async function boot() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  const me = await api('/api/admin/me');
+  if (me.permittedWorkspaces && !me.permittedWorkspaces.includes('enoturismo')) {
+    window.location.href = '/portal.html?key=' + encodeURIComponent(ADMIN_KEY);
+    return;
+  }
+  if (me.permittedWorkspaces) {
+    document.querySelectorAll('#workspace-menu button[onclick^="switchWorkspace"]').forEach(b => {
+      const ws = b.getAttribute('onclick').match(/switchWorkspace\('(\w+)'\)/)?.[1];
+      if (ws && !me.permittedWorkspaces.includes(ws)) b.style.display = 'none';
+    });
+  }
   await loadDashboard();
 }
 

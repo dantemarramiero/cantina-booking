@@ -311,6 +311,11 @@
   .settings-card-group.no-match { display: none; }
   .settings-panel { display: none; }
   .settings-panel.active { display: block; }
+  .roles-matrix-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .roles-matrix-table th { text-align: center; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #9aa0ab; font-weight: 600; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  .roles-matrix-table th:first-child { text-align: left; }
+  .roles-matrix-table td { padding: 10px 6px; border-bottom: 1px solid var(--line); }
+  .roles-matrix-table .roles-matrix-name { font-weight: 600; color: var(--ink); }
 </style>
 </head>
 <body>
@@ -467,7 +472,7 @@
     </nav>
 
     <div class="sidebar-footer">
-      <button onclick="openSettings()">
+      <button onclick="openSettings()" id="settings-nav-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3h-6l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4L4.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1L9 21h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4Z"/></svg>
         Impostazioni
       </button>
@@ -752,6 +757,7 @@
           <div class="settings-card-group" data-settings-group="utenti">
             <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="4.5"/></svg>Utenti e accessi</h4>
             <button type="button" onclick="openSettingsPanel('utenti-portale')" data-settings-label="Utenti del portale">Utenti del portale</button>
+            <button type="button" onclick="openSettingsPanel('ruoli-permessi')" data-settings-label="Ruoli e permessi">Ruoli e permessi</button>
           </div>
           <div class="settings-card-group" data-settings-group="agenti">
             <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>Portale agenti</h4>
@@ -810,6 +816,20 @@
               </button>
             </div>
             <div class="list-rows" id="portal-users-tbody"></div>
+          </div>
+        </div>
+
+        <div class="settings-panel" id="settings-panel-ruoli-permessi">
+          <div class="list-card" style="max-width:820px">
+            <div class="list-toolbar">
+              <div class="list-toolbar-title"><h3>Ruoli e permessi</h3><p>Matrice di accesso: per ogni ruolo, a quali workspace può accedere chi lo ha assegnato</p></div>
+              <div class="list-spacer"></div>
+              <button class="btn-generate" onclick="openRoleModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+                Nuovo ruolo
+              </button>
+            </div>
+            <div id="roles-matrix"></div>
           </div>
         </div>
 
@@ -1050,10 +1070,25 @@
     <div class="field"><label>Nome e cognome</label><input id="pu-name"></div>
     <div class="field"><label>Email</label><input type="email" id="pu-email" placeholder="usato per il recupero password"></div>
     <div class="field"><label>Username</label><input id="pu-username"></div>
+    <div class="field"><label>Ruolo</label><select id="pu-role"><option value="">— Accesso completo —</option></select></div>
     <div class="field" id="pu-password-field"><label>Password</label><input type="password" id="pu-password"></div>
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('portal-user-modal')">Annulla</button>
       <button class="btn" onclick="savePortalUser()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Role modal -->
+<div class="modal-overlay" id="role-modal">
+  <div class="modal-box" style="max-width:380px">
+    <h3>Nuovo ruolo</h3>
+    <div id="role-modal-msg"></div>
+    <div class="field"><label>Nome ruolo</label><input id="role-name" placeholder="es. Magazziniere"></div>
+    <p style="margin:0 0 4px;font-size:11.5px;color:var(--ink-soft)">I permessi per workspace si impostano dalla matrice dopo la creazione.</p>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('role-modal')">Annulla</button>
+      <button class="btn" onclick="saveNewRole()">Crea</button>
     </div>
   </div>
 </div>
@@ -1530,7 +1565,8 @@ function stockBadge(qty, threshold) {
 }
 
 // ── Workspace switcher (top-level area selector) ───────────────────────────────
-const WORKSPACE_LABELS = { enoturismo: 'Enoturismo', commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino', crm: 'CRM' };
+const WORKSPACE_LABELS = { enoturismo: 'Enoturismo', commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino', crm: 'CRM', impostazioni: 'Impostazioni' };
+const ALL_WORKSPACES = Object.keys(WORKSPACE_LABELS);
 const WORKSPACE_ICONS = {
   enoturismo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg>',
   commerciale: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>',
@@ -1576,6 +1612,7 @@ function openSettings() {
   loadSettings();
   loadPortalUsers();
   loadAgentCredentials();
+  loadRolesMatrix();
   closeMobileSidebar();
 }
 
@@ -3088,7 +3125,7 @@ async function loadPortalUsers() {
       <div class="list-row-icon">${esc(u.name).charAt(0).toUpperCase()}</div>
       <div class="list-row-body">
         <div class="list-row-title">${esc(u.name)}</div>
-        <div class="list-row-sub">${esc(u.username)} · ${esc(u.email)}</div>
+        <div class="list-row-sub">${esc(u.username)} · ${esc(u.email)} · ${esc(u.role_name) || 'Accesso completo'}</div>
       </div>
       <div class="list-row-meta">
         <span class="badge ${u.active ? 'green' : 'grey'}">${u.active ? 'Attivo' : 'Disattivo'}</span>
@@ -3102,7 +3139,7 @@ async function loadPortalUsers() {
   `).join('') : '<div class="list-empty">Nessun utente. Creane uno per dare accesso al gestionale.</div>';
 }
 
-function openPortalUserModal(u) {
+async function openPortalUserModal(u) {
   document.getElementById('portal-user-modal-msg').innerHTML = '';
   document.getElementById('portal-user-modal-title').textContent = u ? 'Modifica utente' : 'Nuovo utente';
   document.getElementById('pu-id').value = u ? u.id : '';
@@ -3111,6 +3148,9 @@ function openPortalUserModal(u) {
   document.getElementById('pu-username').value = u ? u.username : '';
   document.getElementById('pu-password').value = '';
   document.getElementById('pu-password-field').style.display = u ? 'none' : 'block';
+  const roles = await api('/api/admin/roles');
+  document.getElementById('pu-role').innerHTML = '<option value="">— Accesso completo —</option>' +
+    roles.map(r => `<option value="${r.id}" ${u && u.role_id === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('');
   openModal('portal-user-modal');
 }
 
@@ -3121,6 +3161,7 @@ async function savePortalUser() {
     name: document.getElementById('pu-name').value.trim(),
     email: document.getElementById('pu-email').value.trim(),
     username: document.getElementById('pu-username').value.trim(),
+    role_id: document.getElementById('pu-role').value || '',
   };
   if (!id) body.password = document.getElementById('pu-password').value;
   try {
@@ -3141,6 +3182,62 @@ async function togglePortalUserActive(id, active) {
 async function deletePortalUser(id) {
   if (!confirm('Eliminare questo utente? Non potrà più accedere al gestionale.')) return;
   await api('/api/admin/portal-users/' + id, { method: 'DELETE' });
+  loadPortalUsers();
+}
+
+// ── IMPOSTAZIONI: ruoli e permessi ──────────────────────────────────────────────
+async function loadRolesMatrix() {
+  const roles = await api('/api/admin/roles');
+  const box = document.getElementById('roles-matrix');
+  if (!roles.length) { box.innerHTML = '<div class="list-empty">Nessun ruolo. Senza un ruolo assegnato, un utente ha accesso completo.</div>'; return; }
+  box.innerHTML = `
+    <table class="roles-matrix-table">
+      <thead><tr><th>Ruolo</th>${ALL_WORKSPACES.map(w => `<th>${esc(WORKSPACE_LABELS[w])}</th>`).join('')}<th></th></tr></thead>
+      <tbody>
+        ${roles.map(r => `
+          <tr>
+            <td class="roles-matrix-name">${esc(r.name)}</td>
+            ${ALL_WORKSPACES.map(w => `<td style="text-align:center"><input type="checkbox" ${r.workspaces.includes(w) ? 'checked' : ''} onchange="toggleRolePermission(${r.id}, '${w}', this.checked)"></td>`).join('')}
+            <td><button class="btn-outline-pill danger" onclick="deleteRole(${r.id})">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+            </button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+}
+
+function openRoleModal() {
+  document.getElementById('role-modal-msg').innerHTML = '';
+  document.getElementById('role-name').value = '';
+  openModal('role-modal');
+}
+
+async function saveNewRole() {
+  const name = document.getElementById('role-name').value.trim();
+  const msg = document.getElementById('role-modal-msg');
+  if (!name) { msg.innerHTML = '<div class="msg error">Il nome del ruolo è obbligatorio.</div>'; return; }
+  try {
+    await api('/api/admin/roles', { method: 'POST', body: JSON.stringify({ name, workspaces: [] }) });
+    closeModal('role-modal');
+    loadRolesMatrix();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function toggleRolePermission(roleId, workspace, checked) {
+  const roles = await api('/api/admin/roles');
+  const role = roles.find(r => r.id === roleId);
+  const workspaces = new Set(role.workspaces);
+  if (checked) workspaces.add(workspace); else workspaces.delete(workspace);
+  await api('/api/admin/roles/' + roleId, { method: 'PATCH', body: JSON.stringify({ workspaces: [...workspaces] }) });
+}
+
+async function deleteRole(id) {
+  if (!confirm('Eliminare questo ruolo? Gli utenti assegnati torneranno ad avere accesso completo.')) return;
+  await api('/api/admin/roles/' + id, { method: 'DELETE' });
+  loadRolesMatrix();
   loadPortalUsers();
 }
 
@@ -3211,12 +3308,28 @@ async function saveWarehouseNote() {
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+let PERMITTED_WORKSPACES = null; // null = accesso completo a tutti i workspace
+
+function applyPermissions() {
+  if (PERMITTED_WORKSPACES === null) return;
+  document.querySelectorAll('#workspace-menu button[data-ws]').forEach(b => {
+    b.style.display = PERMITTED_WORKSPACES.includes(b.dataset.ws) ? 'flex' : 'none';
+  });
+  document.getElementById('settings-nav-btn').style.display = PERMITTED_WORKSPACES.includes('impostazioni') ? 'flex' : 'none';
+}
+
 async function boot() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   loadActivityThresholds();
+  const me = await api('/api/admin/me');
+  PERMITTED_WORKSPACES = me.permittedWorkspaces;
+  applyPermissions();
   const params = new URLSearchParams(window.location.search);
-  const ws = params.get('workspace');
+  let ws = params.get('workspace');
+  if (PERMITTED_WORKSPACES && !PERMITTED_WORKSPACES.includes(ws || 'commerciale')) {
+    ws = PERMITTED_WORKSPACES[0];
+  }
   if (ws && ws !== 'commerciale' && WORKSPACE_LABELS[ws]) {
     switchWorkspace(ws);
   } else {

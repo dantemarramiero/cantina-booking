@@ -608,6 +608,18 @@ db.exec(`
 `);
 try { db.exec('ALTER TABLE orders ADD COLUMN warehouse_note TEXT'); } catch {}
 
+// ── Ruoli e permessi (matrice di accesso per workspace) ──────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS roles (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    workspaces  TEXT NOT NULL DEFAULT '[]',
+    created_at  TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+try { db.exec('ALTER TABLE portal_users ADD COLUMN role_id INTEGER REFERENCES roles(id)'); } catch {}
+const ALL_WORKSPACES = ['enoturismo', 'commerciale', 'produzione', 'magazzino', 'crm', 'impostazioni'];
+
 // ── ERP: magazzino prodotti finiti / materie prime ────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS warehouse_finished (
@@ -718,10 +730,17 @@ function validateDiscount(code, amountCents) {
 }
 function authAdmin(req, res, next) {
   const pwd = req.query.key || req.headers['x-admin-key'];
-  if (pwd === ADMIN_PASSWORD) return next();
-  const user = pwd ? db.prepare('SELECT id FROM portal_users WHERE access_key = ? AND active = 1').get(pwd) : null;
-  if (user) return next();
+  if (pwd === ADMIN_PASSWORD) { req.isMasterKey = true; return next(); }
+  const user = pwd ? db.prepare('SELECT * FROM portal_users WHERE access_key = ? AND active = 1').get(pwd) : null;
+  if (user) { req.portalUser = user; return next(); }
   return res.status(401).json({ error: 'Non autorizzato.' });
+}
+
+function permittedWorkspacesFor(req) {
+  if (req.isMasterKey || !req.portalUser?.role_id) return null; // null = accesso completo
+  const role = db.prepare('SELECT * FROM roles WHERE id = ?').get(req.portalUser.role_id);
+  if (!role) return null;
+  try { return JSON.parse(role.workspaces); } catch { return null; }
 }
 
 // ── ERP helpers ───────────────────────────────────────────────────────────────
@@ -2567,17 +2586,20 @@ function generatePortalAccessKey() {
 }
 
 app.get('/api/admin/portal-users', authAdmin, (req, res) => {
-  res.json(db.prepare('SELECT id, name, email, username, active, created_at FROM portal_users ORDER BY name').all());
+  res.json(db.prepare(`
+    SELECT pu.id, pu.name, pu.email, pu.username, pu.active, pu.created_at, pu.role_id, r.name AS role_name
+    FROM portal_users pu LEFT JOIN roles r ON r.id = pu.role_id ORDER BY pu.name
+  `).all());
 });
 
 app.post('/api/admin/portal-users', authAdmin, (req, res) => {
-  const { name, email, username, password } = req.body || {};
+  const { name, email, username, password, role_id } = req.body || {};
   if (!name?.trim() || !email?.trim() || !username?.trim() || !password) {
     return res.status(400).json({ error: 'Nome, email, username e password sono obbligatori.' });
   }
   try {
-    const result = db.prepare('INSERT INTO portal_users (name, email, username, password_hash, access_key) VALUES (?, ?, ?, ?, ?)')
-      .run(name.trim(), email.trim().toLowerCase(), username.trim(), hashPassword(password), generatePortalAccessKey());
+    const result = db.prepare('INSERT INTO portal_users (name, email, username, password_hash, access_key, role_id) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(name.trim(), email.trim().toLowerCase(), username.trim(), hashPassword(password), generatePortalAccessKey(), role_id || null);
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (e) {
     res.status(400).json({ error: 'Username o email già in uso.' });
@@ -2585,9 +2607,9 @@ app.post('/api/admin/portal-users', authAdmin, (req, res) => {
 });
 
 app.patch('/api/admin/portal-users/:id', authAdmin, (req, res) => {
-  const fields = ['name', 'email', 'username', 'active'];
+  const fields = ['name', 'email', 'username', 'active', 'role_id'];
   const updates = [], params = [];
-  for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }
+  for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
   params.push(req.params.id);
   try {
@@ -2601,6 +2623,46 @@ app.patch('/api/admin/portal-users/:id', authAdmin, (req, res) => {
 app.delete('/api/admin/portal-users/:id', authAdmin, (req, res) => {
   db.prepare('DELETE FROM portal_users WHERE id = ?').run(req.params.id);
   res.json({ success: true });
+});
+
+// ── Ruoli e permessi ──────────────────────────────────────────────────────────
+app.get('/api/admin/roles', authAdmin, (req, res) => {
+  res.json(db.prepare('SELECT * FROM roles ORDER BY name').all().map(r => ({ ...r, workspaces: JSON.parse(r.workspaces) })));
+});
+app.post('/api/admin/roles', authAdmin, (req, res) => {
+  const { name, workspaces } = req.body || {};
+  if (!name?.trim()) return res.status(400).json({ error: 'Il nome del ruolo è obbligatorio.' });
+  const ws = Array.isArray(workspaces) ? workspaces.filter(w => ALL_WORKSPACES.includes(w)) : [];
+  const result = db.prepare('INSERT INTO roles (name, workspaces) VALUES (?, ?)').run(name.trim(), JSON.stringify(ws));
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+app.patch('/api/admin/roles/:id', authAdmin, (req, res) => {
+  const { name, workspaces } = req.body || {};
+  const updates = [], params = [];
+  if (name !== undefined) { updates.push('name = ?'); params.push(name.trim()); }
+  if (workspaces !== undefined) {
+    const ws = Array.isArray(workspaces) ? workspaces.filter(w => ALL_WORKSPACES.includes(w)) : [];
+    updates.push('workspaces = ?'); params.push(JSON.stringify(ws));
+  }
+  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  params.push(req.params.id);
+  db.prepare(`UPDATE roles SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  res.json({ success: true });
+});
+app.delete('/api/admin/roles/:id', authAdmin, (req, res) => {
+  db.prepare('UPDATE portal_users SET role_id = NULL WHERE role_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM roles WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+app.get('/api/admin/me', authAdmin, (req, res) => {
+  const permittedWorkspaces = permittedWorkspacesFor(req);
+  res.json({
+    isMaster: !!req.isMasterKey,
+    name: req.portalUser?.name || (req.isMasterKey ? 'Amministratore' : null),
+    roleName: req.portalUser?.role_id ? db.prepare('SELECT name FROM roles WHERE id = ?').get(req.portalUser.role_id)?.name : null,
+    permittedWorkspaces, // null = accesso completo a tutti i workspace
+  });
 });
 
 app.post('/api/portal-users/login', (req, res) => {
