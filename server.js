@@ -799,12 +799,14 @@ function customerActivityStatus(lastOrderDate) {
   if (!lastOrderDate) return 'inattivo';
   const last = new Date(lastOrderDate + 'T00:00:00');
   if (isNaN(last.getTime())) return 'inattivo';
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  const oneYearAgo = new Date();
-  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-  if (last >= sixMonthsAgo) return 'attivo';
-  if (last >= oneYearAgo) return 'semi_attivo';
+  const activeMonths = parseInt(getSetting('active_months_threshold', '6')) || 6;
+  const semiActiveMonths = parseInt(getSetting('semi_active_months_threshold', '12')) || 12;
+  const activeCutoff = new Date();
+  activeCutoff.setMonth(activeCutoff.getMonth() - activeMonths);
+  const semiActiveCutoff = new Date();
+  semiActiveCutoff.setMonth(semiActiveCutoff.getMonth() - semiActiveMonths);
+  if (last >= activeCutoff) return 'attivo';
+  if (last >= semiActiveCutoff) return 'semi_attivo';
   return 'inattivo';
 }
 
@@ -1677,12 +1679,24 @@ app.get('/api/admin/settings', authAdmin, (req, res) => {
   res.json({
     commercial_alert_email: getSetting('commercial_alert_email', ''),
     procurement_alert_email: getSetting('procurement_alert_email', ''),
+    active_months_threshold: getSetting('active_months_threshold', '6'),
+    semi_active_months_threshold: getSetting('semi_active_months_threshold', '12'),
   });
 });
 app.post('/api/admin/settings', authAdmin, (req, res) => {
-  const { commercial_alert_email, procurement_alert_email } = req.body || {};
+  const { commercial_alert_email, procurement_alert_email, active_months_threshold, semi_active_months_threshold } = req.body || {};
   if (commercial_alert_email !== undefined) setSetting('commercial_alert_email', commercial_alert_email);
   if (procurement_alert_email !== undefined) setSetting('procurement_alert_email', procurement_alert_email);
+  if (active_months_threshold !== undefined) {
+    const n = parseInt(active_months_threshold);
+    if (!n || n < 1) return res.status(400).json({ error: 'La soglia clienti attivi deve essere un numero di mesi valido.' });
+    setSetting('active_months_threshold', String(n));
+  }
+  if (semi_active_months_threshold !== undefined) {
+    const n = parseInt(semi_active_months_threshold);
+    if (!n || n < 1) return res.status(400).json({ error: 'La soglia clienti semi attivi deve essere un numero di mesi valido.' });
+    setSetting('semi_active_months_threshold', String(n));
+  }
   res.json({ success: true });
 });
 

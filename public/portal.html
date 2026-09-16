@@ -298,6 +298,19 @@
   .crm-orders-filters .sep { color: #9aa0ab; font-size: 12px; }
   .btn-outline-pill.active { border-color: var(--wine); color: var(--wine); background: rgba(59,111,224,0.08); font-weight: 600; }
   .crm-item-title .crm-agent-order-customer { color: var(--ink-soft); font-weight: 500; }
+  .settings-search-row { margin-bottom: 22px; }
+  .settings-search-box { position: relative; max-width: 420px; }
+  .settings-search-box svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: #9aa0ab; }
+  .settings-search-box input { width: 100%; padding: 10px 12px 10px 36px; border: 1px solid var(--line); border-radius: 9px; font-size: 13px; font-family: var(--sans); background: #fff; color: var(--ink); box-sizing: border-box; }
+  .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; align-items: start; }
+  .settings-card-group { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+  .settings-card-group h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13.5px; font-weight: 700; color: var(--ink); }
+  .settings-card-group h4 svg { width: 16px; height: 16px; color: var(--wine); flex-shrink: 0; }
+  .settings-card-group button { display: block; width: 100%; text-align: left; background: none; border: none; padding: 6px 0; font-size: 12.5px; color: var(--wine); cursor: pointer; font-family: var(--sans); }
+  .settings-card-group button:hover { text-decoration: underline; }
+  .settings-card-group.no-match { display: none; }
+  .settings-panel { display: none; }
+  .settings-panel.active { display: block; }
 </style>
 </head>
 <body>
@@ -722,31 +735,94 @@
 
     <!-- ═══ IMPOSTAZIONI ═══ -->
     <div class="module" id="module-impostazioni">
-      <div class="box" style="max-width:520px">
-        <h3>Email per gli avvisi di magazzino</h3>
-        <div id="settings-msg"></div>
-        <div class="field">
-          <label>Avviso scarsità prodotto finito (Commerciale)</label>
-          <input type="email" id="set-commercial-email" placeholder="commerciale@cantina.it">
+
+      <div id="settings-grid-view">
+        <div class="settings-search-row">
+          <div class="settings-search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="settings-search-input" placeholder="Cerca nelle impostazioni..." oninput="filterSettingsGrid(this.value)">
+          </div>
         </div>
-        <div class="field">
-          <label>Avviso riordino materie prime (Acquisti/Produzione)</label>
-          <input type="email" id="set-procurement-email" placeholder="acquisti@cantina.it">
+        <div class="settings-grid" id="settings-grid">
+          <div class="settings-card-group" data-settings-group="generale">
+            <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Generale</h4>
+            <button type="button" onclick="openSettingsPanel('email-avvisi')" data-settings-label="Email per gli avvisi di magazzino">Email per gli avvisi di magazzino</button>
+            <button type="button" onclick="openSettingsPanel('regole')" data-settings-label="Regole">Regole</button>
+          </div>
+          <div class="settings-card-group" data-settings-group="utenti">
+            <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="4.5"/></svg>Utenti e accessi</h4>
+            <button type="button" onclick="openSettingsPanel('utenti-portale')" data-settings-label="Utenti del portale">Utenti del portale</button>
+          </div>
+          <div class="settings-card-group" data-settings-group="agenti">
+            <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>Portale agenti</h4>
+            <button type="button" onclick="openSettingsPanel('credenziali-agenti')" data-settings-label="Credenziali portale agenti">Credenziali portale agenti</button>
+          </div>
         </div>
-        <button class="btn" onclick="saveSettings()">Salva impostazioni</button>
       </div>
 
-      <div class="list-card" style="max-width:720px">
-        <div class="list-toolbar">
-          <div class="list-toolbar-title"><h3>Utenti del portale</h3><p>Persone che possono accedere al gestionale interno con username e password</p></div>
-          <div class="list-spacer"></div>
-          <button class="btn-generate" onclick="openPortalUserModal()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
-            Nuovo utente
-          </button>
+      <div id="settings-detail-view" style="display:none">
+        <button class="btn secondary small" style="margin-bottom:18px" onclick="closeSettingsPanel()">← Torna alla configurazione</button>
+
+        <div class="settings-panel" id="settings-panel-email-avvisi">
+          <div class="box" style="max-width:520px">
+            <h3>Email per gli avvisi di magazzino</h3>
+            <div id="settings-msg"></div>
+            <div class="field">
+              <label>Avviso scarsità prodotto finito (Commerciale)</label>
+              <input type="email" id="set-commercial-email" placeholder="commerciale@cantina.it">
+            </div>
+            <div class="field">
+              <label>Avviso riordino materie prime (Acquisti/Produzione)</label>
+              <input type="email" id="set-procurement-email" placeholder="acquisti@cantina.it">
+            </div>
+            <button class="btn" onclick="saveSettings()">Salva impostazioni</button>
+          </div>
         </div>
-        <div class="list-rows" id="portal-users-tbody"></div>
+
+        <div class="settings-panel" id="settings-panel-regole">
+          <div class="box" style="max-width:520px">
+            <h3>Regole</h3>
+            <p style="margin:0 0 14px;font-size:12.5px;color:var(--ink-soft)">Logiche di business del gestionale.</p>
+            <div id="rules-msg"></div>
+            <div class="field-row">
+              <div class="field">
+                <label>Cliente attivo entro (mesi)</label>
+                <input type="number" min="1" id="rule-active-months" placeholder="6">
+              </div>
+              <div class="field">
+                <label>Cliente semi attivo entro (mesi)</label>
+                <input type="number" min="1" id="rule-semi-active-months" placeholder="12">
+              </div>
+            </div>
+            <p style="margin:0 0 14px;font-size:11.5px;color:var(--ink-soft)">Oltre la soglia "semi attivo" un cliente è considerato inattivo. Vale per CRM → Clienti e la scheda "Clienti seguiti" di ogni agente.</p>
+            <button class="btn" onclick="saveRules()">Salva regole</button>
+          </div>
+        </div>
+
+        <div class="settings-panel" id="settings-panel-utenti-portale">
+          <div class="list-card" style="max-width:720px">
+            <div class="list-toolbar">
+              <div class="list-toolbar-title"><h3>Utenti del portale</h3><p>Persone che possono accedere al gestionale interno con username e password</p></div>
+              <div class="list-spacer"></div>
+              <button class="btn-generate" onclick="openPortalUserModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+                Nuovo utente
+              </button>
+            </div>
+            <div class="list-rows" id="portal-users-tbody"></div>
+          </div>
+        </div>
+
+        <div class="settings-panel" id="settings-panel-credenziali-agenti">
+          <div class="list-card" style="max-width:720px">
+            <div class="list-toolbar">
+              <div class="list-toolbar-title"><h3>Credenziali portale agenti</h3><p>Username, password e link di accesso diretto per ogni agente. La password non è visibile dopo la generazione: se persa, rigenerala.</p></div>
+            </div>
+            <div class="list-rows" id="agent-credentials-tbody"></div>
+          </div>
+        </div>
       </div>
+
     </div>
   </main>
   </div>
@@ -843,41 +919,9 @@
       </div>
     </div>
 
-    <div id="agent-link-section" style="display:none" class="avail-field">
-      <label>Credenziali di accesso al portale agenti</label>
-      <div class="avail-row" style="grid-template-columns:1fr 1fr">
-        <div class="avail-field">
-          <label style="font-size:10.5px">Username</label>
-          <input type="text" id="agent-username-value" class="pill-input">
-        </div>
-        <div class="avail-field">
-          <label style="font-size:10.5px">Password</label>
-          <div class="link-pill-box">
-            <input type="text" id="agent-password-value" readonly placeholder="••••••••">
-            <button class="link-pill-btn" type="button" onclick="copyAgentPassword()" title="Copia password">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            </button>
-            <button class="link-pill-btn danger" type="button" onclick="regenerateAgentPassword()" title="Rigenera password">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-soft)">L'agente accede su <code>/agent.html</code> con queste credenziali. La password non è recuperabile in seguito: se persa, rigenerala.</p>
+    <div id="agent-created-msg"></div>
 
-      <label style="margin-top:14px;display:block">Link diretto (facoltativo)</label>
-      <div class="link-pill-box">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"/></svg>
-        <input type="text" id="agent-link-value" readonly>
-        <button class="link-pill-btn" type="button" onclick="copyAgentLink()" title="Copia link">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        </button>
-        <button class="link-pill-btn danger" type="button" onclick="regenerateAgentLink()" title="Rigenera link">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
-        </button>
-      </div>
-      <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-soft)">Il link accede automaticamente senza chiedere username e password: usalo solo internamente.</p>
-    </div>
+    <p style="margin:4px 0 0;font-size:11.5px;color:var(--ink-soft)">Username, password e link di accesso al portale ordini si gestiscono da <b>Impostazioni → Credenziali portale agenti</b>.</p>
 
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('agent-modal')">Annulla</button>
@@ -1528,9 +1572,38 @@ function openSettings() {
   document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
   document.getElementById('module-impostazioni').classList.add('active');
   document.getElementById('topbar-title').textContent = 'Impostazioni';
+  closeSettingsPanel();
   loadSettings();
   loadPortalUsers();
+  loadAgentCredentials();
   closeMobileSidebar();
+}
+
+function openSettingsPanel(id) {
+  document.getElementById('settings-grid-view').style.display = 'none';
+  document.getElementById('settings-detail-view').style.display = 'block';
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('settings-panel-' + id).classList.add('active');
+}
+
+function closeSettingsPanel() {
+  document.getElementById('settings-detail-view').style.display = 'none';
+  document.getElementById('settings-grid-view').style.display = 'block';
+}
+
+function filterSettingsGrid(q) {
+  const query = q.trim().toLowerCase();
+  document.querySelectorAll('.settings-card-group').forEach(group => {
+    const links = [...group.querySelectorAll('button[data-settings-label]')];
+    const groupMatches = group.querySelector('h4').textContent.toLowerCase().includes(query);
+    let anyLinkVisible = false;
+    links.forEach(link => {
+      const visible = groupMatches || link.dataset.settingsLabel.toLowerCase().includes(query);
+      link.style.display = visible ? 'block' : 'none';
+      if (visible) anyLinkVisible = true;
+    });
+    group.classList.toggle('no-match', !anyLinkVisible);
+  });
 }
 
 // ── Sidebar sub-nav (contextual to the selected workspace) ────────────────────
@@ -1888,6 +1961,7 @@ function agentLinkUrl(token) {
 
 function openAgentModal(a) {
   document.getElementById('agent-modal-msg').innerHTML = '';
+  document.getElementById('agent-created-msg').innerHTML = '';
   document.getElementById('agent-modal-title').textContent = a ? 'Modifica agente' : 'Nuovo agente';
   document.getElementById('agent-id').value = a ? a.id : '';
   document.getElementById('agent-name').value = a ? a.name : '';
@@ -1897,19 +1971,6 @@ function openAgentModal(a) {
   document.getElementById('agent-phone').value = a ? (a.phone || '') : '';
   document.getElementById('agent-province-filter').value = '';
   renderProvincePicker('agent-province-picker', a ? a.provinces : []);
-  const linkSection = document.getElementById('agent-link-section');
-  if (a) {
-    linkSection.style.display = 'block';
-    document.getElementById('agent-link-value').value = agentLinkUrl(a.token);
-    document.getElementById('agent-link-value').dataset.agentId = a.id;
-    document.getElementById('agent-username-value').value = a.username || '';
-    document.getElementById('agent-username-value').dataset.agentId = a.id;
-    document.getElementById('agent-password-value').value = a.generatedPassword || '';
-    document.getElementById('agent-password-value').placeholder = a.generatedPassword ? '' : '••••••••';
-    document.getElementById('agent-password-value').dataset.agentId = a.id;
-  } else {
-    linkSection.style.display = 'none';
-  }
   openModal('agent-modal');
 }
 
@@ -1926,52 +1987,56 @@ async function saveAgent() {
   };
   try {
     if (id) {
-      const username = document.getElementById('agent-username-value').value.trim();
-      if (username) body.username = username;
       await api('/api/admin/agents/' + id, { method: 'PATCH', body: JSON.stringify(body) });
       closeModal('agent-modal');
       loadAgents();
     } else {
       const res = await api('/api/admin/agents', { method: 'POST', body: JSON.stringify(body) });
       await loadAgents();
-      const created = AGENTS.find(a => a.id === res.id);
-      created.generatedPassword = res.password;
-      openAgentModal(created);
-      msg.innerHTML = '<div class="msg success">Agente creato. Comunicagli username e password qui sotto per l\'accesso al portale ordini — la password non sarà più visibile dopo aver chiuso questa finestra.</div>';
+      document.getElementById('agent-id').value = res.id;
+      document.getElementById('agent-modal-title').textContent = 'Modifica agente';
+      document.getElementById('agent-created-msg').innerHTML = `<div class="msg success">Agente creato. Username: <b>${esc(res.username)}</b> — Password: <b>${esc(res.password)}</b><br>Comunicagliele ora: non saranno più visibili. Potrai rigenerarle in seguito da Impostazioni → Credenziali portale agenti.</div>`;
     }
   } catch (e) {
     msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
   }
 }
 
-function copyAgentLink() {
-  const input = document.getElementById('agent-link-value');
-  input.select();
-  navigator.clipboard?.writeText(input.value).catch(() => {});
+// ── IMPOSTAZIONI: credenziali portale agenti ────────────────────────────────────
+async function loadAgentCredentials() {
+  const agents = await api('/api/admin/agents');
+  document.getElementById('agent-credentials-tbody').innerHTML = agents.length ? agents.map(a => `
+    <div class="list-row">
+      <div class="list-row-icon">${esc(a.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(a.name)}</div>
+        <div class="list-row-sub" id="agent-cred-sub-${a.id}">Username: ${esc(a.username || '—')}</div>
+      </div>
+      <div class="list-row-meta">
+        <button class="btn-outline-pill" onclick="regenerateAgentCredPassword(${a.id})">Rigenera password</button>
+        <button class="btn-outline-pill" onclick="copyAgentCredLink('${a.token}')">Copia link</button>
+        <button class="btn-outline-pill" onclick="regenerateAgentCredLink(${a.id})">Rigenera link</button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessun agente. Creane uno da CRM → Agenti.</div>';
 }
 
-function copyAgentPassword() {
-  const input = document.getElementById('agent-password-value');
-  if (!input.value) return;
-  input.select();
-  navigator.clipboard?.writeText(input.value).catch(() => {});
-}
-
-async function regenerateAgentPassword() {
-  const id = document.getElementById('agent-password-value').dataset.agentId;
+async function regenerateAgentCredPassword(id) {
   if (!confirm('Rigenerare la password? La vecchia smetterà di funzionare.')) return;
   const res = await api(`/api/admin/agents/${id}/regenerate-password`, { method: 'POST' });
-  document.getElementById('agent-username-value').value = res.username;
-  document.getElementById('agent-password-value').value = res.password;
-  document.getElementById('agent-modal-msg').innerHTML = '<div class="msg success">Nuova password generata. Comunicala all\'agente: non sarà più visibile dopo aver chiuso questa finestra.</div>';
+  document.getElementById('agent-cred-sub-' + id).innerHTML =
+    `Username: <b>${esc(res.username)}</b> · Nuova password: <b>${esc(res.password)}</b> (copiala ora, non sarà più visibile)`;
 }
 
-async function regenerateAgentLink() {
-  const id = document.getElementById('agent-link-value').dataset.agentId;
-  if (!confirm('Rigenerare il link? Il vecchio link smetterà di funzionare.')) return;
+function copyAgentCredLink(token) {
+  navigator.clipboard?.writeText(agentLinkUrl(token)).catch(() => {});
+}
+
+async function regenerateAgentCredLink(id) {
+  if (!confirm('Rigenerare il link diretto? Il vecchio smetterà di funzionare.')) return;
   const res = await api(`/api/admin/agents/${id}/regenerate-token`, { method: 'POST' });
-  document.getElementById('agent-link-value').value = agentLinkUrl(res.token);
-  loadAgents();
+  copyAgentCredLink(res.token);
+  alert('Nuovo link generato e copiato negli appunti.');
 }
 
 async function toggleAgentActive(id, active) {
@@ -2371,11 +2436,18 @@ async function openCrmRecord(type, id) {
 
 const CRM_TC_STATUS_LABELS = { attivo: 'Clienti attivi', semi_attivo: 'Clienti semi attivi', inattivo: 'Clienti inattivi' };
 const CRM_STATUS_LABELS = { attivo: 'Attivo', semi_attivo: 'Semi attivo', inattivo: 'Inattivo' };
-const CRM_TC_STATUS_TIPS = {
-  attivo: 'Ha effettuato almeno un ordine negli ultimi 6 mesi.',
-  semi_attivo: 'Ultimo ordine tra 6 mesi e 1 anno fa.',
-  inattivo: 'Nessun ordine da più di 1 anno (o mai ordinato).',
-};
+let ACTIVITY_THRESHOLDS = { active_months_threshold: 6, semi_active_months_threshold: 12 };
+async function loadActivityThresholds() {
+  const s = await api('/api/admin/settings');
+  ACTIVITY_THRESHOLDS.active_months_threshold = parseInt(s.active_months_threshold) || 6;
+  ACTIVITY_THRESHOLDS.semi_active_months_threshold = parseInt(s.semi_active_months_threshold) || 12;
+}
+function crmStatusTip(status) {
+  const a = ACTIVITY_THRESHOLDS.active_months_threshold, s = ACTIVITY_THRESHOLDS.semi_active_months_threshold;
+  if (status === 'attivo') return `Ha effettuato almeno un ordine negli ultimi ${a} mesi.`;
+  if (status === 'semi_attivo') return `Ultimo ordine tra ${a} e ${s} mesi fa.`;
+  return `Nessun ordine da più di ${s} mesi (o mai ordinato).`;
+}
 
 async function loadCrmTrackedCustomers() {
   const box = document.getElementById('crm-tracked-customers');
@@ -2405,7 +2477,7 @@ async function loadCrmTrackedCustomers() {
           <span class="crm-tc-dot ${status}"></span>
           <span class="crm-tc-group-title">${CRM_TC_STATUS_LABELS[status]}</span>
           <span class="crm-tc-group-count">(${list.length})</span>
-          <i class="crm-info-tip" title="${esc(CRM_TC_STATUS_TIPS[status])}">i</i>
+          <i class="crm-info-tip" title="${esc(crmStatusTip(status))}">i</i>
         </div>
         ${items}
       </div>`;
@@ -2516,7 +2588,7 @@ async function loadCrmOverview() {
       <div class="card"><div class="label">Fatturato</div><div class="value">€ ${fmtEuro(d.revenue_cents || 0)}</div></div>
       ${d.activity_status ? `
       <div class="card">
-        <div class="label">Stato attività <i class="crm-info-tip" title="${esc(CRM_TC_STATUS_TIPS[d.activity_status])}">i</i></div>
+        <div class="label">Stato attività <i class="crm-info-tip" title="${esc(crmStatusTip(d.activity_status))}">i</i></div>
         <div class="value" style="display:flex;align-items:center;gap:7px;font-size:15px"><span class="crm-tc-dot ${d.activity_status}"></span>${CRM_STATUS_LABELS[d.activity_status]}</div>
       </div>` : ''}
     </div>`;
@@ -2979,6 +3051,8 @@ async function loadSettings() {
   const s = await api('/api/admin/settings');
   document.getElementById('set-commercial-email').value = s.commercial_alert_email || '';
   document.getElementById('set-procurement-email').value = s.procurement_alert_email || '';
+  document.getElementById('rule-active-months').value = s.active_months_threshold || 6;
+  document.getElementById('rule-semi-active-months').value = s.semi_active_months_threshold || 12;
 }
 async function saveSettings() {
   const msg = document.getElementById('settings-msg');
@@ -2988,6 +3062,19 @@ async function saveSettings() {
       procurement_alert_email: document.getElementById('set-procurement-email').value.trim(),
     }) });
     msg.innerHTML = '<div class="msg success">Impostazioni salvate.</div>';
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+async function saveRules() {
+  const msg = document.getElementById('rules-msg');
+  try {
+    await api('/api/admin/settings', { method: 'POST', body: JSON.stringify({
+      active_months_threshold: document.getElementById('rule-active-months').value,
+      semi_active_months_threshold: document.getElementById('rule-semi-active-months').value,
+    }) });
+    await loadActivityThresholds();
+    msg.innerHTML = '<div class="msg success">Regole salvate.</div>';
   } catch (e) {
     msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
   }
@@ -3127,6 +3214,7 @@ async function saveWarehouseNote() {
 async function boot() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  loadActivityThresholds();
   const params = new URLSearchParams(window.location.search);
   const ws = params.get('workspace');
   if (ws && ws !== 'commerciale' && WORKSPACE_LABELS[ws]) {
