@@ -781,6 +781,7 @@
           <div class="settings-card-group" data-settings-group="generale">
             <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Generale</h4>
             <button type="button" onclick="openMyProfilePanel()" data-settings-label="Impostazioni personali">Impostazioni personali</button>
+            <button type="button" onclick="openCompanySettingsPanel()" data-settings-label="Impostazioni aziendali">Impostazioni aziendali</button>
             <button type="button" onclick="openSettingsPanel('email-avvisi')" data-settings-label="Email per gli avvisi di magazzino">Email per gli avvisi di magazzino</button>
             <button type="button" onclick="openSettingsPanel('regole')" data-settings-label="Regole">Regole</button>
             <button type="button" onclick="openSettingsPanel('dashboard-widgets')" data-settings-label="Dashboard">Dashboard</button>
@@ -822,6 +823,37 @@
               <div class="field"><label>Conferma nuova password</label><input type="password" id="mp-confirm-password"></div>
               <button class="btn" onclick="saveMyPassword()">Cambia password</button>
             </div>
+          </div>
+        </div>
+
+        <div class="settings-panel" id="settings-panel-impostazioni-aziendali">
+          <div class="box" style="max-width:640px">
+            <h3>Impostazioni aziendali</h3>
+            <p style="margin:0 0 14px;font-size:12.5px;color:var(--ink-soft)">Dati anagrafici dell'azienda, per intestazioni su documenti e fatture in futuro.</p>
+            <div id="company-settings-msg"></div>
+            <div class="field"><label>Ragione sociale</label><input id="co-name"></div>
+            <div class="field-row">
+              <div class="field"><label>Indirizzo</label><input id="co-address"></div>
+              <div class="field"><label>CAP</label><input id="co-postal-code"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Città</label><input id="co-city"></div>
+              <div class="field"><label>Provincia</label><input id="co-province"></div>
+              <div class="field"><label>Paese</label><input id="co-country" value="Italia"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Partita IVA</label><input id="co-vat"></div>
+              <div class="field"><label>Codice Fiscale</label><input id="co-fiscal-code"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Codice SDI</label><input id="co-sdi"></div>
+              <div class="field"><label>PEC</label><input type="email" id="co-pec"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Telefono</label><input id="co-phone"></div>
+              <div class="field"><label>Email</label><input type="email" id="co-email"></div>
+            </div>
+            <button class="btn" onclick="saveCompanySettings()">Salva impostazioni aziendali</button>
           </div>
         </div>
 
@@ -3443,6 +3475,35 @@ async function saveMyPassword() {
     document.getElementById('mp-new-password').value = '';
     document.getElementById('mp-confirm-password').value = '';
     msg.innerHTML = '<div class="msg success">Password aggiornata.</div>';
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+// ── IMPOSTAZIONI: impostazioni aziendali ────────────────────────────────────────
+const COMPANY_FIELD_MAP = {
+  company_name: 'co-name', company_address: 'co-address', company_postal_code: 'co-postal-code',
+  company_city: 'co-city', company_province: 'co-province', company_country: 'co-country',
+  company_vat_number: 'co-vat', company_fiscal_code: 'co-fiscal-code', company_sdi_code: 'co-sdi',
+  company_pec: 'co-pec', company_phone: 'co-phone', company_email: 'co-email',
+};
+
+async function openCompanySettingsPanel() {
+  openSettingsPanel('impostazioni-aziendali');
+  document.getElementById('company-settings-msg').innerHTML = '';
+  const s = await api('/api/admin/settings');
+  for (const [field, elId] of Object.entries(COMPANY_FIELD_MAP)) {
+    document.getElementById(elId).value = s[field] || (field === 'company_country' ? 'Italia' : '');
+  }
+}
+
+async function saveCompanySettings() {
+  const msg = document.getElementById('company-settings-msg');
+  const body = {};
+  for (const [field, elId] of Object.entries(COMPANY_FIELD_MAP)) body[field] = document.getElementById(elId).value;
+  try {
+    await api('/api/admin/settings', { method: 'POST', body: JSON.stringify(body) });
+    msg.innerHTML = '<div class="msg success">Impostazioni aziendali salvate.</div>';
   } catch (e) {
     msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
   }

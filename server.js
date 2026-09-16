@@ -1694,12 +1694,20 @@ app.delete('/api/admin/b2c-orders/:id', authAdmin, (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── Settings (email di alert) ─────────────────────────────────────────────────
+const COMPANY_FIELDS = [
+  'company_name', 'company_address', 'company_postal_code', 'company_city', 'company_province', 'company_country',
+  'company_vat_number', 'company_fiscal_code', 'company_sdi_code', 'company_pec', 'company_phone', 'company_email',
+];
+
 app.get('/api/admin/settings', authAdmin, (req, res) => {
+  const company = {};
+  for (const f of COMPANY_FIELDS) company[f] = getSetting(f, '');
   res.json({
     commercial_alert_email: getSetting('commercial_alert_email', ''),
     procurement_alert_email: getSetting('procurement_alert_email', ''),
     active_months_threshold: getSetting('active_months_threshold', '6'),
     semi_active_months_threshold: getSetting('semi_active_months_threshold', '12'),
+    ...company,
   });
 });
 const DASHBOARD_WIDGET_CATALOG = {
@@ -1779,6 +1787,9 @@ app.post('/api/admin/settings', authAdmin, (req, res) => {
     const n = parseInt(semi_active_months_threshold);
     if (!n || n < 1) return res.status(400).json({ error: 'La soglia clienti semi attivi deve essere un numero di mesi valido.' });
     setSetting('semi_active_months_threshold', String(n));
+  }
+  for (const f of COMPANY_FIELDS) {
+    if (req.body[f] !== undefined) setSetting(f, req.body[f].trim());
   }
   res.json({ success: true });
 });
