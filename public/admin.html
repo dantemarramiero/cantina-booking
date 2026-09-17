@@ -780,12 +780,7 @@
     <div class="panel" id="panel-operators">
       <div class="list-card">
         <div class="list-toolbar">
-          <div class="list-toolbar-title"><h3>Operatori</h3><p>Addetti assegnabili alle visite in cantina</p></div>
-          <div class="list-spacer"></div>
-          <button class="btn-generate" style="margin-top:0;padding:9px 18px" onclick="openOperatorModal()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
-            Nuovo operatore
-          </button>
+          <div class="list-toolbar-title"><h3>Operatori</h3><p>Addetti assegnabili alle visite in cantina — coincidono con gli utenti che hanno accesso al software. Per aggiungerne uno nuovo o disattivarlo, vai in Impostazioni → Utenti del portale.</p></div>
         </div>
         <div class="list-rows" id="operators-tbody"></div>
       </div>
@@ -981,24 +976,6 @@
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('discount-modal')">Annulla</button>
       <button class="btn" onclick="saveDiscount()">Salva</button>
-    </div>
-  </div>
-</div>
-
-<!-- Operator modal -->
-<div class="modal-overlay" id="operator-modal">
-  <div class="modal-box">
-    <h3 id="operator-modal-title">Nuovo operatore</h3>
-    <div id="operator-modal-msg"></div>
-    <input type="hidden" id="op-id">
-    <div class="field"><label>Nome</label><input id="op-name"></div>
-    <div class="field-row">
-      <div class="field"><label>Email</label><input type="email" id="op-email"></div>
-      <div class="field"><label>Telefono</label><input id="op-phone"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn secondary" onclick="closeModal('operator-modal')">Annulla</button>
-      <button class="btn" onclick="saveOperator()">Salva</button>
     </div>
   </div>
 </div>
@@ -1832,7 +1809,7 @@ function openCalEventModal(bookingId) {
       <div class="field"><label>Operatore assegnato</label>
         <select onchange="calUpdateOperator(${b.id}, this.value)">
           <option value="">— Nessuno —</option>
-          ${OPERATORS.map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+          ${OPERATORS.filter(o => o.active).map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
         </select>
       </div>
       <div class="modal-actions" style="justify-content:space-between">
@@ -1882,7 +1859,7 @@ async function loadBookings() {
         <span class="badge ${b.status}">${b.status.replace('_',' ')}</span>
         <select onchange="updateBookingOperator(${b.id}, this.value)" style="padding:6px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;background:#fff">
           <option value="">— Operatore —</option>
-          ${OPERATORS.map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+          ${OPERATORS.filter(o => o.active).map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
         </select>
         <div class="list-row-value">€ ${fmtEuro(b.amount_cents)}</div>
         ${b.status !== 'confermata' ? `<button class="btn-outline-pill" onclick="confirmBooking(${b.id})">Conferma</button>` : ''}
@@ -1930,7 +1907,7 @@ async function openManualBooking() {
   await loadManualSlots();
   if (!OPERATORS.length) OPERATORS = await api('/api/admin/operators');
   document.getElementById('man-operator').innerHTML = '<option value="">— Nessuno —</option>' +
-    OPERATORS.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+    OPERATORS.filter(o => o.active).map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
   openModal('manual-modal');
 }
 async function loadManualSlots() {
@@ -2064,7 +2041,7 @@ async function deleteSubscriber(id) {
   loadNewsletter();
 }
 
-// ── Operatori ─────────────────────────────────────────────────────────────────
+// ── Operatori (specchio in sola lettura degli utenti del portale) ──────────────
 async function loadOperators() {
   OPERATORS = await api('/api/admin/operators');
   document.getElementById('operators-tbody').innerHTML = OPERATORS.length ? OPERATORS.map(o => `
@@ -2072,53 +2049,14 @@ async function loadOperators() {
       <div class="list-row-icon">${esc(o.name).charAt(0).toUpperCase()}</div>
       <div class="list-row-body">
         <div class="list-row-title">${esc(o.name)}</div>
-        <div class="list-row-sub">${esc(o.email) || 'nessuna email'}${o.phone ? ' · ' + esc(o.phone) : ''}</div>
+        <div class="list-row-sub">${esc(o.email) || 'nessuna email'}</div>
       </div>
       <div class="list-row-meta">
         <span class="pill-stat">${o.visitCount} visite</span>
         <span class="badge ${o.active ? 'confermata' : 'annullata'}">${o.active ? 'Attivo' : 'Disattivo'}</span>
-        <button class="btn-outline-pill" onclick='openOperatorModal(${JSON.stringify(o)})'>Modifica</button>
-        <button class="btn-outline-pill" onclick="toggleOperatorActive(${o.id}, ${o.active ? 0 : 1})">${o.active ? 'Disattiva' : 'Attiva'}</button>
-        <button class="btn-outline-pill danger" onclick="deleteOperator(${o.id})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-        </button>
       </div>
     </div>
-  `).join('') : '<div class="list-empty">Nessun operatore. Creane uno per assegnarlo alle visite.</div>';
-}
-function openOperatorModal(o) {
-  document.getElementById('operator-modal-msg').innerHTML = '';
-  document.getElementById('operator-modal-title').textContent = o ? 'Modifica operatore' : 'Nuovo operatore';
-  document.getElementById('op-id').value = o ? o.id : '';
-  document.getElementById('op-name').value = o ? o.name : '';
-  document.getElementById('op-email').value = o ? (o.email || '') : '';
-  document.getElementById('op-phone').value = o ? (o.phone || '') : '';
-  openModal('operator-modal');
-}
-async function saveOperator() {
-  const id = document.getElementById('op-id').value;
-  const body = {
-    name: document.getElementById('op-name').value.trim(),
-    email: document.getElementById('op-email').value.trim(),
-    phone: document.getElementById('op-phone').value.trim(),
-  };
-  try {
-    if (id) await api('/api/admin/operators/' + id, { method: 'PATCH', body: JSON.stringify(body) });
-    else await api('/api/admin/operators', { method: 'POST', body: JSON.stringify(body) });
-    closeModal('operator-modal');
-    loadOperators();
-  } catch (e) {
-    document.getElementById('operator-modal-msg').innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
-  }
-}
-async function toggleOperatorActive(id, active) {
-  await api('/api/admin/operators/' + id, { method: 'PATCH', body: JSON.stringify({ active }) });
-  loadOperators();
-}
-async function deleteOperator(id) {
-  if (!confirm('Eliminare questo operatore? Le visite assegnate resteranno senza operatore.')) return;
-  await api('/api/admin/operators/' + id, { method: 'DELETE' });
-  loadOperators();
+  `).join('') : '<div class="list-empty">Nessun operatore. Gli utenti del portale (Impostazioni → Utenti del portale) diventano automaticamente operatori assegnabili.</div>';
 }
 
 // ── CRM B2C (enoturismo) ─────────────────────────────────────────────────────

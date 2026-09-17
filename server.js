@@ -207,6 +207,10 @@ try { db.exec('ALTER TABLE bookings ADD COLUMN operator_id INTEGER'); } catch {}
 try { db.exec('ALTER TABLE bookings ADD COLUMN b2c_customer_id INTEGER'); } catch {}
 
 // ── Enoturismo: operatori addetti alle visite ─────────────────────────────────
+// Gli operatori selezionabili sono sempre uno specchio degli utenti con accesso al
+// software (portal_users): niente anagrafica separata, si sincronizza automaticamente
+// (vedi syncOperatorForPortalUser). Le righe restano per non rompere gli operator_id
+// già assegnati a prenotazioni passate anche se l'utente viene poi rimosso.
 db.exec(`
   CREATE TABLE IF NOT EXISTS operators (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -217,6 +221,7 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now','localtime'))
   )
 `);
+try { db.exec('ALTER TABLE operators ADD COLUMN portal_user_id INTEGER'); } catch {}
 
 // ── Enoturismo: CRM B2C (visitatori, clienti negozio/e-commerce) ──────────────
 db.exec(`
@@ -682,6 +687,22 @@ db.exec(`
 `);
 try { db.exec('ALTER TABLE portal_users ADD COLUMN role_id INTEGER REFERENCES roles(id)'); } catch {}
 const ALL_WORKSPACES = ['enoturismo', 'commerciale', 'produzione', 'magazzino', 'crm', 'impostazioni'];
+
+// Mantiene "operators" (selezionabile nelle visite enoturismo) sincronizzato con gli
+// utenti del portale: ogni "utente che ha accesso al software" è automaticamente un
+// operatore selezionabile, senza doverlo ricreare a mano in una lista separata.
+function syncOperatorForPortalUser(pu) {
+  const existing = db.prepare('SELECT id FROM operators WHERE portal_user_id = ?').get(pu.id);
+  if (existing) {
+    db.prepare('UPDATE operators SET name = ?, email = ?, active = ? WHERE id = ?').run(pu.name, pu.email, pu.active ? 1 : 0, existing.id);
+  } else {
+    db.prepare('INSERT INTO operators (name, email, portal_user_id, active) VALUES (?, ?, ?, ?)').run(pu.name, pu.email, pu.id, pu.active ? 1 : 0);
+  }
+}
+function deactivateOperatorForPortalUser(portalUserId) {
+  db.prepare('UPDATE operators SET active = 0 WHERE portal_user_id = ?').run(portalUserId);
+}
+db.prepare('SELECT * FROM portal_users').all().forEach(syncOperatorForPortalUser);
 
 // ── ERP: magazzino prodotti finiti / materie prime ────────────────────────────
 db.exec(`
@@ -1703,36 +1724,13 @@ app.delete('/api/admin/newsletter/:id', authAdmin, (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── Operatori addetti alle visite ─────────────────────────────────────────────
+// Operatori: sola lettura — sono uno specchio automatico degli utenti del portale
+// (vedi syncOperatorForPortalUser). Per crearne/modificarne/disattivarne uno si passa
+// da Impostazioni → Utenti del portale, non da qui.
 app.get('/api/admin/operators', authAdmin, (req, res) => {
   const operators = db.prepare('SELECT * FROM operators ORDER BY name').all();
   const visitCount = db.prepare("SELECT COUNT(*) AS c FROM bookings WHERE operator_id = ? AND status != 'annullata'");
   res.json(operators.map(o => ({ ...o, visitCount: visitCount.get(o.id).c })));
-});
-
-app.post('/api/admin/operators', authAdmin, (req, res) => {
-  const { name, email, phone } = req.body || {};
-  if (!name?.trim()) return res.status(400).json({ error: 'Il nome dell\'operatore è obbligatorio.' });
-  const result = db.prepare('INSERT INTO operators (name, email, phone) VALUES (?, ?, ?)')
-    .run(name.trim(), email?.trim() || null, phone?.trim() || null);
-  res.json({ success: true, id: result.lastInsertRowid });
-});
-
-app.patch('/api/admin/operators/:id', authAdmin, (req, res) => {
-  const fields = ['name', 'email', 'phone', 'active'];
-  const updates = [], params = [];
-  for (const f of fields) {
-    if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }
-  }
-  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
-  params.push(req.params.id);
-  db.prepare(`UPDATE operators SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-  res.json({ success: true });
-});
-
-app.delete('/api/admin/operators/:id', authAdmin, (req, res) => {
-  db.prepare('UPDATE bookings SET operator_id = NULL WHERE operator_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM operators WHERE id = ?').run(req.params.id);
-  res.json({ success: true });
 });
 
 // ── CRM B2C: clienti (visitatori + negozio + e-commerce) ──────────────────────
@@ -3353,6 +3351,7 @@ app.post('/api/admin/portal-users', authAdmin, (req, res) => {
   try {
     const result = db.prepare('INSERT INTO portal_users (name, email, username, password_hash, access_key, role_id) VALUES (?, ?, ?, ?, ?, ?)')
       .run(name.trim(), email.trim().toLowerCase(), username.trim(), hashPassword(password), generatePortalAccessKey(), role_id || null);
+    syncOperatorForPortalUser(db.prepare('SELECT * FROM portal_users WHERE id = ?').get(result.lastInsertRowid));
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (e) {
     res.status(400).json({ error: 'Username o email già in uso.' });
@@ -3367,6 +3366,7 @@ app.patch('/api/admin/portal-users/:id', authAdmin, (req, res) => {
   params.push(req.params.id);
   try {
     db.prepare(`UPDATE portal_users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    syncOperatorForPortalUser(db.prepare('SELECT * FROM portal_users WHERE id = ?').get(req.params.id));
     res.json({ success: true });
   } catch (e) {
     res.status(400).json({ error: 'Username o email già in uso.' });
@@ -3374,6 +3374,7 @@ app.patch('/api/admin/portal-users/:id', authAdmin, (req, res) => {
 });
 
 app.delete('/api/admin/portal-users/:id', authAdmin, (req, res) => {
+  deactivateOperatorForPortalUser(req.params.id);
   db.prepare('DELETE FROM portal_users WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });

@@ -1671,7 +1671,7 @@
       <div class="field"><label>Data inizio</label><input type="date" id="fair-start-date"></div>
       <div class="field"><label>Data fine</label><input type="date" id="fair-end-date"></div>
     </div>
-    <div class="field"><label>Responsabile</label><input id="fair-responsible" placeholder="chi parteciperà"></div>
+    <div class="field"><label>Responsabile</label><select id="fair-responsible"><option value="">— Seleziona un utente —</option></select></div>
     <div class="field"><label>Stato</label>
       <select id="fair-status">
         <option value="pianificata">Pianificata</option>
@@ -3185,7 +3185,7 @@ async function loadFairs() {
   `).join('') : '<div class="list-empty">Nessuna fiera pianificata. Creane una.</div>';
 }
 
-function openFairModal(f) {
+async function openFairModal(f) {
   document.getElementById('fair-modal-msg').innerHTML = '';
   document.getElementById('fair-modal-title').textContent = f ? 'Modifica fiera' : 'Nuova fiera';
   document.getElementById('fair-id').value = f ? f.id : '';
@@ -3193,7 +3193,10 @@ function openFairModal(f) {
   document.getElementById('fair-location').value = f ? (f.location || '') : '';
   document.getElementById('fair-start-date').value = f ? (f.start_date || '') : '';
   document.getElementById('fair-end-date').value = f ? (f.end_date || '') : '';
-  document.getElementById('fair-responsible').value = f ? (f.responsible_name || '') : '';
+  const users = await api('/api/admin/portal-users');
+  const responsibleSel = document.getElementById('fair-responsible');
+  responsibleSel.innerHTML = '<option value="">— Seleziona un utente —</option>' +
+    users.filter(u => u.active).map(u => `<option value="${esc(u.name)}" ${f && f.responsible_name === u.name ? 'selected' : ''}>${esc(u.name)}</option>`).join('');
   document.getElementById('fair-status').value = f ? f.status : 'pianificata';
   openModal('fair-modal');
 }
