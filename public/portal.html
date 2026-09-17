@@ -116,6 +116,10 @@
   .list-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 18px 22px; border-bottom: 1px solid var(--line); }
   .list-toolbar-title { flex-shrink: 0; }
   .list-toolbar-title h3 { font-size: 15px; }
+  .target-months-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  @media (max-width: 700px) { .target-months-grid { grid-template-columns: repeat(3, 1fr); } }
+  .target-month-field label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #8d8274; margin-bottom: 5px; font-weight: 600; }
+  .target-month-field input { width: 100%; padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; font-family: var(--sans); background: #fff; color: var(--ink); box-sizing: border-box; text-align: right; }
   .list-toolbar-title p { margin: 2px 0 0; font-size: 12px; color: var(--ink-soft); }
   .list-spacer { flex: 1; }
   .search-input { position: relative; min-width: 200px; }
@@ -414,6 +418,72 @@
     .crm2-context { order: 3; }
   }
 
+  /* Commerciale: dashboard (MyWinery design system) */
+  #sub-com-dashboard { background: #f2ede3; margin: -26px -32px; padding: 26px 32px 32px; min-height: calc(100vh - 64px - 52px); }
+  .com2-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
+  .com2-head h1 { margin: 0 0 6px; font: 400 32px/1.1 var(--display); color: var(--ink); }
+  .com2-subtitle { font: 400 13px var(--sans); color: var(--ink-soft); }
+  .com2-period-seg { display: flex; gap: 6px; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+  .com2-period-seg span { padding: 6px 14px; border-radius: 999px; font: 600 12px var(--sans); color: var(--ink-soft); cursor: pointer; }
+  .com2-period-seg span.active { background: var(--bordeaux); color: #eae2ca; }
+  .com2-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .com2-span2 { grid-column: span 2; }
+  .com2-span3 { grid-column: span 3; }
+  .com2-card { background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 1px 2px rgba(56,17,18,.06), 0 6px 18px -10px rgba(56,17,18,.18); padding: 16px 18px; }
+  .com2-kpi-eyebrow { font: 600 10px var(--sans); letter-spacing: .18em; text-transform: uppercase; color: #8d8274; margin-bottom: 10px; }
+  .com2-kpi-value { font: 400 30px/1 var(--display); color: var(--ink); margin-bottom: 12px; }
+  .com2-kpi-value.danger { color: var(--bad); }
+  .com2-kpi-note { font: 400 11.5px var(--sans); color: var(--ink-soft); margin-top: 8px; }
+  .com2-kpi-note.positive { color: var(--ok); }
+  .com2-chart-card { display: flex; flex-direction: column; min-height: 0; padding: 20px 22px; }
+  .com2-chart-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+  .com2-chart-title { font: 600 14px var(--sans); color: var(--ink); margin-bottom: 4px; }
+  .com2-chart-subtitle { font: 400 12px var(--sans); color: var(--ink-soft); }
+  .com2-legend { display: flex; gap: 16px; font: 400 12px var(--sans); color: var(--ink-soft); }
+  .com2-legend span { display: flex; align-items: center; gap: 6px; }
+  .com2-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .com2-bars { flex: 1; min-height: 180px; display: flex; align-items: flex-end; gap: 10px; }
+  .com2-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; height: 100%; justify-content: flex-end; }
+  .com2-bar-stack { width: 100%; display: flex; flex-direction: column; justify-content: flex-end; }
+  .com2-bar-export { background: var(--wine); border-radius: 3px 3px 0 0; }
+  .com2-bar-italia { background: var(--bordeaux); }
+  .com2-bar-label { font: 400 11px var(--sans); color: #8d8274; }
+  .com2-bar-label.current { font-weight: 600; color: var(--ink); }
+  .com2-obiettivi { background: var(--bordeaux); color: #eae2ca; display: flex; flex-direction: column; }
+  .com2-card-eyebrow { font: 600 10px var(--sans); letter-spacing: .18em; text-transform: uppercase; color: #c08552; margin-bottom: 18px; }
+  .com2-obiettivo-block { margin-bottom: 18px; }
+  .com2-obiettivo-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; font: 400 13px var(--sans); color: #e3d2d2; }
+  .com2-obiettivo-row b { font: 600 12.5px var(--sans); color: #e4c4a6; }
+  .com2-obiettivo-figure { display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px; font: 400 28px/1 var(--display); }
+  .com2-obiettivo-figure span { font: 400 12px var(--sans); color: #e4c4a6; }
+  .com2-obiettivo-bar { height: 5px; border-radius: 999px; background: rgba(234,226,202,.2); overflow: hidden; }
+  .com2-obiettivo-bar-fill { height: 100%; background: #c08552; }
+  .com2-obiettivi-footer { margin-top: auto; padding-top: 18px; border-top: 1px solid rgba(234,226,202,.16); font: 400 12.5px/1.5 var(--sans); color: #e3d2d2; }
+  .com2-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .com2-card-title { font: 600 14px var(--sans); color: var(--ink); }
+  .com2-label-row { display: flex; align-items: center; gap: 11px; margin-bottom: 12px; }
+  .com2-label-row:last-child { margin-bottom: 0; }
+  .com2-label-dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
+  .com2-label-name { flex: 1; font: 400 13px var(--sans); color: #2e2925; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .com2-label-track { width: 120px; height: 4px; border-radius: 999px; background: #f2ede3; overflow: hidden; flex-shrink: 0; }
+  .com2-label-fill { display: block; height: 100%; background: var(--bordeaux); }
+  .com2-label-qty { width: 70px; text-align: right; font: 600 12.5px var(--sans); color: #2e2925; flex-shrink: 0; }
+  .com2-canale-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; font: 400 13px var(--sans); color: #2e2925; }
+  .com2-canale-row b { font: 600 12.5px var(--sans); }
+  .com2-canali-bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; margin-top: 4px; }
+  .com2-attn-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font: 400 12.5px/1.4 var(--sans); color: #2e2925; }
+  .com2-attn-row:last-child { margin-bottom: 0; }
+  .com2-attn-dot { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; }
+  @media (max-width: 1100px) {
+    .com2-grid { grid-template-columns: repeat(2, 1fr); }
+    .com2-span3 { grid-column: span 2; }
+    .com2-obiettivi { grid-column: span 2; }
+  }
+  @media (max-width: 720px) {
+    .com2-grid { grid-template-columns: 1fr; }
+    .com2-span2, .com2-span3, .com2-obiettivi { grid-column: span 1; }
+  }
+
   .crm-record-topbar { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
   .crm-record-topbar h2 { font-size: 19px; margin: 0; }
   .crm-record-tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 22px; padding-bottom: 0; }
@@ -599,6 +669,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
         Fiere
       </button>
+      <button data-sub="com-obiettivi">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
+        Obiettivi
+      </button>
     </nav>
 
     <nav class="sidebar-nav" data-workspace-nav="produzione" style="display:none">
@@ -697,20 +771,53 @@
     <!-- ═══ COMMERCIALE ═══ -->
     <div class="module active" id="module-commerciale">
       <div class="subpanel active" id="sub-com-dashboard">
-        <div class="cards" id="com-stats-cards"></div>
-        <div class="dash-two-col" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-          <div id="com-widget-revenue_by_channel">
-            <h3 style="margin-bottom:10px">Ricavo per canale</h3>
-            <div class="table-wrap"><table><thead><tr><th>Canale</th><th>Ordini</th><th>Ricavo</th></tr></thead><tbody id="com-by-channel"></tbody></table></div>
+        <div class="com2-head">
+          <div>
+            <h1>Commerciale</h1>
+            <div class="com2-subtitle" id="com2-subtitle">—</div>
           </div>
-          <div id="com-widget-revenue_by_pricelist">
-            <h3 style="margin-bottom:10px">Ricavo per listino</h3>
-            <div class="table-wrap"><table><thead><tr><th>Listino</th><th>Ordini</th><th>Ricavo</th></tr></thead><tbody id="com-by-pricelist"></tbody></table></div>
+          <div class="com2-period-seg" id="com2-period-seg">
+            <span data-periodo="mese" class="active" onclick="setComPeriodo('mese')">Mese</span>
+            <span data-periodo="trimestre" onclick="setComPeriodo('trimestre')">Trimestre</span>
+            <span data-periodo="annata" onclick="setComPeriodo('annata')">Annata</span>
           </div>
         </div>
-        <div id="com-widget-top_products">
-          <h3 style="margin:20px 0 10px">Top prodotti</h3>
-          <div class="table-wrap"><table><thead><tr><th>Prodotto</th><th>Quantità</th><th>Ricavo</th></tr></thead><tbody id="com-top-products"></tbody></table></div>
+
+        <div class="com2-grid">
+          <div class="com2-card" id="com2-kpi-fatturato"></div>
+          <div class="com2-card" id="com2-kpi-bottiglie"></div>
+          <div class="com2-card" id="com2-kpi-ordine-medio"></div>
+          <div class="com2-card" id="com2-kpi-crediti"></div>
+
+          <div class="com2-card com2-span3 com2-chart-card">
+            <div class="com2-chart-head">
+              <div><div class="com2-chart-title">Italia e export, dodici mesi</div><div class="com2-chart-subtitle">In bottiglie, per mese di consegna</div></div>
+              <div class="com2-legend"><span><i style="background:#381112"></i>Italia</span><span><i style="background:#a5623a"></i>Export</span></div>
+            </div>
+            <div class="com2-bars" id="com2-bars"></div>
+          </div>
+
+          <div class="com2-card com2-obiettivi">
+            <div class="com2-card-eyebrow">Obiettivo annata per area</div>
+            <div id="com2-obiettivi-body"></div>
+            <div class="com2-obiettivi-footer" id="com2-obiettivi-footer"></div>
+          </div>
+
+          <div class="com2-card com2-span2">
+            <div class="com2-card-head"><span class="com2-card-title">Etichette più vendute</span></div>
+            <div id="com2-top-labels"></div>
+          </div>
+
+          <div class="com2-card">
+            <div class="com2-card-title" style="margin-bottom:14px">Per canale</div>
+            <div id="com2-canali"></div>
+            <div class="com2-canali-bar" id="com2-canali-bar"></div>
+          </div>
+
+          <div class="com2-card">
+            <div class="com2-card-title" style="margin-bottom:14px">Richiede attenzione</div>
+            <div id="com2-attenzione"></div>
+          </div>
         </div>
       </div>
 
@@ -815,6 +922,40 @@
             <h2 id="fair-detail-title">—</h2>
           </div>
           <div id="fair-detail-body"></div>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-com-obiettivi">
+        <div class="box">
+          <div class="list-toolbar-title" style="margin-bottom:14px"><h3>Imposta obiettivo</h3><p>Fissa un target in bottiglie per un'area, per l'intera annata o per una singola etichetta, spalmato sui 12 mesi.</p></div>
+          <div id="target-form-msg"></div>
+          <div class="field-row">
+            <div class="field"><label>Anno</label><input type="number" id="target-year" placeholder="2026"></div>
+            <div class="field"><label>Area</label><select id="target-area"></select></div>
+            <div class="field">
+              <label>Ambito</label>
+              <select id="target-scope" onchange="onTargetScopeChange()">
+                <option value="totale">Totale (tutte le bottiglie)</option>
+                <option value="prodotto">Singola etichetta</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" id="target-product-field" style="display:none">
+            <label>Etichetta</label>
+            <select id="target-product"></select>
+          </div>
+          <button class="btn secondary small" onclick="loadTargetFormMonths()">Carica / aggiorna mesi</button>
+          <div id="target-months-grid" class="target-months-grid" style="margin-top:16px"></div>
+          <div id="target-annual-total" style="margin-top:10px;font-size:13px;color:var(--ink-soft)"></div>
+          <div style="margin-top:16px;display:flex;gap:10px">
+            <button class="btn" onclick="saveTargetSet()">Salva obiettivo</button>
+            <button class="btn-outline-pill danger" onclick="deleteTargetSet()">Elimina questo obiettivo</button>
+          </div>
+        </div>
+
+        <div class="box">
+          <div class="list-toolbar-title" style="margin-bottom:14px"><h3>Obiettivi impostati</h3><p id="target-list-year-label"></p></div>
+          <div class="table-wrap"><table><thead><tr><th>Area</th><th>Ambito</th><th>Totale anno</th><th></th></tr></thead><tbody id="target-sets-tbody"></tbody></table></div>
         </div>
       </div>
     </div>
@@ -1105,6 +1246,13 @@
             <p style="margin:0 0 14px;font-size:11.5px;color:var(--ink-soft)">Oltre la soglia "semi attivo" un cliente è considerato inattivo. Vale per CRM → Clienti e la scheda "Clienti seguiti" di ogni agente.</p>
             <button class="btn" onclick="saveRules()">Salva regole</button>
           </div>
+
+          <div class="box" style="max-width:640px">
+            <h3>Aree commerciali</h3>
+            <p style="margin:0 0 14px;font-size:12.5px;color:var(--ink-soft)">Le aree usate per gli obiettivi annui in Commerciale → Obiettivi. Ogni area raggruppa uno o più paesi: un ordine conta per un'area se il paese del cliente è nell'elenco.</p>
+            <div id="target-areas-list" style="margin-bottom:14px"></div>
+            <button class="btn secondary small" onclick="openTargetAreaModal()">+ Nuova area</button>
+          </div>
         </div>
 
         <div class="settings-panel" id="settings-panel-dashboard-widgets">
@@ -1196,11 +1344,36 @@
       <div class="field"><label>Annata</label><input id="prod-vintage"></div>
       <div class="field"><label>Vitigno</label><input id="prod-varietal"></div>
     </div>
+    <div class="field">
+      <label>Tipologia</label>
+      <select id="prod-wine-type">
+        <option value="">— Non specificata —</option>
+        <option value="rosso">Rosso</option>
+        <option value="bianco">Bianco</option>
+        <option value="rosato">Rosato</option>
+        <option value="spumante">Spumante</option>
+      </select>
+    </div>
     <div class="field"><label>Descrizione</label><textarea id="prod-description" rows="3"></textarea></div>
     <div class="field"><label>Foto bottiglia</label><input type="file" id="prod-image" accept="image/*"></div>
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('product-modal')">Annulla</button>
       <button class="btn" onclick="saveProduct()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Target area modal -->
+<div class="modal-overlay" id="target-area-modal">
+  <div class="modal-box">
+    <h3 id="target-area-modal-title">Nuova area</h3>
+    <div id="target-area-modal-msg"></div>
+    <input type="hidden" id="ta-id">
+    <div class="field"><label>Nome area</label><input id="ta-name" placeholder="es. Italia, CE, Extra CE, Nord America..."></div>
+    <div class="field"><label>Paesi inclusi</label><textarea id="ta-countries" rows="3" placeholder="Un paese per riga o separati da virgola, es. Germania, Francia, Spagna"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('target-area-modal')">Annulla</button>
+      <button class="btn" onclick="saveTargetArea()">Salva</button>
     </div>
   </div>
 </div>
@@ -2124,6 +2297,7 @@ function openSettings() {
   loadAgentCredentials();
   loadRolesMatrix();
   loadDashboardWidgetsConfig();
+  loadTargetAreas();
   closeMobileSidebar();
 }
 
@@ -2193,6 +2367,7 @@ function loadSubpanel(sub) {
   if (sub === 'com-news') loadNews();
   if (sub === 'com-catalogo') loadCatalogs();
   if (sub === 'com-fiere') loadFairs();
+  if (sub === 'com-obiettivi') loadObiettiviPanel();
   if (sub === 'prod-dashboard') loadProduzioneDashboard();
   if (sub === 'prod-riepilogo') loadProductionSummary();
   if (sub === 'prod-clienti') loadProductionSummary();
@@ -2216,29 +2391,192 @@ function isWidgetOn(catalog, workspace, key) {
   return w ? w.enabled : true;
 }
 
-// ── COMMERCIALE: dashboard ─────────────────────────────────────────────────────
+// ── COMMERCIALE: dashboard (MyWinery design system) ─────────────────────────────
+const WINE_TYPE_COLORS = { rosso: '#5c1a24', bianco: '#cbb46b', rosato: '#c98a86', spumante: '#b9a15e' };
+const COM_ATTN_COLORS = { danger: '#a12f21', warning: '#b0741c', neutro: '#6b6157' };
+const COM_PERIODO_LABELS = { mese: 'mese', trimestre: 'trimestre', annata: 'annata' };
+
+function setComPeriodo(p) {
+  localStorage.setItem('com_periodo', p);
+  document.querySelectorAll('#com2-period-seg span').forEach(s => s.classList.toggle('active', s.dataset.periodo === p));
+  loadDashboard();
+}
+
+function sparklineSvg(values, color) {
+  if (!values.length) return '';
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = max - min || 1;
+  const pts = values.map((v, i) => {
+    const x = 2 + (i / (values.length - 1)) * 116;
+    const y = 27 - ((v - min) / range) * 24;
+    return `${x.toFixed(1)} ${y.toFixed(1)}`;
+  });
+  return `<svg viewBox="0 0 120 30" style="width:100%;height:30px;display:block" preserveAspectRatio="none"><path d="M${pts.join(' L')}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
 async function loadDashboard() {
-  const [catalog, s] = await Promise.all([getDashboardWidgets(), api('/api/admin/commercial/stats')]);
-  const on = k => isWidgetOn(catalog, 'commerciale', k);
-  const cards = [];
-  if (on('orders_total')) cards.push(`<div class="card"><div class="label">Ordini totali</div><div class="value">${s.totals.orders}</div></div>`);
-  if (on('revenue_total')) cards.push(`<div class="card"><div class="label">Ricavo totale</div><div class="value">€ ${fmtEuro(s.totals.revenue_cents)}</div></div>`);
-  document.getElementById('com-stats-cards').innerHTML = cards.join('');
+  const periodo = localStorage.getItem('com_periodo') || 'mese';
+  document.querySelectorAll('#com2-period-seg span').forEach(s => s.classList.toggle('active', s.dataset.periodo === periodo));
+  const s = await api('/api/admin/commercial/dashboard?periodo=' + periodo);
 
-  document.getElementById('com-widget-revenue_by_channel').style.display = on('revenue_by_channel') ? 'block' : 'none';
-  document.getElementById('com-by-channel').innerHTML = s.byChannel.length ? s.byChannel.map(c => `
-    <tr><td>${esc(c.channel)}</td><td>${c.orders}</td><td>€ ${fmtEuro(c.revenue_cents)}</td></tr>`).join('')
-    : '<tr><td colspan="3" class="empty">Nessun dato.</td></tr>';
+  const now = new Date();
+  document.getElementById('com2-subtitle').textContent =
+    `${now.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })} · ${COM_PERIODO_LABELS[periodo]} in corso · aggiornato alle ${new Date(s.aggiornatoAlle).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
 
-  document.getElementById('com-widget-revenue_by_pricelist').style.display = on('revenue_by_pricelist') ? 'block' : 'none';
-  document.getElementById('com-by-pricelist').innerHTML = s.byPriceList.length ? s.byPriceList.map(c => `
-    <tr><td>${esc(c.price_list)}</td><td>${c.orders}</td><td>€ ${fmtEuro(c.revenue_cents)}</td></tr>`).join('')
-    : '<tr><td colspan="3" class="empty">Nessun dato.</td></tr>';
+  const k = s.kpi;
+  document.getElementById('com2-kpi-fatturato').innerHTML = `
+    <div class="com2-kpi-eyebrow">Fatturato</div>
+    <div class="com2-kpi-value">€ ${fmtEuro(k.fatturato_cents)}</div>
+    ${sparklineSvg(k.fatturato_spark, '#a5623a')}
+    <div class="com2-kpi-note">${k.numero_ordini} ${k.numero_ordini === 1 ? 'ordine nel periodo' : 'ordini nel periodo'}</div>`;
+  document.getElementById('com2-kpi-bottiglie').innerHTML = `
+    <div class="com2-kpi-eyebrow">Bottiglie evase</div>
+    <div class="com2-kpi-value">${k.bottiglie_evase.toLocaleString('it-IT')}</div>
+    ${sparklineSvg(k.bottiglie_spark, '#a5623a')}
+    <div class="com2-kpi-note">su ${k.bottiglie_pianificate.toLocaleString('it-IT')} pianificate</div>`;
+  document.getElementById('com2-kpi-ordine-medio').innerHTML = `
+    <div class="com2-kpi-eyebrow">Ordine medio</div>
+    <div class="com2-kpi-value">€ ${fmtEuro(k.ordine_medio_cents)}</div>
+    ${sparklineSvg(k.ordine_medio_spark, '#a5623a')}
+    <div class="com2-kpi-note">${k.numero_ordini} ${k.numero_ordini === 1 ? 'ordine nel periodo' : 'ordini nel periodo'}</div>`;
+  document.getElementById('com2-kpi-crediti').innerHTML = `
+    <div class="com2-kpi-eyebrow">Crediti scaduti</div>
+    <div class="com2-kpi-value danger">€ ${fmtEuro(k.crediti_scaduti_cents)}</div>
+    ${sparklineSvg(k.crediti_scaduti_spark, '#a12f21')}
+    <div class="com2-kpi-note">${k.crediti_scaduti_clienti} ${k.crediti_scaduti_clienti === 1 ? 'cliente' : 'clienti'}</div>`;
 
-  document.getElementById('com-widget-top_products').style.display = on('top_products') ? 'block' : 'none';
-  document.getElementById('com-top-products').innerHTML = s.topProducts.length ? s.topProducts.map(p => `
-    <tr><td>${esc(p.product_name)}</td><td>${p.quantity}</td><td>€ ${fmtEuro(p.revenue_cents)}</td></tr>`).join('')
-    : '<tr><td colspan="3" class="empty">Nessun dato.</td></tr>';
+  const maxBar = Math.max(1, ...s.serieMensile.map(m => m.bottiglieItalia + m.bottiglieExport));
+  const currentMonthLabel = now.toLocaleDateString('it-IT', { month: 'short' }).replace('.', '');
+  document.getElementById('com2-bars').innerHTML = s.serieMensile.map(m => {
+    const total = m.bottiglieItalia + m.bottiglieExport;
+    const heightPct = (total / maxBar) * 100;
+    const exportPct = total ? (m.bottiglieExport / total) * 100 : 0;
+    const italiaPct = total ? 100 - exportPct : 0;
+    const isCurrent = m.mese === currentMonthLabel;
+    return `
+      <div class="com2-bar-col">
+        <div class="com2-bar-stack" style="height:${heightPct}%">
+          <div class="com2-bar-export" style="height:${exportPct}%"></div>
+          <div class="com2-bar-italia" style="height:${italiaPct}%"></div>
+        </div>
+        <span class="com2-bar-label${isCurrent ? ' current' : ''}">${esc(m.mese)}</span>
+      </div>`;
+  }).join('');
+
+  const o = s.obiettivi;
+  document.getElementById('com2-obiettivi-body').innerHTML = o.aree.length ? o.aree.map(a => `
+    <div class="com2-obiettivo-block">
+      <div class="com2-obiettivo-row"><span>${esc(a.area)}</span><b>${a.pct}%</b></div>
+      <div class="com2-obiettivo-figure">${a.consegnate.toLocaleString('it-IT')}<span>di ${a.target.toLocaleString('it-IT')} bt</span></div>
+      <div class="com2-obiettivo-bar"><div class="com2-obiettivo-bar-fill" style="width:${Math.min(100, a.pct)}%"></div></div>
+    </div>`).join('') : '<p style="font-size:12.5px;color:#c08552">Nessuna area configurata. Impostale da Impostazioni → Regole.</p>';
+  document.getElementById('com2-obiettivi-footer').textContent = o.totaleRestante > 0
+    ? `Restano ${o.totaleRestante.toLocaleString('it-IT')} bt da consegnare in ${o.mesiRestanti} ${o.mesiRestanti === 1 ? 'mese' : 'mesi'}`
+    : (o.aree.some(a => a.target > 0) ? 'Obiettivi raggiunti per tutte le aree.' : 'Nessun obiettivo impostato per quest\'anno.');
+
+  document.getElementById('com2-top-labels').innerHTML = s.topEtichette.length ? s.topEtichette.map(t => `
+    <div class="com2-label-row">
+      <span class="com2-label-dot" style="background:${WINE_TYPE_COLORS[t.tipologia] || '#8d8274'}"></span>
+      <span class="com2-label-name">${esc(t.nome)}</span>
+      <span class="com2-label-track"><span class="com2-label-fill" style="width:${t.pct}%"></span></span>
+      <span class="com2-label-qty">${t.bottiglie.toLocaleString('it-IT')} bt</span>
+    </div>`).join('') : '<p class="crm2-empty">Nessun dato per questo periodo.</p>';
+
+  const totaleCanali = s.canali.reduce((sum, c) => sum + c.fatturato, 0) || 1;
+  document.getElementById('com2-canali').innerHTML = s.canali.length ? s.canali.map(c => `
+    <div class="com2-canale-row"><span>${esc(c.nome)}</span><b>€ ${fmtEuro(c.fatturato)}</b></div>`).join('')
+    : '<p class="crm2-empty">Nessun dato per questo periodo.</p>';
+  const canaleColors = ['#381112', '#a5623a', '#c08552', '#8d8274', '#d3cabb'];
+  document.getElementById('com2-canali-bar').innerHTML = s.canali.map((c, i) =>
+    `<div style="width:${(c.fatturato / totaleCanali) * 100}%;background:${canaleColors[i % canaleColors.length]}"></div>`).join('');
+
+  document.getElementById('com2-attenzione').innerHTML = s.attenzione.length ? s.attenzione.map(a => `
+    <div class="com2-attn-row"><span class="com2-attn-dot" style="background:${COM_ATTN_COLORS[a.gravita] || COM_ATTN_COLORS.neutro}"></span><span>${esc(a.testo)}</span></div>`).join('')
+    : '<p style="font-size:12.5px;color:#8d8274">Nessuna azione in sospeso.</p>';
+}
+
+// ── COMMERCIALE: obiettivi annui per area ───────────────────────────────────────
+const MONTH_LABELS = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+async function loadObiettiviPanel() {
+  document.getElementById('target-year').value = document.getElementById('target-year').value || new Date().getFullYear();
+  const areas = await api('/api/admin/sales-target-areas');
+  document.getElementById('target-area').innerHTML = areas.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('') || '<option value="">Nessuna area — creane una da Impostazioni → Regole</option>';
+  if (!PRODUCTS.length) PRODUCTS = await api('/api/admin/products');
+  document.getElementById('target-product').innerHTML = PRODUCTS.map(p => `<option value="${p.id}">${esc(p.name)}${p.vintage ? ' ' + esc(p.vintage) : ''}</option>`).join('');
+  renderTargetMonthsGrid(Array(12).fill(0));
+  loadTargetSetsTable();
+}
+function onTargetScopeChange() {
+  document.getElementById('target-product-field').style.display = document.getElementById('target-scope').value === 'prodotto' ? 'block' : 'none';
+}
+function renderTargetMonthsGrid(months) {
+  document.getElementById('target-months-grid').innerHTML = MONTH_LABELS.map((label, i) => `
+    <div class="target-month-field">
+      <label>${label}</label>
+      <input type="number" min="0" step="1" value="${months[i] || 0}" oninput="updateTargetAnnualTotal()" class="target-month-input">
+    </div>
+  `).join('');
+  updateTargetAnnualTotal();
+}
+function updateTargetAnnualTotal() {
+  const total = [...document.querySelectorAll('.target-month-input')].reduce((s, el) => s + (parseInt(el.value) || 0), 0);
+  document.getElementById('target-annual-total').textContent = `Totale annuo: ${total.toLocaleString('it-IT')} bt`;
+}
+async function loadTargetFormMonths() {
+  const year = document.getElementById('target-year').value;
+  const areaId = document.getElementById('target-area').value;
+  if (!year || !areaId) return;
+  const productId = document.getElementById('target-scope').value === 'prodotto' ? document.getElementById('target-product').value : 0;
+  const res = await api(`/api/admin/sales-targets?year=${year}&area_id=${areaId}&product_id=${productId}`);
+  renderTargetMonthsGrid(res.months);
+}
+async function saveTargetSet() {
+  const msg = document.getElementById('target-form-msg');
+  const year = document.getElementById('target-year').value;
+  const areaId = document.getElementById('target-area').value;
+  if (!year || !areaId) { msg.innerHTML = '<div class="msg error">Seleziona anno e area.</div>'; return; }
+  const productId = document.getElementById('target-scope').value === 'prodotto' ? document.getElementById('target-product').value : 0;
+  const months = [...document.querySelectorAll('.target-month-input')].map(el => parseInt(el.value) || 0);
+  try {
+    await api('/api/admin/sales-targets', { method: 'POST', body: JSON.stringify({ year: parseInt(year), area_id: parseInt(areaId), product_id: parseInt(productId), months }) });
+    msg.innerHTML = '<div class="msg success">Obiettivo salvato.</div>';
+    loadTargetSetsTable();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+async function deleteTargetSet() {
+  const year = document.getElementById('target-year').value;
+  const areaId = document.getElementById('target-area').value;
+  if (!year || !areaId) return;
+  const productId = document.getElementById('target-scope').value === 'prodotto' ? document.getElementById('target-product').value : 0;
+  if (!confirm('Eliminare questo obiettivo?')) return;
+  await api(`/api/admin/sales-targets?year=${year}&area_id=${areaId}&product_id=${productId}`, { method: 'DELETE' });
+  renderTargetMonthsGrid(Array(12).fill(0));
+  loadTargetSetsTable();
+}
+async function loadTargetSetsTable() {
+  const year = document.getElementById('target-year').value || new Date().getFullYear();
+  document.getElementById('target-list-year-label').textContent = `Anno ${year}`;
+  const rows = await api(`/api/admin/sales-targets/list?year=${year}`);
+  document.getElementById('target-sets-tbody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td>${esc(r.area_name)}</td>
+      <td>${esc(r.product_name)}</td>
+      <td>${r.total_bottles.toLocaleString('it-IT')} bt</td>
+      <td>
+        <button class="btn-outline-pill" onclick="editTargetSet(${r.area_id}, ${r.product_id})">Modifica</button>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="4" class="empty">Nessun obiettivo impostato per questo anno.</td></tr>';
+}
+async function editTargetSet(areaId, productId) {
+  document.getElementById('target-area').value = areaId;
+  document.getElementById('target-scope').value = productId ? 'prodotto' : 'totale';
+  onTargetScopeChange();
+  if (productId) document.getElementById('target-product').value = productId;
+  await loadTargetFormMonths();
+  document.getElementById('target-months-grid').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ── CRM: dashboard ─────────────────────────────────────────────────────────────
@@ -2388,6 +2726,7 @@ function openProductModal(p) {
   document.getElementById('prod-name').value = p ? p.name : '';
   document.getElementById('prod-vintage').value = p ? (p.vintage || '') : '';
   document.getElementById('prod-varietal').value = p ? (p.varietal || '') : '';
+  document.getElementById('prod-wine-type').value = p ? (p.wine_type || '') : '';
   document.getElementById('prod-description').value = p ? (p.description || '') : '';
   document.getElementById('prod-image').value = '';
   openModal('product-modal');
@@ -2400,6 +2739,7 @@ async function saveProduct() {
   fd.append('name', document.getElementById('prod-name').value.trim());
   fd.append('vintage', document.getElementById('prod-vintage').value.trim());
   fd.append('varietal', document.getElementById('prod-varietal').value.trim());
+  fd.append('wine_type', document.getElementById('prod-wine-type').value);
   fd.append('description', document.getElementById('prod-description').value.trim());
   const imageFile = document.getElementById('prod-image').files[0];
   if (imageFile) fd.append('image', imageFile);
@@ -4222,6 +4562,54 @@ async function saveRules() {
   } catch (e) {
     msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
   }
+}
+
+// ── IMPOSTAZIONI: aree commerciali (usate per gli obiettivi) ────────────────────
+let TARGET_AREAS_CACHE = [];
+async function loadTargetAreas() {
+  TARGET_AREAS_CACHE = await api('/api/admin/sales-target-areas');
+  document.getElementById('target-areas-list').innerHTML = TARGET_AREAS_CACHE.length ? TARGET_AREAS_CACHE.map(a => `
+    <div class="list-row">
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(a.name)}</div>
+        <div class="list-row-sub">${a.countries.length ? a.countries.map(esc).join(', ') : 'nessun paese associato'}</div>
+      </div>
+      <div class="list-row-meta">
+        <button class="btn-outline-pill" onclick='openTargetAreaModal(${jsonAttrP(a)})'>Modifica</button>
+        <button class="btn-outline-pill danger" onclick="deleteTargetArea(${a.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<p class="crm-tc-empty">Nessuna area. Creane una.</p>';
+}
+function openTargetAreaModal(a) {
+  document.getElementById('target-area-modal-msg').innerHTML = '';
+  document.getElementById('target-area-modal-title').textContent = a ? 'Modifica area' : 'Nuova area';
+  document.getElementById('ta-id').value = a ? a.id : '';
+  document.getElementById('ta-name').value = a ? a.name : '';
+  document.getElementById('ta-countries').value = a ? a.countries.join(', ') : '';
+  openModal('target-area-modal');
+}
+async function saveTargetArea() {
+  const id = document.getElementById('ta-id').value;
+  const msg = document.getElementById('target-area-modal-msg');
+  const name = document.getElementById('ta-name').value.trim();
+  if (!name) { msg.innerHTML = '<div class="msg error">Il nome è obbligatorio.</div>'; return; }
+  const countries = document.getElementById('ta-countries').value.split(/[,\n]/).map(c => c.trim()).filter(Boolean);
+  try {
+    if (id) await api('/api/admin/sales-target-areas/' + id, { method: 'PATCH', body: JSON.stringify({ name, countries }) });
+    else await api('/api/admin/sales-target-areas', { method: 'POST', body: JSON.stringify({ name, countries }) });
+    closeModal('target-area-modal');
+    loadTargetAreas();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+async function deleteTargetArea(id) {
+  if (!confirm('Eliminare questa area? Verranno eliminati anche gli obiettivi associati.')) return;
+  await api('/api/admin/sales-target-areas/' + id, { method: 'DELETE' });
+  loadTargetAreas();
 }
 
 // ── IMPOSTAZIONI: utenti del portale ────────────────────────────────────────────

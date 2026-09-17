@@ -294,6 +294,7 @@ db.exec(`
     created_at  TEXT DEFAULT (datetime('now','localtime'))
   )
 `);
+try { db.exec('ALTER TABLE products ADD COLUMN wine_type TEXT'); } catch {}
 
 // ── ERP: listini ──────────────────────────────────────────────────────────────
 db.exec(`
@@ -708,6 +709,39 @@ db.exec(`
     updated_at      TEXT DEFAULT (datetime('now','localtime'))
   )
 `);
+
+// ── Commerciale: obiettivi annui per area (configurabile da Impostazioni → Regole) ──
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sales_target_areas (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL UNIQUE,
+    countries  TEXT NOT NULL DEFAULT '[]',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    active     INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+// Un obiettivo per (anno, area, prodotto, mese). product_id = 0 significa "totale" (tutte le bottiglie),
+// non un vero prodotto — evita gli NULL, che SQLite non considera uguali in un vincolo UNIQUE.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sales_targets (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    year           INTEGER NOT NULL,
+    area_id        INTEGER NOT NULL,
+    product_id     INTEGER NOT NULL DEFAULT 0,
+    month          INTEGER NOT NULL,
+    target_bottles INTEGER NOT NULL DEFAULT 0,
+    created_at     TEXT DEFAULT (datetime('now','localtime')),
+    UNIQUE(year, area_id, product_id, month),
+    FOREIGN KEY (area_id) REFERENCES sales_target_areas(id)
+  )
+`);
+if (db.prepare('SELECT COUNT(*) AS c FROM sales_target_areas').get().c === 0) {
+  const insertArea = db.prepare('INSERT INTO sales_target_areas (name, countries, sort_order) VALUES (?, ?, ?)');
+  insertArea.run('Italia', JSON.stringify(['Italia']), 1);
+  insertArea.run('CE', JSON.stringify(['Germania', 'Francia', 'Spagna', 'Belgio', 'Olanda', 'Austria']), 2);
+  insertArea.run('Extra CE', JSON.stringify(['Stati Uniti', 'Regno Unito', 'Svizzera', 'Giappone', 'Canada']), 3);
+}
 
 // Seed a couple of demo experiences on first run
 const expCount = db.prepare('SELECT COUNT(*) AS c FROM experiences').get().c;
@@ -1912,14 +1946,14 @@ app.get('/api/admin/products', authAdmin, (req, res) => {
 });
 
 app.post('/api/admin/products', authAdmin, upload.single('image'), (req, res) => {
-  const { sku, name, vintage, varietal, description } = req.body || {};
+  const { sku, name, vintage, varietal, description, wine_type } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'Il nome della bottiglia è obbligatorio.' });
   const image_url = req.file ? `/uploads/products/${req.file.filename}` : null;
   try {
     const result = db.prepare(`
-      INSERT INTO products (sku, name, vintage, varietal, description, image_url)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(sku?.trim() || null, name.trim(), vintage?.trim() || null, varietal?.trim() || null, description?.trim() || null, image_url);
+      INSERT INTO products (sku, name, vintage, varietal, description, image_url, wine_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(sku?.trim() || null, name.trim(), vintage?.trim() || null, varietal?.trim() || null, description?.trim() || null, image_url, wine_type || null);
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (e) {
     res.status(409).json({ error: 'SKU già esistente.' });
@@ -1927,7 +1961,7 @@ app.post('/api/admin/products', authAdmin, upload.single('image'), (req, res) =>
 });
 
 app.patch('/api/admin/products/:id', authAdmin, upload.single('image'), (req, res) => {
-  const fields = ['sku', 'name', 'vintage', 'varietal', 'description', 'active'];
+  const fields = ['sku', 'name', 'vintage', 'varietal', 'description', 'active', 'wine_type'];
   const updates = [], params = [];
   for (const f of fields) {
     if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }
@@ -2117,6 +2151,234 @@ app.post('/api/admin/orders/import', authAdmin, excelUpload.single('file'), (req
   }
 
   res.json({ success: true, orders_created: created, rows_processed: rows.length });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Commerciale: aree di interesse (configurabili da Impostazioni → Regole) e obiettivi
+// ══════════════════════════════════════════════════════════════════════════════
+app.get('/api/admin/sales-target-areas', authAdmin, (req, res) => {
+  const rows = db.prepare('SELECT * FROM sales_target_areas ORDER BY sort_order, name').all();
+  res.json(rows.map(r => ({ ...r, countries: JSON.parse(r.countries || '[]') })));
+});
+app.post('/api/admin/sales-target-areas', authAdmin, (req, res) => {
+  const { name, countries, sort_order } = req.body || {};
+  if (!name?.trim()) return res.status(400).json({ error: 'Il nome dell\'area è obbligatorio.' });
+  try {
+    const result = db.prepare('INSERT INTO sales_target_areas (name, countries, sort_order) VALUES (?, ?, ?)')
+      .run(name.trim(), JSON.stringify(Array.isArray(countries) ? countries : []), sort_order || 0);
+    res.json({ success: true, id: result.lastInsertRowid });
+  } catch (e) {
+    res.status(409).json({ error: 'Esiste già un\'area con questo nome.' });
+  }
+});
+app.patch('/api/admin/sales-target-areas/:id', authAdmin, (req, res) => {
+  const { name, countries, sort_order, active } = req.body || {};
+  const updates = [], params = [];
+  if (name !== undefined) { updates.push('name = ?'); params.push(name.trim()); }
+  if (countries !== undefined) { updates.push('countries = ?'); params.push(JSON.stringify(Array.isArray(countries) ? countries : [])); }
+  if (sort_order !== undefined) { updates.push('sort_order = ?'); params.push(sort_order); }
+  if (active !== undefined) { updates.push('active = ?'); params.push(active ? 1 : 0); }
+  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  params.push(req.params.id);
+  db.prepare(`UPDATE sales_target_areas SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  res.json({ success: true });
+});
+app.delete('/api/admin/sales-target-areas/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM sales_targets WHERE area_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM sales_target_areas WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// Obiettivi: un set = (anno, area, prodotto) con 12 valori mensili. product_id 0 = totale.
+app.get('/api/admin/sales-targets', authAdmin, (req, res) => {
+  const { year, area_id, product_id } = req.query;
+  if (!year || !area_id) return res.status(400).json({ error: 'year e area_id sono obbligatori.' });
+  const pid = product_id ? parseInt(product_id) : 0;
+  const rows = db.prepare('SELECT month, target_bottles FROM sales_targets WHERE year = ? AND area_id = ? AND product_id = ?').all(year, area_id, pid);
+  const months = Array(12).fill(0);
+  rows.forEach(r => { months[r.month - 1] = r.target_bottles; });
+  res.json({ months });
+});
+
+app.get('/api/admin/sales-targets/list', authAdmin, (req, res) => {
+  const year = req.query.year || new Date().getFullYear();
+  const rows = db.prepare(`
+    SELECT st.area_id, a.name AS area_name, st.product_id, COALESCE(p.name, 'Totale') AS product_name,
+      SUM(st.target_bottles) AS total_bottles
+    FROM sales_targets st
+    JOIN sales_target_areas a ON a.id = st.area_id
+    LEFT JOIN products p ON p.id = st.product_id AND st.product_id != 0
+    WHERE st.year = ?
+    GROUP BY st.area_id, st.product_id
+    ORDER BY a.sort_order, st.product_id
+  `).all(year);
+  res.json(rows);
+});
+
+app.post('/api/admin/sales-targets', authAdmin, (req, res) => {
+  const { year, area_id, product_id, months } = req.body || {};
+  if (!year || !area_id || !Array.isArray(months) || months.length !== 12) {
+    return res.status(400).json({ error: 'year, area_id e 12 valori mensili sono obbligatori.' });
+  }
+  const pid = product_id || 0;
+  const upsert = db.prepare(`
+    INSERT INTO sales_targets (year, area_id, product_id, month, target_bottles) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(year, area_id, product_id, month) DO UPDATE SET target_bottles = excluded.target_bottles
+  `);
+  months.forEach((v, i) => upsert.run(year, area_id, pid, i + 1, v || 0));
+  res.json({ success: true });
+});
+
+app.delete('/api/admin/sales-targets', authAdmin, (req, res) => {
+  const { year, area_id, product_id } = req.query;
+  if (!year || !area_id) return res.status(400).json({ error: 'year e area_id sono obbligatori.' });
+  const pid = product_id ? parseInt(product_id) : 0;
+  db.prepare('DELETE FROM sales_targets WHERE year = ? AND area_id = ? AND product_id = ?').run(year, area_id, pid);
+  res.json({ success: true });
+});
+
+function periodRange(periodo) {
+  const now = new Date();
+  let start;
+  if (periodo === 'trimestre') { const q = Math.floor(now.getMonth() / 3); start = new Date(now.getFullYear(), q * 3, 1); }
+  else if (periodo === 'annata') { start = new Date(now.getFullYear(), 0, 1); }
+  else { start = new Date(now.getFullYear(), now.getMonth(), 1); }
+  return { start: start.toISOString().slice(0, 10), end: now.toISOString().slice(0, 10) };
+}
+
+function trailingMonths(n) {
+  const now = new Date();
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const endD = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+    out.push({ start: d.toISOString().slice(0, 10), end: endD.toISOString().slice(0, 10), label: d.toLocaleDateString('it-IT', { month: 'short' }).replace('.', '') });
+  }
+  return out;
+}
+
+app.get('/api/admin/commercial/dashboard', authAdmin, (req, res) => {
+  const periodo = ['mese', 'trimestre', 'annata'].includes(req.query.periodo) ? req.query.periodo : 'mese';
+  const { start, end } = periodRange(periodo);
+  const today = new Date().toISOString().slice(0, 10);
+  const year = new Date().getFullYear();
+
+  // KPI del periodo + sparkline (8 mesi trascorsi, indipendente dal periodo selezionato)
+  const months8 = trailingMonths(8);
+  const revenueInRange = (s, e) => db.prepare('SELECT COALESCE(SUM(total_cents),0) AS c, COUNT(*) AS n FROM orders WHERE order_date >= ? AND order_date < ?').get(s, e);
+  const bottlesShippedInRange = (s, e) => db.prepare(`
+    SELECT COALESCE(SUM(oi.quantity),0) AS q FROM order_items oi JOIN orders o ON o.id = oi.order_id
+    WHERE oi.production_status = 'completato' AND o.order_date >= ? AND o.order_date < ?
+  `).get(s, e).q;
+  const bottlesPlannedInRange = (s, e) => db.prepare(`
+    SELECT COALESCE(SUM(oi.quantity),0) AS q FROM order_items oi JOIN orders o ON o.id = oi.order_id
+    WHERE o.order_date >= ? AND o.order_date < ?
+  `).get(s, e).q;
+  const overdueCreditsInRange = (s, e) => db.prepare(`
+    SELECT COALESCE(SUM(total_cents),0) AS c, COUNT(DISTINCT customer_id) AS n FROM orders
+    WHERE payment_status != 'pagato' AND payment_due_date >= ? AND payment_due_date < ? AND payment_due_date < ?
+  `).get(s, e, today);
+
+  const endExclusive = new Date(new Date(end).getTime() + 86400000).toISOString().slice(0, 10);
+  const revenueNow = revenueInRange(start, endExclusive);
+  const bottlesEvase = bottlesShippedInRange(start, endExclusive);
+  const bottlesPianificate = bottlesPlannedInRange(start, endExclusive);
+  const overdueNow = db.prepare(`
+    SELECT COALESCE(SUM(total_cents),0) AS c, COUNT(DISTINCT customer_id) AS n FROM orders
+    WHERE payment_status != 'pagato' AND payment_due_date IS NOT NULL AND payment_due_date < ?
+  `).get(today);
+
+  const kpi = {
+    fatturato_cents: revenueNow.c,
+    fatturato_spark: months8.map(m => revenueInRange(m.start, m.end).c),
+    bottiglie_evase: bottlesEvase,
+    bottiglie_pianificate: bottlesPianificate,
+    bottiglie_spark: months8.map(m => bottlesShippedInRange(m.start, m.end)),
+    ordine_medio_cents: revenueNow.n ? Math.round(revenueNow.c / revenueNow.n) : 0,
+    numero_ordini: revenueNow.n,
+    ordine_medio_spark: months8.map(m => { const r = revenueInRange(m.start, m.end); return r.n ? Math.round(r.c / r.n) : 0; }),
+    crediti_scaduti_cents: overdueNow.c,
+    crediti_scaduti_clienti: overdueNow.n,
+    crediti_scaduti_spark: months8.map(m => overdueCreditsInRange(m.start, m.end).c),
+  };
+
+  // Serie mensile Italia/Export (12 mesi)
+  const months12 = trailingMonths(12);
+  const serieMensile = months12.map(m => {
+    const italia = db.prepare(`
+      SELECT COALESCE(SUM(oi.quantity),0) AS q FROM order_items oi JOIN orders o ON o.id = oi.order_id
+      WHERE o.order_date >= ? AND o.order_date < ? AND (o.customer_country = 'Italia' OR o.customer_country IS NULL OR o.customer_country = '')
+    `).get(m.start, m.end).q;
+    const exportQ = db.prepare(`
+      SELECT COALESCE(SUM(oi.quantity),0) AS q FROM order_items oi JOIN orders o ON o.id = oi.order_id
+      WHERE o.order_date >= ? AND o.order_date < ? AND o.customer_country IS NOT NULL AND o.customer_country != '' AND o.customer_country != 'Italia'
+    `).get(m.start, m.end).q;
+    return { mese: m.label, bottiglieItalia: italia, bottiglieExport: exportQ };
+  });
+
+  // Obiettivi annata per area (sempre sull'anno corrente, indipendente dal periodo selezionato)
+  const areas = db.prepare('SELECT * FROM sales_target_areas WHERE active = 1 ORDER BY sort_order, name').all();
+  const yearStart = `${year}-01-01`;
+  const yearEndExclusive = today;
+  let totalRemaining = 0;
+  const obiettivi = areas.map(a => {
+    const countries = JSON.parse(a.countries || '[]');
+    let consegnate = 0;
+    if (countries.length) {
+      const placeholders = countries.map(() => '?').join(',');
+      consegnate = db.prepare(`
+        SELECT COALESCE(SUM(oi.quantity),0) AS q FROM order_items oi JOIN orders o ON o.id = oi.order_id
+        WHERE o.order_date >= ? AND o.order_date <= ? AND o.customer_country IN (${placeholders})
+      `).get(yearStart, yearEndExclusive, ...countries).q;
+    }
+    const target = db.prepare('SELECT COALESCE(SUM(target_bottles),0) AS t FROM sales_targets WHERE year = ? AND area_id = ? AND product_id = 0').get(year, a.id).t;
+    if (target > consegnate) totalRemaining += (target - consegnate);
+    return { area: a.name, consegnate, target, pct: target ? Math.round((consegnate / target) * 100) : 0 };
+  });
+  const monthsRemaining = 12 - new Date().getMonth() - 1;
+
+  // Etichette più vendute (periodo selezionato)
+  const topEtichette = db.prepare(`
+    SELECT COALESCE(p.name, oi.product_name_raw) AS nome, p.wine_type AS tipologia, SUM(oi.quantity) AS bottiglie
+    FROM order_items oi JOIN orders o ON o.id = oi.order_id LEFT JOIN products p ON p.id = oi.product_id
+    WHERE o.order_date >= ? AND o.order_date < ?
+    GROUP BY COALESCE(p.id, oi.product_name_raw) ORDER BY bottiglie DESC LIMIT 4
+  `).all(start, endExclusive);
+  const maxBottiglie = topEtichette.length ? topEtichette[0].bottiglie : 1;
+
+  // Per canale (periodo selezionato)
+  const canali = db.prepare(`
+    SELECT COALESCE(NULLIF(channel,''),'Non specificato') AS nome, COALESCE(SUM(total_cents),0) AS fatturato
+    FROM orders WHERE order_date >= ? AND order_date < ? GROUP BY channel ORDER BY fatturato DESC
+  `).all(start, endExclusive);
+
+  // Richiede attenzione
+  const attenzione = [];
+  const sospesi = db.prepare(`SELECT id, order_number FROM orders WHERE status = 'sospeso' ORDER BY order_date ASC LIMIT 3`).all();
+  sospesi.forEach(o => attenzione.push({ testo: `${o.order_number} sospeso`, gravita: 'danger', href: null }));
+  const exportDaConfermare = db.prepare(`
+    SELECT COUNT(*) AS c FROM orders WHERE status = 'nuovo' AND customer_country IS NOT NULL AND customer_country != '' AND customer_country != 'Italia'
+  `).get().c;
+  if (exportDaConfermare > 0) attenzione.push({ testo: `${exportDaConfermare} ${exportDaConfermare === 1 ? 'ordine export da confermare' : 'ordini export da confermare'}`, gravita: 'warning', href: null });
+  const sottoSoglia = db.prepare(`
+    SELECT p.name FROM warehouse_finished wf JOIN products p ON p.id = wf.product_id WHERE wf.below_threshold = 1 LIMIT 3
+  `).all();
+  sottoSoglia.forEach(p => attenzione.push({ testo: `${p.name} sotto soglia`, gravita: 'warning', href: null }));
+  const clientiFermi = db.prepare(`
+    SELECT c.name, MAX(o.order_date) AS last_order, CAST(julianday(?) - julianday(MAX(o.order_date)) AS INTEGER) AS days
+    FROM customers c JOIN orders o ON o.customer_id = c.id
+    GROUP BY c.id HAVING days >= 60 ORDER BY days DESC LIMIT 2
+  `).all(today);
+  clientiFermi.forEach(c => attenzione.push({ testo: `${c.name} fermo da ${c.days} gg`, gravita: 'neutro', href: null }));
+
+  res.json({
+    periodo, aggiornatoAlle: new Date().toISOString(),
+    kpi, serieMensile,
+    obiettivi: { aree: obiettivi, mesiRestanti: monthsRemaining, totaleRestante: totalRemaining },
+    topEtichette: topEtichette.map(t => ({ ...t, pct: Math.round((t.bottiglie / maxBottiglie) * 100) })),
+    canali,
+    attenzione: attenzione.slice(0, 6),
+  });
 });
 
 app.get('/api/admin/commercial/stats', authAdmin, (req, res) => {
