@@ -35,8 +35,36 @@
   #login-screen input { width: 100%; padding: 10px; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
 
   /* App shell: sidebar + main area */
-  .app-shell { display: flex; min-height: 100vh; }
-  .sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--bordeaux); border-right: none; display: flex; flex-direction: column; padding: 20px 14px 16px; }
+  .app-shell { display: flex; min-height: 100vh; position: relative; }
+  .sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--bordeaux); border-right: none; display: flex; flex-direction: column; padding: 20px 14px 16px; transition: width .2s cubic-bezier(.22,.61,.36,1); }
+  .sidebar-brand-mark { display: none; width: 100%; text-align: center; font: 400 20px var(--display); color: #eae2ca; }
+  .sidebar-collapse-btn svg { transition: transform .2s ease; }
+  .app-shell.sidebar-collapsed .sidebar { width: 64px; overflow: hidden; }
+  .app-shell.sidebar-collapsed .sidebar-brand-full { display: none; }
+  .app-shell.sidebar-collapsed .sidebar-brand-mark { display: block; }
+  .app-shell.sidebar-collapsed .sidebar-section-label,
+  .app-shell.sidebar-collapsed .workspace-trigger-text,
+  .app-shell.sidebar-collapsed .workspace-chevron,
+  .app-shell.sidebar-collapsed #sidebar-user-name { display: none; }
+  .app-shell.sidebar-collapsed .sidebar-nav button,
+  .app-shell.sidebar-collapsed .sidebar-footer button,
+  .app-shell.sidebar-collapsed .sidebar-footer a,
+  .app-shell.sidebar-collapsed .workspace-trigger { font-size: 0; gap: 0; justify-content: center; }
+  .app-shell.sidebar-collapsed .sidebar-collapse-btn svg { transform: rotate(180deg); }
+  .app-shell.sidebar-collapsed .sidebar:hover {
+    width: 248px; position: absolute; top: 0; left: 0; bottom: 0; z-index: 80; overflow-y: auto;
+    box-shadow: 0 2px 6px rgba(56,17,18,.08), 0 16px 32px -18px rgba(56,17,18,.28);
+  }
+  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-brand-full { display: flex; }
+  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-brand-mark { display: none; }
+  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-section-label,
+  .app-shell.sidebar-collapsed .sidebar:hover .workspace-trigger-text,
+  .app-shell.sidebar-collapsed .sidebar:hover .workspace-chevron,
+  .app-shell.sidebar-collapsed .sidebar:hover #sidebar-user-name { display: block; }
+  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-nav button,
+  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-footer a { font-size: 13px; gap: 11px; justify-content: flex-start; }
+  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-footer button { font-size: 13px; gap: 11px; justify-content: flex-start; }
+  .app-shell.sidebar-collapsed .sidebar:hover .workspace-trigger { font-size: 13px; gap: 10px; justify-content: flex-start; }
   .sidebar-brand { display: flex; align-items: center; gap: 9px; padding: 0 6px; margin: 2px 0 22px; }
   .sidebar-brand img { width: 118px; height: auto; opacity: .95; }
   .sidebar-section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em; color: #c08552; font-weight: 600; padding: 0 10px 9px; margin-top: 9px; }
@@ -408,9 +436,10 @@
 <div id="app" style="display:none">
 <div class="app-shell">
   <aside class="sidebar">
-    <div class="sidebar-brand">
+    <div class="sidebar-brand sidebar-brand-full">
       <img src="/img/logo-cream.png" alt="Marramiero">
     </div>
+    <div class="sidebar-brand-mark">M</div>
 
     <div class="workspace-switcher" id="workspace-switcher">
       <button class="workspace-trigger" onclick="toggleWorkspaceMenu()">
@@ -485,6 +514,10 @@
     </nav>
 
     <div class="sidebar-footer">
+      <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Comprimi/espandi sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
+        Comprimi
+      </button>
       <button onclick="logout()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Esci
@@ -1094,6 +1127,14 @@ async function doResetPassword() {
 function logout() {
   sessionStorage.removeItem('admin_key');
   location.reload();
+}
+
+function toggleSidebarCollapse() {
+  const collapsed = document.querySelector('.app-shell').classList.toggle('sidebar-collapsed');
+  localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0');
+}
+if (localStorage.getItem('sidebar_collapsed') === '1') {
+  document.addEventListener('DOMContentLoaded', () => document.querySelector('.app-shell').classList.add('sidebar-collapsed'));
 }
 
 async function api(path, opts = {}) {

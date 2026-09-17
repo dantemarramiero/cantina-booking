@@ -38,8 +38,26 @@
   #login-screen .btn { width: 100%; margin-top: 10px; padding: 10px; }
 
   /* App shell: sidebar + main area (coerente con admin/portale interno) */
-  .app-shell { display: flex; min-height: 100vh; }
-  .sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--bordeaux); border-right: none; display: flex; flex-direction: column; padding: 20px 14px 16px; }
+  .app-shell { display: flex; min-height: 100vh; position: relative; }
+  .sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--bordeaux); border-right: none; display: flex; flex-direction: column; padding: 20px 14px 16px; transition: width .2s cubic-bezier(.22,.61,.36,1); }
+  .sidebar-brand-mark { display: none; width: 100%; text-align: center; font: 400 20px var(--display); color: #eae2ca; }
+  .sidebar-collapse-btn svg { transition: transform .2s ease; }
+  .app-shell.sidebar-collapsed .sidebar { width: 64px; overflow: hidden; }
+  .app-shell.sidebar-collapsed .sidebar-brand-full { display: none; }
+  .app-shell.sidebar-collapsed .sidebar-brand-mark { display: block; }
+  .app-shell.sidebar-collapsed .sidebar-greeting { display: none; }
+  .app-shell.sidebar-collapsed .sidebar-nav button,
+  .app-shell.sidebar-collapsed .sidebar-footer button { font-size: 0; gap: 0; justify-content: center; }
+  .app-shell.sidebar-collapsed .sidebar-collapse-btn svg { transform: rotate(180deg); }
+  .app-shell.sidebar-collapsed .sidebar:hover {
+    width: 248px; position: absolute; top: 0; left: 0; bottom: 0; z-index: 80; overflow-y: auto;
+    box-shadow: 0 2px 6px rgba(56,17,18,.08), 0 16px 32px -18px rgba(56,17,18,.28);
+  }
+  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-brand-full { display: flex; }
+  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-brand-mark { display: none; }
+  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-greeting { display: block; }
+  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-nav button { font-size: 13.5px; gap: 11px; justify-content: flex-start; }
+  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-footer button { font-size: 13px; gap: 11px; justify-content: flex-start; }
   .sidebar-brand { display: flex; align-items: center; gap: 9px; padding: 4px 8px 14px; }
   .sidebar-brand img { width: 118px; height: auto; }
   .sidebar-greeting { padding: 0 8px 16px; border-bottom: 1px solid rgba(234,226,202,.14); margin-bottom: 10px; }
@@ -175,9 +193,10 @@
 <div id="app" style="display:none">
   <div class="app-shell">
     <aside class="sidebar">
-      <div class="sidebar-brand">
+      <div class="sidebar-brand sidebar-brand-full">
         <img src="/img/logo-cream.png" alt="Marramiero">
       </div>
+      <div class="sidebar-brand-mark">M</div>
       <div class="sidebar-greeting">
         <div class="hi" id="agent-greeting-label">Benvenuto</div>
         <div class="name" id="agent-name">Agente</div>
@@ -216,6 +235,10 @@
       </nav>
 
       <div class="sidebar-footer">
+        <button type="button" class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Comprimi/espandi sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
+          Comprimi
+        </button>
         <button type="button" onclick="agentLogout()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           Esci
@@ -431,6 +454,14 @@ function agentLogout() {
   localStorage.removeItem('agent_token');
   TOKEN = null;
   window.location.href = '/agent.html';
+}
+
+function toggleSidebarCollapse() {
+  const collapsed = document.querySelector('.app-shell').classList.toggle('sidebar-collapsed');
+  localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0');
+}
+if (localStorage.getItem('sidebar_collapsed') === '1') {
+  document.addEventListener('DOMContentLoaded', () => document.querySelector('.app-shell').classList.add('sidebar-collapsed'));
 }
 
 function showLogin() {
