@@ -406,6 +406,20 @@ try { db.exec('ALTER TABLE agents ADD COLUMN code TEXT'); } catch {}
 try { db.exec('ALTER TABLE agents ADD COLUMN username TEXT'); } catch {}
 try { db.exec('ALTER TABLE agents ADD COLUMN password_hash TEXT'); } catch {}
 try { db.exec('ALTER TABLE agents ADD COLUMN gender TEXT'); } catch {}
+// ── CRM: anagrafica estesa agenti (allineata a clienti/importatori/fornitori) ──
+try { db.exec('ALTER TABLE agents ADD COLUMN mobile TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN address TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN city TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN business_province TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN postal_code TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN country TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN vat_number TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN sdi_code TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN pec TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN iban TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN fiscal_code TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN payment_terms TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN commission_percent REAL DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE orders ADD COLUMN billing_customer_id INTEGER'); } catch {}
 try { db.exec('ALTER TABLE orders ADD COLUMN causale TEXT DEFAULT \'ORDCLI\''); } catch {}
 try { db.exec('ALTER TABLE orders ADD COLUMN delivery_date TEXT'); } catch {}
@@ -497,6 +511,12 @@ db.exec(`
     created_at                TEXT DEFAULT (datetime('now','localtime'))
   )
 `);
+try { db.exec('ALTER TABLE importers ADD COLUMN iban TEXT'); } catch {}
+try { db.exec('ALTER TABLE importers ADD COLUMN pec TEXT'); } catch {}
+try { db.exec('ALTER TABLE importers ADD COLUMN fiscal_code TEXT'); } catch {}
+try { db.exec('ALTER TABLE suppliers ADD COLUMN iban TEXT'); } catch {}
+try { db.exec('ALTER TABLE suppliers ADD COLUMN pec TEXT'); } catch {}
+try { db.exec('ALTER TABLE suppliers ADD COLUMN fiscal_code TEXT'); } catch {}
 
 // ── CRM: attività polimorfiche (note/allegati/riunioni/compiti/affari/email) ──
 // entity_type ∈ {'customer','agent','importer','supplier'}, entity_id = id del record
@@ -853,7 +873,57 @@ function agentWithStats(agent) {
   const customerCount = db.prepare('SELECT COUNT(*) AS c FROM customers WHERE agent_id = ?').get(agent.id).c;
 
   const { password_hash, ...agentSafe } = agent;
-  return { ...agentSafe, provinces, orderCount, revenueCents, avgValueCents, avgFrequencyDays, customerCount };
+  return { ...agentSafe, provinces, orderCount, revenueCents, avgValueCents, avgFrequencyDays, customerCount, ...crmSalesStats('agent_id', agent.id), ...crmCounts('agent', agent.id) };
+}
+
+// Statistiche vendite per l'intestazione della scheda CRM (clienti/agenti) — 'column' è
+// sempre una stringa fissa lato codice ('customer_id' | 'agent_id'), mai input utente.
+function crmSalesStats(column, id) {
+  const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const oneYearAgoStr = oneYearAgo.toISOString().slice(0, 10);
+  const yearStart = new Date().getFullYear() + '-01-01';
+  const today = new Date().toISOString().slice(0, 10);
+
+  const revenue12mCents = db.prepare(`SELECT COALESCE(SUM(total_cents),0) AS cents FROM orders WHERE ${column} = ? AND order_date >= ?`).get(id, oneYearAgoStr).cents;
+
+  const bottlesYear = db.prepare(`
+    SELECT COALESCE(SUM(oi.quantity),0) AS q FROM order_items oi
+    JOIN orders o ON o.id = oi.order_id
+    WHERE o.${column} = ? AND o.order_date >= ?
+  `).get(id, yearStart).q;
+
+  const topProduct = db.prepare(`
+    SELECT COALESCE(p.name, oi.product_name_raw) AS name, SUM(oi.quantity) AS q
+    FROM order_items oi JOIN orders o ON o.id = oi.order_id LEFT JOIN products p ON p.id = oi.product_id
+    WHERE o.${column} = ? GROUP BY COALESCE(p.name, oi.product_name_raw) ORDER BY q DESC LIMIT 1
+  `).get(id);
+
+  const unpaidTotalCents = db.prepare(`SELECT COALESCE(SUM(total_cents),0) AS cents FROM orders WHERE ${column} = ? AND payment_status != 'pagato'`).get(id).cents;
+
+  const nextUnpaid = db.prepare(`
+    SELECT order_number, total_cents, payment_due_date FROM orders
+    WHERE ${column} = ? AND payment_status != 'pagato'
+    ORDER BY (payment_due_date IS NULL), payment_due_date ASC LIMIT 1
+  `).get(id);
+
+  return {
+    revenue_12m_cents: revenue12mCents,
+    bottles_year: bottlesYear,
+    top_product_name: topProduct ? topProduct.name : null,
+    unpaid_total_cents: unpaidTotalCents,
+    next_unpaid: nextUnpaid ? { ...nextUnpaid, overdue: !!(nextUnpaid.payment_due_date && nextUnpaid.payment_due_date < today) } : null,
+  };
+}
+
+// Contatori per l'indice laterale della scheda CRM (Contatti/Affari/Compiti/Documenti)
+function crmCounts(entityType, entityId) {
+  const c = (sql) => db.prepare(sql).get(entityType, entityId).c;
+  return {
+    contacts_count: c('SELECT COUNT(*) c FROM contacts WHERE entity_type = ? AND entity_id = ?'),
+    deals_count: c('SELECT COUNT(*) c FROM crm_deals WHERE entity_type = ? AND entity_id = ?'),
+    open_tasks_count: c("SELECT COUNT(*) c FROM crm_tasks WHERE entity_type = ? AND entity_id = ? AND status != 'chiuso'"),
+    documents_count: c('SELECT COUNT(*) c FROM crm_attachments WHERE entity_type = ? AND entity_id = ?'),
+  };
 }
 
 function customerActivityStatus(lastOrderDate) {
@@ -2174,6 +2244,11 @@ app.get('/api/admin/agents/:id', authAdmin, (req, res) => {
   res.json(agentWithStats(agent));
 });
 
+const AGENT_EXTENDED_FIELDS = [
+  'mobile', 'address', 'city', 'business_province', 'postal_code', 'country',
+  'vat_number', 'sdi_code', 'pec', 'iban', 'fiscal_code', 'payment_terms', 'commission_percent',
+];
+
 app.post('/api/admin/agents', authAdmin, (req, res) => {
   const { name, email, phone, code, gender, provinces } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'Il nome dell\'agente è obbligatorio.' });
@@ -2188,6 +2263,11 @@ app.post('/api/admin/agents', authAdmin, (req, res) => {
     const insertProv = db.prepare('INSERT OR IGNORE INTO agent_provinces (agent_id, province) VALUES (?, ?)');
     for (const p of provinces) insertProv.run(agentId, p);
   }
+  const extUpdates = [], extParams = [];
+  for (const f of AGENT_EXTENDED_FIELDS) {
+    if (req.body[f] !== undefined && req.body[f] !== '') { extUpdates.push(`${f} = ?`); extParams.push(req.body[f]); }
+  }
+  if (extUpdates.length) { extParams.push(agentId); db.prepare(`UPDATE agents SET ${extUpdates.join(', ')} WHERE id = ?`).run(...extParams); }
   res.json({ success: true, id: agentId, token, username, password });
 });
 
@@ -2195,10 +2275,10 @@ app.patch('/api/admin/agents/:id', authAdmin, (req, res) => {
   const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id);
   if (!agent) return res.status(404).json({ error: 'Agente non trovato.' });
 
-  const fields = ['name', 'email', 'phone', 'code', 'active', 'username', 'gender'];
+  const fields = ['name', 'email', 'phone', 'code', 'active', 'username', 'gender', ...AGENT_EXTENDED_FIELDS];
   const updates = [], params = [];
   for (const f of fields) {
-    if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }
+    if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
   }
   if (updates.length) {
     params.push(req.params.id);
@@ -2315,6 +2395,7 @@ app.get('/api/admin/customers/:id', authAdmin, (req, res) => {
   `).get(req.params.id);
   if (!c) return res.status(404).json({ error: 'Cliente non trovato.' });
   c.activity_status = customerActivityStatus(c.last_order_date);
+  Object.assign(c, crmSalesStats('customer_id', c.id), crmCounts('customer', c.id));
   res.json(c);
 });
 
@@ -2418,7 +2499,7 @@ const IMPORTER_FIELDS = [
   'address', 'city', 'province', 'postal_code', 'country',
   'shipping_address', 'shipping_city', 'shipping_province', 'shipping_postal_code', 'shipping_country',
   'discount_code', 'discount_percent', 'payment_terms', 'sdi_code', 'vat_number', 'estimated_volume_cents',
-  'agent_id', 'notes',
+  'agent_id', 'notes', 'iban', 'pec', 'fiscal_code',
 ];
 
 app.get('/api/admin/importers', authAdmin, (req, res) => {
@@ -2430,8 +2511,9 @@ app.get('/api/admin/importers', authAdmin, (req, res) => {
   res.json(db.prepare(sql).all(...params));
 });
 app.get('/api/admin/importers/:id', authAdmin, (req, res) => {
-  const row = db.prepare('SELECT * FROM importers WHERE id = ?').get(req.params.id);
+  const row = db.prepare('SELECT i.*, a.name AS agent_name FROM importers i LEFT JOIN agents a ON a.id = i.agent_id WHERE i.id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Importatore non trovato.' });
+  Object.assign(row, crmCounts('importer', row.id));
   res.json(row);
 });
 app.post('/api/admin/importers', authAdmin, (req, res) => {
@@ -2467,6 +2549,7 @@ const SUPPLIER_FIELDS = [
   'address', 'city', 'province', 'postal_code', 'country',
   'shipping_address', 'shipping_city', 'shipping_province', 'shipping_postal_code', 'shipping_country',
   'category', 'discount_code', 'discount_percent', 'payment_terms', 'sdi_code', 'vat_number', 'estimated_volume_cents', 'notes',
+  'iban', 'pec', 'fiscal_code',
 ];
 
 app.get('/api/admin/suppliers', authAdmin, (req, res) => {
@@ -2480,6 +2563,7 @@ app.get('/api/admin/suppliers', authAdmin, (req, res) => {
 app.get('/api/admin/suppliers/:id', authAdmin, (req, res) => {
   const row = db.prepare('SELECT * FROM suppliers WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Fornitore non trovato.' });
+  Object.assign(row, crmCounts('supplier', row.id));
   res.json(row);
 });
 app.post('/api/admin/suppliers', authAdmin, (req, res) => {
@@ -2545,6 +2629,35 @@ app.post('/api/admin/crm/:entityType/:entityId/notes', authAdmin, (req, res) => 
 app.delete('/api/admin/crm/notes/:id', authAdmin, (req, res) => {
   db.prepare('DELETE FROM crm_notes WHERE id = ?').run(req.params.id);
   res.json({ success: true });
+});
+
+// Attività unificata (note + riunioni + compiti + email + ordini) per la scheda CRM
+app.get('/api/admin/crm/:entityType/:entityId/activity', authAdmin, (req, res) => {
+  const { entityType, entityId } = req.params;
+  if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  const limit = Math.min(parseInt(req.query.limit) || 12, 50);
+
+  const notes = db.prepare('SELECT id, body, created_at FROM crm_notes WHERE entity_type = ? AND entity_id = ?').all(entityType, entityId)
+    .map(n => ({ kind: 'nota', title: 'Nota', detail: n.body, at: n.created_at }));
+  const meetings = db.prepare('SELECT id, title, outcome, meeting_date, created_at FROM crm_meetings WHERE entity_type = ? AND entity_id = ?').all(entityType, entityId)
+    .map(m => ({ kind: 'riunione', title: m.title, detail: m.outcome || null, at: m.meeting_date || m.created_at }));
+  const tasks = db.prepare('SELECT id, title, status, due_date, created_at FROM crm_tasks WHERE entity_type = ? AND entity_id = ?').all(entityType, entityId)
+    .map(t => ({ kind: 'compito', title: t.title, detail: t.status === 'chiuso' ? 'Completato' : (t.due_date ? 'Scadenza ' + t.due_date : null), at: t.created_at }));
+  const emails = db.prepare('SELECT id, subject, direction, sent_at, created_at FROM crm_emails WHERE entity_type = ? AND entity_id = ?').all(entityType, entityId)
+    .map(e => ({ kind: 'email', title: (e.direction === 'in' ? 'Email ricevuta' : 'Email inviata'), detail: e.subject || null, at: e.sent_at || e.created_at }));
+
+  let orders = [];
+  const orderColumn = entityType === 'customer' ? 'customer_id' : entityType === 'agent' ? 'agent_id' : null;
+  if (orderColumn) {
+    orders = db.prepare(`SELECT order_number, order_date, imported_at FROM orders WHERE ${orderColumn} = ? ORDER BY imported_at DESC LIMIT ?`).all(entityId, limit)
+      .map(o => ({ kind: 'ordine', title: 'Ordine inserito', detail: o.order_number, at: o.imported_at || o.order_date }));
+  }
+
+  const all = [...notes, ...meetings, ...tasks, ...emails, ...orders]
+    .filter(a => a.at)
+    .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+    .slice(0, limit);
+  res.json(all);
 });
 
 // Contatti (persone collegate all'anagrafica)
