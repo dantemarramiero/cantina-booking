@@ -297,7 +297,41 @@
   .mobile-section-tabs { display: none; }
   .mobile-bottom-tabbar { display: none; }
 
-  @media (max-width: 860px) {
+  /* Finestre desktop/laptop strette: solo compattazione, la sidebar resta */
+  @media (max-width: 860px) and (min-width: 641px) {
+    main { padding: 16px; }
+    .field-row { grid-template-columns: 1fr; }
+    .avail-row { grid-template-columns: 1fr; }
+    .modal-box { padding: 18px; }
+    .cal-toolbar-v2 .cal-range { min-width: 0; }
+    .list-toolbar { flex-direction: column; align-items: stretch; }
+    .list-toolbar .search-input { width: 100%; min-width: 0; }
+    .list-toolbar .segmented { max-width: 100%; overflow-x: auto; }
+    .list-toolbar .btn-generate, .list-toolbar > select { width: 100%; justify-content: center; }
+    .exp-toolbar { flex-direction: column; align-items: stretch; }
+    .exp-toolbar .search-input { width: 100%; min-width: 0; }
+    .exp-toolbar .btn { width: 100%; }
+    .exp-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .exp-grid { grid-template-columns: 1fr; }
+    .cards { grid-template-columns: 1fr 1fr; }
+  }
+  /* Solo veri schermi da telefono: qui si passa alla navigazione mobile (bottom bar) */
+  @media (max-width: 640px) {
+    table { font-size: 11px; }
+    th, td { padding: 6px 7px; }
+    th { font-size: 8.5px; }
+    .btn.small, .btn-outline-pill { padding: 4px 8px; font-size: 10.5px; }
+    .badge { padding: 2px 7px; font-size: 9.5px; }
+    .actions-cell { gap: 4px; }
+    .cal-header-cell { padding: 8px 3px; font-size: 10.5px; }
+    .cal-time-cell { padding: 0 3px; font-size: 9px; }
+    .cal-body-row, .cal-header-row { grid-template-columns: 34px repeat(var(--cal-cols, 7), 1fr) !important; }
+    .cal-event { padding: 3px 4px; font-size: 9.5px; }
+    .cal-event .cal-exp { font-size: 10px; }
+    .cal-event .cal-badge { font-size: 7px; padding: 1px 4px; }
+
     .sidebar { display: none !important; }
     .mobile-settings-btn { display: flex; }
     .topbar { padding: 12px 16px; gap: 10px; justify-content: space-between; }
@@ -327,24 +361,6 @@
     .mobile-bottom-tabbar button.active { color: var(--wine); }
 
     .list-row-icon { border-radius: 50%; }
-  }
-  @media (max-width: 480px) {
-    .exp-grid { grid-template-columns: 1fr; }
-    .cards { grid-template-columns: 1fr 1fr; }
-  }
-  @media (max-width: 640px) {
-    table { font-size: 11px; }
-    th, td { padding: 6px 7px; }
-    th { font-size: 8.5px; }
-    .btn.small, .btn-outline-pill { padding: 4px 8px; font-size: 10.5px; }
-    .badge { padding: 2px 7px; font-size: 9.5px; }
-    .actions-cell { gap: 4px; }
-    .cal-header-cell { padding: 8px 3px; font-size: 10.5px; }
-    .cal-time-cell { padding: 0 3px; font-size: 9px; }
-    .cal-body-row, .cal-header-row { grid-template-columns: 34px repeat(var(--cal-cols, 7), 1fr) !important; }
-    .cal-event { padding: 3px 4px; font-size: 9.5px; }
-    .cal-event .cal-exp { font-size: 10px; }
-    .cal-event .cal-badge { font-size: 7px; padding: 1px 4px; }
   }
 </style>
 </head>

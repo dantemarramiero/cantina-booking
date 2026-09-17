@@ -571,6 +571,48 @@ db.exec(`
   )
 `);
 
+// ── CRM: contatti (persone collegate a clienti/agenti/importatori/fornitori) ──
+db.exec(`
+  CREATE TABLE IF NOT EXISTS contacts (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type    TEXT NOT NULL,
+    entity_id      INTEGER NOT NULL,
+    name           TEXT NOT NULL,
+    role           TEXT,
+    email          TEXT,
+    phone          TEXT,
+    mobile         TEXT,
+    notes          TEXT,
+    source_fair_id INTEGER,
+    created_at     TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+
+// ── Commerciale: fiere ────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS fairs (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    name               TEXT NOT NULL,
+    location           TEXT,
+    start_date         TEXT,
+    end_date           TEXT,
+    responsible_name   TEXT,
+    status             TEXT DEFAULT 'pianificata',
+    report_notes       TEXT,
+    created_at         TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS fair_attachments (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    fair_id       INTEGER NOT NULL,
+    filename      TEXT NOT NULL,
+    original_name TEXT,
+    uploaded_at   TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+try { db.exec('ALTER TABLE customers ADD COLUMN source_fair_id INTEGER'); } catch {}
+
 // ── Portale agenti: news e cataloghi condivisi ────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS news (
@@ -2065,6 +2107,61 @@ app.get('/api/admin/produzione/dashboard', authAdmin, (req, res) => {
   res.json({ bottlesToProduce, pendingLines, topCustomers });
 });
 
+app.get('/api/admin/home/dashboard', authAdmin, (req, res) => {
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const today = now.toISOString().slice(0, 10);
+
+  const revenueMonth = db.prepare(`SELECT COALESCE(SUM(total_cents),0) AS cents FROM orders WHERE order_date >= ?`).get(monthStart);
+  const revenueMonthForeign = db.prepare(`
+    SELECT COALESCE(SUM(total_cents),0) AS cents FROM orders
+    WHERE order_date >= ? AND customer_country IS NOT NULL AND customer_country != '' AND customer_country != 'Italia'
+  `).get(monthStart);
+  const foreignPct = revenueMonth.cents > 0 ? Math.round((revenueMonthForeign.cents / revenueMonth.cents) * 100) : 0;
+
+  const bottlesShipped = db.prepare(`
+    SELECT COALESCE(SUM(oi.quantity),0) AS qty FROM order_items oi JOIN orders o ON o.id = oi.order_id
+    WHERE oi.production_status = 'completato' AND o.order_date >= ?
+  `).get(monthStart).qty;
+  const bottlesPlanned = db.prepare(`
+    SELECT COALESCE(SUM(oi.quantity),0) AS qty FROM order_items oi JOIN orders o ON o.id = oi.order_id
+    WHERE o.order_date >= ?
+  `).get(monthStart).qty;
+
+  const overdueCredits = db.prepare(`
+    SELECT COUNT(DISTINCT customer_id) AS customers, COALESCE(SUM(total_cents),0) AS cents FROM orders
+    WHERE payment_status != 'pagato' AND payment_due_date IS NOT NULL AND payment_due_date < ? AND customer_id IS NOT NULL
+  `).get(today);
+
+  const decisionOrder = db.prepare(`
+    SELECT o.id, o.order_number, o.customer_name, o.warehouse_note, o.payment_due_date,
+      CAST(julianday(?) - julianday(o.order_date) AS INTEGER) AS days_open
+    FROM orders o WHERE o.status = 'sospeso'
+    ORDER BY o.order_date ASC LIMIT 1
+  `).get(today);
+
+  const lowStock = db.prepare(`
+    SELECT wf.quantity, p.name FROM warehouse_finished wf JOIN products p ON p.id = wf.product_id
+    WHERE wf.below_threshold = 1 ORDER BY wf.quantity ASC LIMIT 5
+  `).all();
+
+  const upcomingFairs = db.prepare(`
+    SELECT id, name, location, start_date, end_date, responsible_name FROM fairs
+    WHERE end_date IS NULL OR end_date >= ? ORDER BY start_date ASC LIMIT 5
+  `).all(today);
+
+  res.json({
+    date: today,
+    revenueMonthCents: revenueMonth.cents,
+    revenueForeignPct: foreignPct,
+    bottlesShipped, bottlesPlanned,
+    overdueCredits,
+    decisionOrder,
+    lowStock,
+    upcomingFairs,
+  });
+});
+
 // ── CRM: agenti ─────────────────────────────────────────────────────────────────
 app.get('/api/admin/agents', authAdmin, (req, res) => {
   const agents = db.prepare('SELECT * FROM agents ORDER BY name').all();
@@ -2158,7 +2255,7 @@ const CUSTOMER_FIELDS = [
   'discount_code', 'discount_percent',
   'contact_person', 'contact_person_secondary', 'newsletter_subscribed', 'website',
   'shipping_address', 'shipping_city', 'shipping_province', 'shipping_postal_code', 'shipping_country',
-  'estimated_volume_cents',
+  'estimated_volume_cents', 'source_fair_id',
 ];
 
 app.get('/api/admin/customers', authAdmin, (req, res) => {
@@ -2187,6 +2284,7 @@ app.post('/api/admin/customers', authAdmin, (req, res) => {
     }
   }
   const result = db.prepare(`INSERT INTO customers (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`).run(...values);
+  if (body.source_fair_id) addFairEncounterNote('customer', result.lastInsertRowid, body.source_fair_id);
   res.json({ success: true, id: result.lastInsertRowid });
 });
 
@@ -2218,6 +2316,98 @@ app.get('/api/admin/customers/:id', authAdmin, (req, res) => {
   if (!c) return res.status(404).json({ error: 'Cliente non trovato.' });
   c.activity_status = customerActivityStatus(c.last_order_date);
   res.json(c);
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Commerciale: Fiere
+// ══════════════════════════════════════════════════════════════════════════════
+const fairAttachmentsDir = path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname, 'fair-attachments');
+fs.mkdirSync(fairAttachmentsDir, { recursive: true });
+const uploadFairAttachment = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, fairAttachmentsDir),
+    filename: (req, file, cb) => cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`),
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
+
+app.get('/api/admin/fairs', authAdmin, (req, res) => {
+  res.json(db.prepare(`
+    SELECT f.*,
+      (SELECT COUNT(*) FROM customers c WHERE c.source_fair_id = f.id) AS customers_count,
+      (SELECT COUNT(*) FROM contacts ct WHERE ct.source_fair_id = f.id) AS contacts_count,
+      (SELECT COUNT(*) FROM fair_attachments fa WHERE fa.fair_id = f.id) AS attachments_count
+    FROM fairs f ORDER BY f.start_date DESC, f.id DESC
+  `).all());
+});
+
+app.get('/api/admin/fairs/:id', authAdmin, (req, res) => {
+  const fair = db.prepare('SELECT * FROM fairs WHERE id = ?').get(req.params.id);
+  if (!fair) return res.status(404).json({ error: 'Fiera non trovata.' });
+  fair.customers = db.prepare('SELECT id, name, city, province FROM customers WHERE source_fair_id = ? ORDER BY name').all(fair.id);
+  fair.contacts = db.prepare(`
+    SELECT ct.*,
+      CASE ct.entity_type
+        WHEN 'customer' THEN (SELECT name FROM customers WHERE id = ct.entity_id)
+        WHEN 'agent' THEN (SELECT name FROM agents WHERE id = ct.entity_id)
+        WHEN 'importer' THEN (SELECT name FROM importers WHERE id = ct.entity_id)
+        WHEN 'supplier' THEN (SELECT name FROM suppliers WHERE id = ct.entity_id)
+      END AS entity_name
+    FROM contacts ct WHERE ct.source_fair_id = ? ORDER BY ct.name
+  `).all(fair.id);
+  fair.attachments = db.prepare('SELECT * FROM fair_attachments WHERE fair_id = ? ORDER BY uploaded_at DESC').all(fair.id);
+  res.json(fair);
+});
+
+app.post('/api/admin/fairs', authAdmin, (req, res) => {
+  const { name, location, start_date, end_date, responsible_name, status } = req.body || {};
+  if (!name?.trim()) return res.status(400).json({ error: 'Il nome della fiera è obbligatorio.' });
+  const result = db.prepare('INSERT INTO fairs (name, location, start_date, end_date, responsible_name, status) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(name.trim(), location?.trim() || null, start_date || null, end_date || null, responsible_name?.trim() || null, status || 'pianificata');
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+
+app.patch('/api/admin/fairs/:id', authAdmin, (req, res) => {
+  const fields = ['name', 'location', 'start_date', 'end_date', 'responsible_name', 'status', 'report_notes'];
+  const updates = [], params = [];
+  for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
+  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  params.push(req.params.id);
+  db.prepare(`UPDATE fairs SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  res.json({ success: true });
+});
+
+app.delete('/api/admin/fairs/:id', authAdmin, (req, res) => {
+  const attachments = db.prepare('SELECT * FROM fair_attachments WHERE fair_id = ?').all(req.params.id);
+  for (const a of attachments) { try { fs.unlinkSync(path.join(fairAttachmentsDir, a.filename)); } catch {} }
+  db.prepare('DELETE FROM fair_attachments WHERE fair_id = ?').run(req.params.id);
+  db.prepare('UPDATE customers SET source_fair_id = NULL WHERE source_fair_id = ?').run(req.params.id);
+  db.prepare('UPDATE contacts SET source_fair_id = NULL WHERE source_fair_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM fairs WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+app.post('/api/admin/fairs/:id/attachments', authAdmin, uploadFairAttachment.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Carica un file.' });
+  const result = db.prepare('INSERT INTO fair_attachments (fair_id, filename, original_name) VALUES (?, ?, ?)')
+    .run(req.params.id, req.file.filename, req.file.originalname);
+  res.json({ success: true, id: result.lastInsertRowid, filename: req.file.filename });
+});
+app.get('/api/admin/fairs/attachments/:id/download', authAdmin, (req, res) => {
+  const a = db.prepare('SELECT * FROM fair_attachments WHERE id = ?').get(req.params.id);
+  if (!a) return res.status(404).json({ error: 'Allegato non trovato.' });
+  res.download(path.join(fairAttachmentsDir, a.filename), a.original_name || a.filename);
+});
+app.get('/api/admin/fairs/attachments/:id/view', authAdmin, (req, res) => {
+  const a = db.prepare('SELECT * FROM fair_attachments WHERE id = ?').get(req.params.id);
+  if (!a) return res.status(404).json({ error: 'Allegato non trovato.' });
+  res.sendFile(path.join(fairAttachmentsDir, a.filename));
+});
+app.delete('/api/admin/fairs/attachments/:id', authAdmin, (req, res) => {
+  const a = db.prepare('SELECT * FROM fair_attachments WHERE id = ?').get(req.params.id);
+  if (a) { try { fs.unlinkSync(path.join(fairAttachmentsDir, a.filename)); } catch {} }
+  db.prepare('DELETE FROM fair_attachments WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2323,6 +2513,14 @@ app.delete('/api/admin/suppliers/:id', authAdmin, (req, res) => {
 const CRM_ENTITY_TYPES = ['customer', 'agent', 'importer', 'supplier'];
 function validEntityType(t) { return CRM_ENTITY_TYPES.includes(t); }
 
+function addFairEncounterNote(entityType, entityId, fairId) {
+  const fair = db.prepare('SELECT * FROM fairs WHERE id = ?').get(fairId);
+  if (!fair) return;
+  const when = fair.start_date ? new Date(fair.start_date + 'T00:00:00').toLocaleDateString('it-IT') : 'data non specificata';
+  const body = `Incontrato alla fiera "${fair.name}"${fair.location ? ' a ' + fair.location : ''} (${when}).`;
+  db.prepare('INSERT INTO crm_notes (entity_type, entity_id, body) VALUES (?, ?, ?)').run(entityType, entityId, body);
+}
+
 const crmAttachmentsDir = path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname, 'crm-attachments');
 fs.mkdirSync(crmAttachmentsDir, { recursive: true });
 const uploadCrmAttachment = multer({
@@ -2346,6 +2544,42 @@ app.post('/api/admin/crm/:entityType/:entityId/notes', authAdmin, (req, res) => 
 });
 app.delete('/api/admin/crm/notes/:id', authAdmin, (req, res) => {
   db.prepare('DELETE FROM crm_notes WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// Contatti (persone collegate all'anagrafica)
+app.get('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  res.json(db.prepare('SELECT * FROM contacts WHERE entity_type = ? AND entity_id = ? ORDER BY name').all(req.params.entityType, req.params.entityId));
+});
+app.post('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  const { name, role, email, phone, mobile, notes, source_fair_id } = req.body || {};
+  if (!name?.trim()) return res.status(400).json({ error: 'Il nome del contatto è obbligatorio.' });
+  let finalNotes = notes?.trim() || null;
+  if (source_fair_id) {
+    const fair = db.prepare('SELECT * FROM fairs WHERE id = ?').get(source_fair_id);
+    if (fair) {
+      const when = fair.start_date ? new Date(fair.start_date + 'T00:00:00').toLocaleDateString('it-IT') : 'data non specificata';
+      const autoNote = `Incontrato alla fiera "${fair.name}"${fair.location ? ' a ' + fair.location : ''} (${when}).`;
+      finalNotes = finalNotes ? `${autoNote}\n\n${finalNotes}` : autoNote;
+    }
+  }
+  const result = db.prepare('INSERT INTO contacts (entity_type, entity_id, name, role, email, phone, mobile, notes, source_fair_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(req.params.entityType, req.params.entityId, name.trim(), role?.trim() || null, email?.trim() || null, phone?.trim() || null, mobile?.trim() || null, finalNotes, source_fair_id || null);
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+app.patch('/api/admin/crm/contacts/:id', authAdmin, (req, res) => {
+  const fields = ['name', 'role', 'email', 'phone', 'mobile', 'notes'];
+  const updates = [], params = [];
+  for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
+  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  params.push(req.params.id);
+  db.prepare(`UPDATE contacts SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  res.json({ success: true });
+});
+app.delete('/api/admin/crm/contacts/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM contacts WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 

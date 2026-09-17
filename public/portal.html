@@ -221,7 +221,36 @@
   .mobile-bottom-tabbar { display: none; }
   .mobile-logout-btn { display: none; }
 
-  @media (max-width: 860px) {
+  /* Finestre desktop/laptop strette: solo compattazione, la sidebar resta */
+  @media (max-width: 860px) and (min-width: 641px) {
+    main { padding: 16px; }
+    #crm-record-view { padding: 16px; }
+    .field-row, .field-row:has(> :nth-child(3)) { grid-template-columns: 1fr; }
+    .avail-row { grid-template-columns: 1fr !important; }
+    .dash-two-col { grid-template-columns: 1fr !important; }
+    .modal-box { padding: 18px; }
+    .list-toolbar { flex-direction: column; align-items: stretch; }
+    .list-toolbar-title { margin-bottom: 6px; }
+    .list-toolbar .search-input { width: 100%; min-width: 0; }
+    .list-toolbar .segmented { max-width: 100%; overflow-x: auto; }
+    .list-toolbar .ord-new-dropdown { margin-left: 0; }
+    .list-toolbar .btn-generate, .list-toolbar > select { width: 100%; justify-content: center; }
+    .cal-toolbar-v2 .cal-range { min-width: 0; }
+    .cal-toolbar-v2 { justify-content: flex-start; }
+  }
+  @media (max-width: 480px) {
+    .cards { grid-template-columns: 1fr 1fr; }
+    .kanban-board { grid-template-columns: minmax(220px, 1fr); }
+  }
+  /* Solo veri schermi da telefono: qui si passa alla navigazione mobile (bottom bar) */
+  @media (max-width: 640px) {
+    table { font-size: 11px; }
+    th, td { padding: 6px 7px; }
+    th { font-size: 8.5px; }
+    .btn.small, .btn-outline-pill { padding: 4px 8px; font-size: 10.5px; }
+    .badge { padding: 2px 7px; font-size: 9.5px; }
+    .prod-thumb { width: 26px !important; height: 34px !important; }
+
     .sidebar { display: none !important; }
     .mobile-settings-btn { display: flex; }
     .topbar { padding: 12px 16px; gap: 10px; justify-content: space-between; }
@@ -254,18 +283,6 @@
     .mobile-logout-btn { display: flex; align-items: center; gap: 7px; margin-top: 18px; background: none; border: none; color: var(--bad); font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; padding: 8px 2px; }
 
     .list-row-icon { border-radius: 50%; }
-  }
-  @media (max-width: 480px) {
-    .cards { grid-template-columns: 1fr 1fr; }
-    .kanban-board { grid-template-columns: minmax(220px, 1fr); }
-  }
-  @media (max-width: 640px) {
-    table { font-size: 11px; }
-    th, td { padding: 6px 7px; }
-    th { font-size: 8.5px; }
-    .btn.small, .btn-outline-pill { padding: 4px 8px; font-size: 10.5px; }
-    .badge { padding: 2px 7px; font-size: 9.5px; }
-    .prod-thumb { width: 26px !important; height: 34px !important; }
   }
 
   /* CRM: record detail page */
@@ -336,6 +353,16 @@
   .dashboard-widgets-group { margin-bottom: 18px; }
   .dashboard-widgets-group h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--wine); margin: 0 0 10px; }
   .dashboard-widget-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); padding: 5px 0; cursor: pointer; }
+  #fair-detail-view { position: fixed; inset: 0; z-index: 150; background: var(--cream); overflow-y: auto; padding: 24px 32px; }
+  @media (max-width: 860px) { #fair-detail-view { padding: 16px 16px 88px; } }
+  .fair-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 12px; }
+  .fair-photo-item { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); aspect-ratio: 1; background: #f0f2f5; }
+  .fair-photo-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .fair-photo-item button { position: absolute; top: 5px; right: 5px; width: 22px; height: 22px; border-radius: 50%; border: none; background: rgba(16,19,26,0.65); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .fair-status-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .fair-status-badge.pianificata { background: #eceef2; color: #6b7280; }
+  .fair-status-badge.in_corso { background: rgba(59,111,224,0.1); color: var(--wine); }
+  .fair-status-badge.conclusa { background: #dcfce7; color: #166534; }
 </style>
 </head>
 <body>
@@ -439,6 +466,10 @@
       <button data-sub="com-catalogo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 1 4 17.5v-13Z"/><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/></svg>
         Catalogo
+      </button>
+      <button data-sub="com-fiere">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+        Fiere
       </button>
     </nav>
 
@@ -624,6 +655,30 @@
             </button>
           </div>
           <div class="list-rows" id="catalogs-tbody"></div>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-com-fiere">
+        <div id="fiere-list-view">
+          <div class="list-card">
+            <div class="list-toolbar">
+              <div class="list-toolbar-title"><h3>Fiere</h3><p>Programma le fiere a cui partecipare e tieni traccia dei contatti raccolti</p></div>
+              <div class="list-spacer"></div>
+              <button class="btn-generate" onclick="openFairModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+                Nuova fiera
+              </button>
+            </div>
+            <div class="list-rows" id="fairs-tbody"></div>
+          </div>
+        </div>
+
+        <div id="fair-detail-view" style="display:none">
+          <div class="crm-record-topbar">
+            <button class="btn secondary small" onclick="closeFairDetail()">← Torna alla lista</button>
+            <h2 id="fair-detail-title">—</h2>
+          </div>
+          <div id="fair-detail-body"></div>
         </div>
       </div>
     </div>
@@ -1266,6 +1321,64 @@
   </div>
 </div>
 
+<!-- Fair modal (create + edit) -->
+<div class="modal-overlay" id="fair-modal">
+  <div class="modal-box">
+    <h3 id="fair-modal-title">Nuova fiera</h3>
+    <div id="fair-modal-msg"></div>
+    <input type="hidden" id="fair-id">
+    <div class="field"><label>Nome fiera</label><input id="fair-name" placeholder="es. Vinitaly 2027"></div>
+    <div class="field"><label>Località</label><input id="fair-location"></div>
+    <div class="field-row">
+      <div class="field"><label>Data inizio</label><input type="date" id="fair-start-date"></div>
+      <div class="field"><label>Data fine</label><input type="date" id="fair-end-date"></div>
+    </div>
+    <div class="field"><label>Responsabile</label><input id="fair-responsible" placeholder="chi parteciperà"></div>
+    <div class="field"><label>Stato</label>
+      <select id="fair-status">
+        <option value="pianificata">Pianificata</option>
+        <option value="in_corso">In corso</option>
+        <option value="conclusa">Conclusa</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('fair-modal')">Annulla</button>
+      <button class="btn" onclick="saveFair()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fair contact modal (contatto raccolto ad una fiera) -->
+<div class="modal-overlay" id="fair-contact-modal">
+  <div class="modal-box">
+    <h3>Nuovo contatto</h3>
+    <div id="fair-contact-modal-msg"></div>
+    <div class="field-row">
+      <div class="field"><label>Tipo</label>
+        <select id="fair-contact-entity-type" onchange="populateFairContactEntityOptions()">
+          <option value="customer">Cliente</option>
+          <option value="importer">Importatore</option>
+          <option value="agent">Agente</option>
+          <option value="supplier">Fornitore</option>
+        </select>
+      </div>
+      <div class="field"><label id="fair-contact-entity-label">Cliente</label><select id="fair-contact-entity"></select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Nome e cognome</label><input id="fair-contact-name"></div>
+      <div class="field"><label>Ruolo</label><input id="fair-contact-role"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Email</label><input type="email" id="fair-contact-email"></div>
+      <div class="field"><label>Telefono</label><input id="fair-contact-phone"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('fair-contact-modal')">Annulla</button>
+      <button class="btn" onclick="saveFairContact()">Salva</button>
+    </div>
+  </div>
+</div>
+
 <!-- Importer modal (create + edit) -->
 <div class="modal-overlay" id="importer-modal">
   <div class="modal-box" style="max-width:640px">
@@ -1457,6 +1570,7 @@
     <button type="button" data-rtab="overview">Overview</button>
     <button type="button" data-rtab="email">Email</button>
     <button type="button" data-rtab="note">Note</button>
+    <button type="button" data-rtab="contatti">Contatti</button>
     <button type="button" data-rtab="allegati">Allegati</button>
     <button type="button" data-rtab="riunioni">Riunioni</button>
     <button type="button" data-rtab="compiti">Compiti</button>
@@ -1479,6 +1593,11 @@
     <div class="field"><textarea id="crm-note-input" rows="2" placeholder="Scrivi una nota..."></textarea></div>
     <button class="btn small" onclick="addCrmNote()">Aggiungi nota</button>
     <div id="crm-notes-list" style="margin-top:16px"></div>
+  </div>
+
+  <div class="crm-record-panel" id="crm-rtab-contatti">
+    <div class="crm-panel-toolbar"><div class="list-spacer"></div><button class="btn-generate" style="margin-top:0" onclick="openCrmContactModal()">+ Nuovo contatto</button></div>
+    <div id="crm-contacts-list"></div>
   </div>
 
   <div class="crm-record-panel" id="crm-rtab-allegati">
@@ -1587,6 +1706,29 @@
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('crm-deal-modal')">Annulla</button>
       <button class="btn" onclick="saveCrmDeal()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- CRM: contact modal -->
+<div class="modal-overlay" id="crm-contact-modal">
+  <div class="modal-box">
+    <h3 id="crm-contact-modal-title">Nuovo contatto</h3>
+    <div id="crm-contact-modal-msg"></div>
+    <input type="hidden" id="crm-contact-id">
+    <div class="field-row">
+      <div class="field"><label>Nome e cognome</label><input id="crm-contact-name"></div>
+      <div class="field"><label>Ruolo</label><input id="crm-contact-role" placeholder="es. Responsabile acquisti"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Email</label><input type="email" id="crm-contact-email"></div>
+      <div class="field"><label>Telefono</label><input id="crm-contact-phone"></div>
+    </div>
+    <div class="field"><label>Cellulare</label><input id="crm-contact-mobile"></div>
+    <div class="field"><label>Note</label><textarea id="crm-contact-notes" rows="2"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('crm-contact-modal')">Annulla</button>
+      <button class="btn" onclick="saveCrmContact()">Salva</button>
     </div>
   </div>
 </div>
@@ -1826,6 +1968,7 @@ function loadSubpanel(sub) {
   if (sub === 'com-listini') loadPriceLists();
   if (sub === 'com-news') loadNews();
   if (sub === 'com-catalogo') loadCatalogs();
+  if (sub === 'com-fiere') loadFairs();
   if (sub === 'prod-dashboard') loadProduzioneDashboard();
   if (sub === 'prod-riepilogo') loadProductionSummary();
   if (sub === 'prod-clienti') loadProductionSummary();
@@ -2422,6 +2565,235 @@ async function saveCatalog() {
   }
 }
 
+// ── COMMERCIALE: Fiere ─────────────────────────────────────────────────────────
+const FAIR_STATUS_LABELS = { pianificata: 'Pianificata', in_corso: 'In corso', conclusa: 'Conclusa' };
+let FAIR_CURRENT_ID = null;
+let FAIR_CURRENT_DATA = null;
+
+async function loadFairs() {
+  const rows = await api('/api/admin/fairs');
+  document.getElementById('fairs-tbody').innerHTML = rows.length ? rows.map(f => `
+    <div class="list-row" style="cursor:pointer" onclick="openFairDetail(${f.id})">
+      <div class="list-row-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+      </div>
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(f.name)}</div>
+        <div class="list-row-sub">${esc(f.location) || 'nessuna località'}${f.start_date ? ' · ' + f.start_date : ''}${f.end_date ? ' – ' + f.end_date : ''}${f.responsible_name ? ' · ' + esc(f.responsible_name) : ''}</div>
+      </div>
+      <div class="list-row-meta">
+        <span class="fair-status-badge ${f.status}">${FAIR_STATUS_LABELS[f.status] || f.status}</span>
+        <span class="pill-stat">${f.customers_count} clienti</span>
+        <span class="pill-stat">${f.contacts_count} contatti</span>
+        <button class="btn-outline-pill" onclick='event.stopPropagation(); openFairModal(${jsonAttrP(f)})'>Modifica</button>
+        <button class="btn-outline-pill danger" onclick="event.stopPropagation(); deleteFair(${f.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Nessuna fiera pianificata. Creane una.</div>';
+}
+
+function openFairModal(f) {
+  document.getElementById('fair-modal-msg').innerHTML = '';
+  document.getElementById('fair-modal-title').textContent = f ? 'Modifica fiera' : 'Nuova fiera';
+  document.getElementById('fair-id').value = f ? f.id : '';
+  document.getElementById('fair-name').value = f ? f.name : '';
+  document.getElementById('fair-location').value = f ? (f.location || '') : '';
+  document.getElementById('fair-start-date').value = f ? (f.start_date || '') : '';
+  document.getElementById('fair-end-date').value = f ? (f.end_date || '') : '';
+  document.getElementById('fair-responsible').value = f ? (f.responsible_name || '') : '';
+  document.getElementById('fair-status').value = f ? f.status : 'pianificata';
+  openModal('fair-modal');
+}
+
+async function saveFair() {
+  const id = document.getElementById('fair-id').value;
+  const msg = document.getElementById('fair-modal-msg');
+  const name = document.getElementById('fair-name').value.trim();
+  if (!name) { msg.innerHTML = '<div class="msg error">Il nome della fiera è obbligatorio.</div>'; return; }
+  const body = {
+    name,
+    location: document.getElementById('fair-location').value.trim(),
+    start_date: document.getElementById('fair-start-date').value,
+    end_date: document.getElementById('fair-end-date').value,
+    responsible_name: document.getElementById('fair-responsible').value.trim(),
+    status: document.getElementById('fair-status').value,
+  };
+  try {
+    if (id) await api('/api/admin/fairs/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+    else await api('/api/admin/fairs', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('fair-modal');
+    loadFairs();
+    if (FAIR_CURRENT_ID && String(FAIR_CURRENT_ID) === id) loadFairDetail(FAIR_CURRENT_ID);
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function deleteFair(id) {
+  if (!confirm('Eliminare questa fiera? Verranno rimossi anche resoconto e foto associate.')) return;
+  await api('/api/admin/fairs/' + id, { method: 'DELETE' });
+  loadFairs();
+}
+
+async function openFairDetail(id) {
+  FAIR_CURRENT_ID = id;
+  document.getElementById('fiere-list-view').style.display = 'none';
+  document.getElementById('fair-detail-view').style.display = 'block';
+  await loadFairDetail(id);
+}
+
+function closeFairDetail() {
+  document.getElementById('fair-detail-view').style.display = 'none';
+  document.getElementById('fiere-list-view').style.display = 'block';
+  loadFairs();
+}
+
+async function loadFairDetail(id) {
+  const f = await api('/api/admin/fairs/' + id);
+  FAIR_CURRENT_DATA = f;
+  document.getElementById('fair-detail-title').textContent = f.name;
+  document.getElementById('fair-detail-body').innerHTML = `
+    <div class="crm-info-section">
+      <h4>Informazioni</h4>
+      <div class="crm-info-grid">
+        ${crmField('Località', f.location)}
+        ${crmField('Date', (f.start_date || '—') + (f.end_date ? ' – ' + f.end_date : ''))}
+        ${crmField('Responsabile', f.responsible_name)}
+        ${crmField('Stato', FAIR_STATUS_LABELS[f.status] || f.status)}
+      </div>
+      <div class="crm-save-bar"><button class="btn secondary" onclick='openFairModal(${jsonAttrP(f)})'>Modifica</button></div>
+    </div>
+
+    <div class="crm-info-section">
+      <h4>Resoconto</h4>
+      <div id="fair-report-msg"></div>
+      <div class="field"><textarea id="fair-report-notes" rows="4" placeholder="Cosa è stato fatto, contatti principali, esito...">${esc(f.report_notes || '')}</textarea></div>
+      <button class="btn small" onclick="saveFairReport()">Salva resoconto</button>
+      <div style="margin-top:18px">
+        <label class="btn-outline-pill" style="cursor:pointer;display:inline-flex">+ Aggiungi foto<input type="file" id="fair-photo-input" accept="image/*" style="display:none" onchange="uploadFairPhoto()"></label>
+        <div class="fair-photo-grid" id="fair-photo-grid">
+          ${f.attachments.map(a => `
+            <div class="fair-photo-item">
+              <img src="/api/admin/fairs/attachments/${a.id}/view?key=${encodeURIComponent(ADMIN_KEY)}" loading="lazy">
+              <button onclick="deleteFairPhoto(${a.id})">×</button>
+            </div>
+          `).join('') || ''}
+        </div>
+        ${!f.attachments.length ? '<p class="crm-tc-empty">Nessuna foto ancora caricata.</p>' : ''}
+      </div>
+    </div>
+
+    <div class="crm-info-section">
+      <div class="crm-panel-toolbar"><h4 style="margin:0">Clienti incontrati</h4><div class="list-spacer"></div><button class="btn-generate" style="margin-top:0" onclick="openNewCustomerForFair(${f.id})">+ Nuovo cliente</button></div>
+      <div style="margin-top:14px">
+        ${f.customers.length ? f.customers.map(c => `
+          <div class="crm-tc-customer" onclick="openCrmRecord('customer', ${c.id})">
+            <div>
+              <div class="crm-item-title">${esc(c.name)}</div>
+              <div class="crm-item-meta">${esc(c.city) || 'nessuna località'}</div>
+            </div>
+          </div>
+        `).join('') : '<p class="crm-tc-empty">Nessun cliente ancora collegato a questa fiera.</p>'}
+      </div>
+    </div>
+
+    <div class="crm-info-section">
+      <div class="crm-panel-toolbar"><h4 style="margin:0">Contatti raccolti</h4><div class="list-spacer"></div><button class="btn-generate" style="margin-top:0" onclick="openFairContactModal()">+ Nuovo contatto</button></div>
+      <div style="margin-top:14px">
+        ${f.contacts.length ? f.contacts.map(c => `
+          <div class="crm-activity-item">
+            <div class="crm-item-top"><span class="crm-item-title">${esc(c.name)}${c.role ? ' · ' + esc(c.role) : ''}</span></div>
+            <span class="crm-item-meta">${[c.entity_name, c.email, c.phone].filter(Boolean).map(esc).join(' · ')}</span>
+          </div>
+        `).join('') : '<p class="crm-tc-empty">Nessun contatto raccolto ancora.</p>'}
+      </div>
+    </div>
+  `;
+}
+
+async function saveFairReport() {
+  const msg = document.getElementById('fair-report-msg');
+  try {
+    await api('/api/admin/fairs/' + FAIR_CURRENT_ID, { method: 'PATCH', body: JSON.stringify({ report_notes: document.getElementById('fair-report-notes').value }) });
+    msg.innerHTML = '<div class="msg success">Resoconto salvato.</div>';
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function uploadFairPhoto() {
+  const input = document.getElementById('fair-photo-input');
+  if (!input.files.length) return;
+  const fd = new FormData();
+  fd.append('file', input.files[0]);
+  await api('/api/admin/fairs/' + FAIR_CURRENT_ID + '/attachments', { method: 'POST', body: fd });
+  input.value = '';
+  loadFairDetail(FAIR_CURRENT_ID);
+}
+
+async function deleteFairPhoto(attachmentId) {
+  if (!confirm('Eliminare questa foto?')) return;
+  await api('/api/admin/fairs/attachments/' + attachmentId, { method: 'DELETE' });
+  loadFairDetail(FAIR_CURRENT_ID);
+}
+
+const FAIR_CONTACT_ENTITY_LABELS = { customer: 'Cliente', importer: 'Importatore', agent: 'Agente', supplier: 'Fornitore' };
+
+function openFairContactModal() {
+  document.getElementById('fair-contact-modal-msg').innerHTML = '';
+  document.getElementById('fair-contact-name').value = '';
+  document.getElementById('fair-contact-role').value = '';
+  document.getElementById('fair-contact-email').value = '';
+  document.getElementById('fair-contact-phone').value = '';
+  document.getElementById('fair-contact-entity-type').value = 'customer';
+  populateFairContactEntityOptions();
+  openModal('fair-contact-modal');
+}
+
+async function populateFairContactEntityOptions() {
+  const type = document.getElementById('fair-contact-entity-type').value;
+  document.getElementById('fair-contact-entity-label').textContent = FAIR_CONTACT_ENTITY_LABELS[type];
+  const sel = document.getElementById('fair-contact-entity');
+  sel.innerHTML = '<option value="">Caricamento...</option>';
+  let options = [];
+  if (type === 'customer') {
+    options = FAIR_CURRENT_DATA.customers;
+  } else if (type === 'importer') {
+    options = await api('/api/admin/importers');
+  } else if (type === 'agent') {
+    options = await api('/api/admin/agents');
+  } else if (type === 'supplier') {
+    options = await api('/api/admin/suppliers');
+  }
+  sel.innerHTML = options.length
+    ? options.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('')
+    : `<option value="">— Nessun${type === 'customer' ? ' cliente collegato a questa fiera' : ' ' + FAIR_CONTACT_ENTITY_LABELS[type].toLowerCase() + ' disponibile'} —</option>`;
+}
+
+async function saveFairContact() {
+  const msg = document.getElementById('fair-contact-modal-msg');
+  const entityType = document.getElementById('fair-contact-entity-type').value;
+  const entityId = document.getElementById('fair-contact-entity').value;
+  const name = document.getElementById('fair-contact-name').value.trim();
+  if (!entityId) { msg.innerHTML = `<div class="msg error">Seleziona ${FAIR_CONTACT_ENTITY_LABELS[entityType].toLowerCase()} a cui collegare il contatto.</div>`; return; }
+  if (!name) { msg.innerHTML = '<div class="msg error">Il nome è obbligatorio.</div>'; return; }
+  try {
+    await api(`/api/admin/crm/${entityType}/${entityId}/contacts`, { method: 'POST', body: JSON.stringify({
+      name,
+      role: document.getElementById('fair-contact-role').value.trim(),
+      email: document.getElementById('fair-contact-email').value.trim(),
+      phone: document.getElementById('fair-contact-phone').value.trim(),
+      source_fair_id: FAIR_CURRENT_ID,
+    }) });
+    closeModal('fair-contact-modal');
+    loadFairDetail(FAIR_CURRENT_ID);
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
 async function deleteCatalog(id) {
   if (!confirm('Eliminare questo catalogo?')) return;
   await api('/api/admin/catalogs/' + id, { method: 'DELETE' });
@@ -2496,6 +2868,12 @@ async function openNewCustomerForAgent() {
   document.getElementById('cust-agent').value = CRM_CURRENT.id;
 }
 
+let CUSTOMER_MODAL_SOURCE_FAIR_ID = null;
+async function openNewCustomerForFair(fairId) {
+  await openCustomerModal();
+  CUSTOMER_MODAL_SOURCE_FAIR_ID = fairId;
+}
+
 async function saveCustomer() {
   const id = document.getElementById('cust-id').value;
   const msg = document.getElementById('customer-modal-msg');
@@ -2508,6 +2886,7 @@ async function saveCustomer() {
   body.estimated_volume_cents = volVal ? Math.round(parseFloat(volVal) * 100) : '';
   body.agent_id = document.getElementById('cust-agent').value || '';
   body.price_list_id = document.getElementById('cust-price-list').value || '';
+  if (!id && CUSTOMER_MODAL_SOURCE_FAIR_ID) body.source_fair_id = CUSTOMER_MODAL_SOURCE_FAIR_ID;
   try {
     if (id) await api('/api/admin/customers/' + id, { method: 'PATCH', body: JSON.stringify(body) });
     else await api('/api/admin/customers', { method: 'POST', body: JSON.stringify(body) });
@@ -2515,6 +2894,7 @@ async function saveCustomer() {
     loadCustomers();
     if (CRM_CURRENT.type === 'agent') loadCrmTrackedCustomers();
     if (CRM_CURRENT.type === 'customer' && String(CRM_CURRENT.id) === id) loadCrmRecordData();
+    if (CUSTOMER_MODAL_SOURCE_FAIR_ID) { loadFairDetail(CUSTOMER_MODAL_SOURCE_FAIR_ID); CUSTOMER_MODAL_SOURCE_FAIR_ID = null; }
   } catch (e) {
     msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
   }
@@ -2684,6 +3064,7 @@ function switchCrmTab(tab) {
   if (tab === 'overview') loadCrmOverview();
   if (tab === 'email') loadCrmEmails();
   if (tab === 'note') loadCrmNotes();
+  if (tab === 'contatti') loadCrmContacts();
   if (tab === 'allegati') loadCrmAttachments();
   if (tab === 'riunioni') loadCrmMeetings();
   if (tab === 'compiti') loadCrmTasks();
@@ -2899,6 +3280,73 @@ async function addCrmNote() {
 async function deleteCrmNote(noteId) {
   await api('/api/admin/crm/notes/' + noteId, { method: 'DELETE' });
   loadCrmNotes();
+}
+
+// ── Contatti ──────────────────────────────────────────────────────────────────
+async function loadCrmContacts() {
+  const { type, id } = CRM_CURRENT;
+  const rows = await api(`/api/admin/crm/${type}/${id}/contacts`);
+  document.getElementById('crm-contacts-list').innerHTML = rows.length ? rows.map(c => `
+    <div class="crm-activity-item">
+      <div class="crm-item-top">
+        <div>
+          <span class="crm-item-title">${esc(c.name)}</span>
+          ${c.role ? '<span class="crm-item-meta"> · ' + esc(c.role) + '</span>' : ''}
+        </div>
+        <div class="crm-item-actions">
+          <button class="btn-outline-pill" onclick='openCrmContactModal(${jsonAttrP(c)})'>Modifica</button>
+          <button class="btn-outline-pill danger" onclick="deleteCrmContact(${c.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </div>
+      </div>
+      <span class="crm-item-meta">${[c.email, c.phone, c.mobile].filter(Boolean).map(esc).join(' · ') || 'nessun recapito'}</span>
+      ${c.notes ? `<div class="crm-item-body">${esc(c.notes)}</div>` : ''}
+    </div>
+  `).join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessun contatto.</p>';
+}
+
+function openCrmContactModal(c) {
+  document.getElementById('crm-contact-modal-msg').innerHTML = '';
+  document.getElementById('crm-contact-modal-title').textContent = c ? 'Modifica contatto' : 'Nuovo contatto';
+  document.getElementById('crm-contact-id').value = c ? c.id : '';
+  document.getElementById('crm-contact-name').value = c ? c.name : '';
+  document.getElementById('crm-contact-role').value = c ? (c.role || '') : '';
+  document.getElementById('crm-contact-email').value = c ? (c.email || '') : '';
+  document.getElementById('crm-contact-phone').value = c ? (c.phone || '') : '';
+  document.getElementById('crm-contact-mobile').value = c ? (c.mobile || '') : '';
+  document.getElementById('crm-contact-notes').value = c ? (c.notes || '') : '';
+  openModal('crm-contact-modal');
+}
+
+async function saveCrmContact() {
+  const { type, id } = CRM_CURRENT;
+  const contactId = document.getElementById('crm-contact-id').value;
+  const msg = document.getElementById('crm-contact-modal-msg');
+  const name = document.getElementById('crm-contact-name').value.trim();
+  if (!name) { msg.innerHTML = '<div class="msg error">Il nome è obbligatorio.</div>'; return; }
+  const body = {
+    name,
+    role: document.getElementById('crm-contact-role').value.trim(),
+    email: document.getElementById('crm-contact-email').value.trim(),
+    phone: document.getElementById('crm-contact-phone').value.trim(),
+    mobile: document.getElementById('crm-contact-mobile').value.trim(),
+    notes: document.getElementById('crm-contact-notes').value.trim(),
+  };
+  try {
+    if (contactId) await api('/api/admin/crm/contacts/' + contactId, { method: 'PATCH', body: JSON.stringify(body) });
+    else await api(`/api/admin/crm/${type}/${id}/contacts`, { method: 'POST', body: JSON.stringify(body) });
+    closeModal('crm-contact-modal');
+    loadCrmContacts();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function deleteCrmContact(contactId) {
+  if (!confirm('Eliminare questo contatto?')) return;
+  await api('/api/admin/crm/contacts/' + contactId, { method: 'DELETE' });
+  loadCrmContacts();
 }
 
 // ── Allegati ──────────────────────────────────────────────────────────────────
