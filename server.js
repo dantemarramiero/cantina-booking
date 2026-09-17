@@ -2893,6 +2893,35 @@ app.delete('/api/admin/crm/notes/:id', authAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// Bottiglie vendute per tipologia (scheda CRM), filtrabile per anno/mese.
+// Gli ordini sono collegati solo a clienti e agenti (customer_id/agent_id) — non esiste
+// ancora un legame ordine→importatore nel gestionale, quindi per gli importatori si
+// risponde con supported:false invece di mostrare un dato falso.
+const CRM_SOLD_COLUMN_BY_TYPE = { customer: 'customer_id', agent: 'agent_id' };
+app.get('/api/admin/crm/:entityType/:entityId/sold', authAdmin, (req, res) => {
+  const { entityType, entityId } = req.params;
+  if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  const column = CRM_SOLD_COLUMN_BY_TYPE[entityType];
+  if (!column) return res.json({ supported: false, rows: [], availableYears: [] });
+
+  const { year, month } = req.query;
+  let sql = `
+    SELECT COALESCE(p.name, oi.product_name_raw) AS product_name, p.wine_type AS wine_type,
+      SUM(oi.quantity) AS quantity, SUM(oi.quantity * oi.unit_price_cents) AS revenue_cents
+    FROM order_items oi JOIN orders o ON o.id = oi.order_id LEFT JOIN products p ON p.id = oi.product_id
+    WHERE o.${column} = ?`;
+  const params = [entityId];
+  if (year) { sql += ` AND strftime('%Y', o.order_date) = ?`; params.push(String(year)); }
+  if (month) { sql += ` AND strftime('%m', o.order_date) = ?`; params.push(String(month).padStart(2, '0')); }
+  sql += ' GROUP BY COALESCE(p.id, oi.product_name_raw) ORDER BY quantity DESC';
+  const rows = db.prepare(sql).all(...params);
+
+  const availableYears = db.prepare(`SELECT DISTINCT strftime('%Y', o.order_date) AS y FROM orders o WHERE o.${column} = ? AND o.order_date IS NOT NULL ORDER BY y DESC`)
+    .all(entityId).map(r => r.y).filter(Boolean);
+
+  res.json({ supported: true, rows, availableYears });
+});
+
 // Attività unificata (note + riunioni + compiti + email + ordini) per la scheda CRM
 app.get('/api/admin/crm/:entityType/:entityId/activity', authAdmin, (req, res) => {
   const { entityType, entityId } = req.params;

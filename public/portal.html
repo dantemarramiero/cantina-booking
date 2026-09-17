@@ -364,8 +364,8 @@
   .crm2-section { margin-bottom: 22px; }
   .crm2-section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
   .crm2-section-head h2 { margin: 0; font: 400 20px var(--display); color: var(--ink); }
-  .crm2-edit-link { font: 400 12px var(--sans); color: #8c4a2a; cursor: pointer; }
-  .crm2-edit-link:hover { color: var(--wine-dark); text-decoration: underline; }
+  .crm2-edit-link { display: inline-flex; align-items: center; gap: 5px; font: 600 12px var(--sans); color: #8c4a2a; cursor: pointer; padding: 5px 12px; border: 1px solid #d9c2a8; border-radius: 999px; background: #fff; }
+  .crm2-edit-link:hover { color: #fff; background: var(--wine); border-color: var(--wine); }
   .crm2-fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; }
   @media (max-width: 720px) { .crm2-fields-grid, .crm2-sedi-grid { grid-template-columns: 1fr; } }
   .crm2-field-row { display: flex; align-items: baseline; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--line); }
@@ -1924,19 +1924,19 @@
     <div id="crm2-content">
       <div id="crm2-anagrafica">
         <div class="crm2-section" id="crm2-section-contatto">
-          <div class="crm2-section-head"><h2>Contatto</h2><span class="crm2-edit-link" onclick="crmEditSection('contatto')">Modifica</span></div>
+          <div class="crm2-section-head"><h2>Contatto</h2><span class="crm2-edit-link" onclick="crmEditSection('contatto')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>Modifica</span></div>
           <div id="crm2-view-contatto"></div>
         </div>
         <div class="crm2-section" id="crm2-section-sedi">
-          <div class="crm2-section-head"><h2 id="crm2-sedi-title">Sedi</h2><span class="crm2-edit-link" onclick="crmEditSection('sedi')">Modifica</span></div>
+          <div class="crm2-section-head"><h2 id="crm2-sedi-title">Sedi</h2><span class="crm2-edit-link" onclick="crmEditSection('sedi')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>Modifica</span></div>
           <div id="crm2-view-sedi"></div>
         </div>
         <div class="crm2-section" id="crm2-section-fiscali">
-          <div class="crm2-section-head"><h2>Dati fiscali</h2><span class="crm2-edit-link" onclick="crmEditSection('fiscali')">Modifica</span></div>
+          <div class="crm2-section-head"><h2>Dati fiscali</h2><span class="crm2-edit-link" onclick="crmEditSection('fiscali')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>Modifica</span></div>
           <div id="crm2-view-fiscali"></div>
         </div>
         <div class="crm2-section" id="crm2-section-commerciali">
-          <div class="crm2-section-head"><h2>Condizioni commerciali</h2><span class="crm2-edit-link" onclick="crmEditSection('commerciali')">Modifica</span></div>
+          <div class="crm2-section-head"><h2>Condizioni commerciali</h2><span class="crm2-edit-link" onclick="crmEditSection('commerciali')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>Modifica</span></div>
           <div id="crm2-view-commerciali"></div>
         </div>
       </div>
@@ -1973,6 +1973,21 @@
         <div class="crm2-list-panel-head"><h2>Documenti</h2></div>
         <input type="file" id="crm-attachment-input" onchange="uploadCrmAttachmentFile()">
         <div id="crm-attachments-list" style="margin-top:16px"></div>
+      </div>
+
+      <div class="crm2-list-panel" id="crm2-list-bottiglie" style="display:none">
+        <div class="crm2-list-panel-head"><h2>Bottiglie</h2></div>
+        <div class="crm-orders-filters">
+          <select id="bottiglie-year" onchange="loadCrmBottiglie()"></select>
+          <select id="bottiglie-month" onchange="loadCrmBottiglie()">
+            <option value="">Tutti i mesi</option>
+            <option value="1">Gennaio</option><option value="2">Febbraio</option><option value="3">Marzo</option>
+            <option value="4">Aprile</option><option value="5">Maggio</option><option value="6">Giugno</option>
+            <option value="7">Luglio</option><option value="8">Agosto</option><option value="9">Settembre</option>
+            <option value="10">Ottobre</option><option value="11">Novembre</option><option value="12">Dicembre</option>
+          </select>
+        </div>
+        <div id="crm-bottiglie-list" style="margin-top:14px"></div>
       </div>
 
       <div class="crm2-list-panel" id="crm2-list-clienti-seguiti" style="display:none">
@@ -3840,6 +3855,7 @@ function renderCrm2Index() {
     { key: 'contatti', label: 'Contatti', count: d.contacts_count },
   ];
   if (type === 'customer' || type === 'agent') items.push({ key: 'ordini', label: 'Ordini', count: d.order_count ?? d.orderCount });
+  if (type === 'customer' || type === 'agent' || type === 'importer') items.push({ key: 'bottiglie', label: 'Bottiglie' });
   if (type !== 'agent') items.push({ key: 'affari', label: 'Affari', count: d.deals_count });
   items.push({ key: 'compiti', label: 'Compiti', count: d.open_tasks_count });
   if (type === 'agent') items.push({ key: 'clienti-seguiti', label: 'Clienti seguiti' });
@@ -3855,7 +3871,7 @@ function crmSetActiveSection(section) {
   document.querySelectorAll('#crm2-index button').forEach(b => b.classList.toggle('active', b.dataset.section === section));
   const isAnagrafica = CRM_ANAGRAFICA_SECTIONS.includes(section);
   document.getElementById('crm2-anagrafica').style.display = isAnagrafica ? 'block' : 'none';
-  ['contatti', 'ordini', 'affari', 'compiti', 'documenti', 'clienti-seguiti'].forEach(k => {
+  ['contatti', 'ordini', 'bottiglie', 'affari', 'compiti', 'documenti', 'clienti-seguiti'].forEach(k => {
     const el = document.getElementById('crm2-list-' + k);
     if (el) el.style.display = k === section ? 'block' : 'none';
   });
@@ -3863,6 +3879,7 @@ function crmSetActiveSection(section) {
     document.getElementById('crm2-section-' + section)?.scrollIntoView({ block: 'nearest' });
   } else if (section === 'contatti') loadCrmContacts();
   else if (section === 'ordini') loadCrmOrders();
+  else if (section === 'bottiglie') loadCrmBottiglieInit();
   else if (section === 'affari') loadCrmDeals();
   else if (section === 'compiti') loadCrmTasks();
   else if (section === 'documenti') loadCrmAttachments();
@@ -4392,6 +4409,48 @@ async function loadCrmOrders() {
       <span class="crm-item-meta">${o.order_date} · € ${fmtEuro(o.total_cents)}</span>
     </div>
   `).join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessun ordine.</p>';
+}
+
+// ── Bottiglie vendute (Clienti / Agenti / Importatori) ──────────────────────────
+let CRM_BOTTIGLIE_YEARS_LOADED = false;
+async function loadCrmBottiglieInit() {
+  CRM_BOTTIGLIE_YEARS_LOADED = false;
+  await loadCrmBottiglie();
+}
+async function loadCrmBottiglie() {
+  const { type, id } = CRM_CURRENT;
+  const listEl = document.getElementById('crm-bottiglie-list');
+  const yearSel = document.getElementById('bottiglie-year');
+  const monthSel = document.getElementById('bottiglie-month');
+  const params = new URLSearchParams();
+  if (CRM_BOTTIGLIE_YEARS_LOADED && yearSel.value) params.set('year', yearSel.value);
+  if (CRM_BOTTIGLIE_YEARS_LOADED && monthSel.value) params.set('month', monthSel.value);
+  const res = await api(`/api/admin/crm/${type}/${id}/sold?` + params.toString());
+  if (!res.supported) {
+    yearSel.style.display = 'none';
+    monthSel.style.display = 'none';
+    listEl.innerHTML = '<p style="color:var(--ink-soft);font-size:13px">Gli ordini non sono ancora collegati agli importatori nel gestionale: questo dato non è disponibile per ora.</p>';
+    return;
+  }
+  yearSel.style.display = '';
+  monthSel.style.display = '';
+  if (!CRM_BOTTIGLIE_YEARS_LOADED) {
+    const currentYear = new Date().getFullYear();
+    const years = res.availableYears.length ? res.availableYears : [String(currentYear)];
+    yearSel.innerHTML = '<option value="">Tutti gli anni</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
+    yearSel.value = years.includes(String(currentYear)) ? String(currentYear) : '';
+    CRM_BOTTIGLIE_YEARS_LOADED = true;
+    return loadCrmBottiglie();
+  }
+  const maxQty = res.rows.length ? res.rows[0].quantity : 1;
+  listEl.innerHTML = res.rows.length ? res.rows.map(r => `
+    <div class="com2-label-row">
+      <span class="com2-label-dot" style="background:${WINE_TYPE_COLORS[r.wine_type] || '#8d8274'}"></span>
+      <span class="com2-label-name">${esc(r.product_name)}</span>
+      <span class="com2-label-track"><span class="com2-label-fill" style="width:${Math.round((r.quantity / maxQty) * 100)}%"></span></span>
+      <span class="com2-label-qty">${r.quantity.toLocaleString('it-IT')} bt</span>
+    </div>
+  `).join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessuna bottiglia venduta per questo periodo.</p>';
 }
 
 // ── PRODUZIONE ──────────────────────────────────────────────────────────────────
