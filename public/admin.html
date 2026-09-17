@@ -1809,7 +1809,7 @@ function openCalEventModal(bookingId) {
       <div class="field"><label>Operatore assegnato</label>
         <select onchange="calUpdateOperator(${b.id}, this.value)">
           <option value="">— Nessuno —</option>
-          ${OPERATORS.filter(o => o.active).map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+          ${OPERATORS.filter(o => o.active && o.portal_user_id).map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
         </select>
       </div>
       <div class="modal-actions" style="justify-content:space-between">
@@ -1859,7 +1859,7 @@ async function loadBookings() {
         <span class="badge ${b.status}">${b.status.replace('_',' ')}</span>
         <select onchange="updateBookingOperator(${b.id}, this.value)" style="padding:6px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;background:#fff">
           <option value="">— Operatore —</option>
-          ${OPERATORS.filter(o => o.active).map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+          ${OPERATORS.filter(o => o.active && o.portal_user_id).map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
         </select>
         <div class="list-row-value">€ ${fmtEuro(b.amount_cents)}</div>
         ${b.status !== 'confermata' ? `<button class="btn-outline-pill" onclick="confirmBooking(${b.id})">Conferma</button>` : ''}
@@ -1907,7 +1907,7 @@ async function openManualBooking() {
   await loadManualSlots();
   if (!OPERATORS.length) OPERATORS = await api('/api/admin/operators');
   document.getElementById('man-operator').innerHTML = '<option value="">— Nessuno —</option>' +
-    OPERATORS.filter(o => o.active).map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+    OPERATORS.filter(o => o.active && o.portal_user_id).map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
   openModal('manual-modal');
 }
 async function loadManualSlots() {
@@ -2053,6 +2053,7 @@ async function loadOperators() {
       </div>
       <div class="list-row-meta">
         <span class="pill-stat">${o.visitCount} visite</span>
+        ${!o.portal_user_id ? '<span class="badge annullata" title="Creato prima che gli operatori venissero collegati agli utenti del portale: non selezionabile per nuove visite finché non corrisponde a un utente del software">Non collegato a un utente</span>' : ''}
         <span class="badge ${o.active ? 'confermata' : 'annullata'}">${o.active ? 'Attivo' : 'Disattivo'}</span>
       </div>
     </div>
