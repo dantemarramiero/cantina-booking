@@ -226,6 +226,31 @@ db.exec(`
 `);
 try { db.exec('ALTER TABLE operators ADD COLUMN portal_user_id INTEGER'); } catch {}
 
+// ── Enoturismo: eventi terzi (affitto struttura) ──────────────────────────────
+// Lato operativo soltanto: l'organizzatore è un testo libero, non un'anagrafica
+// CRM collegata. crm_customer_id è un aggancio riservato per la futura
+// unificazione dell'identità CRM (persone/ruoli), oggi non usato.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS venue_events (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    title             TEXT NOT NULL,
+    organizer_name    TEXT NOT NULL,
+    organizer_email   TEXT,
+    organizer_phone   TEXT,
+    event_date        TEXT NOT NULL,
+    start_time        TEXT,
+    end_time          TEXT,
+    guests_estimate   INTEGER,
+    rental_fee_cents  INTEGER NOT NULL DEFAULT 0,
+    deposit_cents     INTEGER NOT NULL DEFAULT 0,
+    deposit_paid      INTEGER NOT NULL DEFAULT 0,
+    status            TEXT NOT NULL DEFAULT 'richiesta',
+    notes             TEXT,
+    crm_customer_id   INTEGER,
+    created_at        TEXT DEFAULT (datetime('now','localtime'))
+  )
+`);
+
 // ── Enoturismo: CRM B2C (visitatori, clienti negozio/e-commerce) ──────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS b2c_customers (
@@ -1736,6 +1761,68 @@ app.get('/api/admin/operators', authAdmin, (req, res) => {
   const operators = db.prepare('SELECT * FROM operators ORDER BY name').all();
   const visitCount = db.prepare("SELECT COUNT(*) AS c FROM bookings WHERE operator_id = ? AND status != 'annullata'");
   res.json(operators.map(o => ({ ...o, visitCount: visitCount.get(o.id).c })));
+});
+
+// ── Enoturismo: eventi terzi (affitto struttura) — lato operativo ─────────────
+const VENUE_EVENT_STATUSES = ['richiesta', 'confermato', 'completato', 'annullato'];
+
+app.get('/api/admin/venue-events', authAdmin, (req, res) => {
+  res.json(db.prepare('SELECT * FROM venue_events ORDER BY event_date DESC, id DESC').all());
+});
+
+app.get('/api/admin/venue-events/:id', authAdmin, (req, res) => {
+  const row = db.prepare('SELECT * FROM venue_events WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Evento non trovato.' });
+  res.json(row);
+});
+
+app.post('/api/admin/venue-events', authAdmin, (req, res) => {
+  const { title, organizer_name, organizer_email, organizer_phone, event_date, start_time, end_time,
+    guests_estimate, rental_fee_cents, deposit_cents, deposit_paid, status, notes } = req.body || {};
+  if (!title?.trim()) return res.status(400).json({ error: 'Il titolo dell\'evento è obbligatorio.' });
+  if (!organizer_name?.trim()) return res.status(400).json({ error: 'Il nome dell\'organizzatore è obbligatorio.' });
+  if (!event_date) return res.status(400).json({ error: 'La data dell\'evento è obbligatoria.' });
+  const finalStatus = VENUE_EVENT_STATUSES.includes(status) ? status : 'richiesta';
+  const result = db.prepare(`
+    INSERT INTO venue_events (title, organizer_name, organizer_email, organizer_phone, event_date, start_time, end_time,
+      guests_estimate, rental_fee_cents, deposit_cents, deposit_paid, status, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    title.trim(), organizer_name.trim(), organizer_email?.trim() || null, organizer_phone?.trim() || null,
+    event_date, start_time || null, end_time || null,
+    guests_estimate || null, rental_fee_cents || 0, deposit_cents || 0, deposit_paid ? 1 : 0,
+    finalStatus, notes?.trim() || null
+  );
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+
+app.patch('/api/admin/venue-events/:id', authAdmin, (req, res) => {
+  const fields = ['title', 'organizer_name', 'organizer_email', 'organizer_phone', 'event_date', 'start_time', 'end_time',
+    'guests_estimate', 'rental_fee_cents', 'deposit_cents', 'deposit_paid', 'status', 'notes'];
+  if (req.body.status !== undefined && !VENUE_EVENT_STATUSES.includes(req.body.status)) {
+    return res.status(400).json({ error: 'Stato non valido.' });
+  }
+  const updates = [], params = [];
+  for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
+  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  params.push(req.params.id);
+  db.prepare(`UPDATE venue_events SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  res.json({ success: true });
+});
+
+app.delete('/api/admin/venue-events/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM venue_events WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// Controllo rapido di conflitto: eventi terzi attivi nella stessa data (evita doppie prenotazioni della struttura)
+app.get('/api/admin/venue-events/conflicts/:date', authAdmin, (req, res) => {
+  const excludeId = req.query.excludeId || 0;
+  const rows = db.prepare(`
+    SELECT id, title, organizer_name, status FROM venue_events
+    WHERE event_date = ? AND status != 'annullato' AND id != ?
+  `).all(req.params.date, excludeId);
+  res.json(rows);
 });
 
 // ── CRM B2C: clienti (visitatori + negozio + e-commerce) ──────────────────────
