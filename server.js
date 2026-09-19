@@ -134,6 +134,9 @@ try { db.exec('ALTER TABLE experiences ADD COLUMN included_it TEXT'); } catch {}
 try { db.exec('ALTER TABLE experiences ADD COLUMN included_en TEXT'); } catch {}
 try { db.exec('ALTER TABLE experiences ADD COLUMN languages TEXT'); } catch {}
 try { db.exec('ALTER TABLE experiences ADD COLUMN facilities TEXT'); } catch {}
+// 'visita' | 'evento' — stesso motore anagrafica/disponibilità/prenotazioni/operatori,
+// solo la vetrina pubblica e le liste in admin li separano (modulo Eventi proprietari).
+try { db.exec("ALTER TABLE experiences ADD COLUMN type TEXT NOT NULL DEFAULT 'visita'"); } catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS experience_images (
@@ -1110,7 +1113,8 @@ app.get('/api/config', (req, res) => {
 });
 
 app.get('/api/experiences', (req, res) => {
-  const rows = db.prepare('SELECT * FROM experiences WHERE active = 1 ORDER BY sort_order, id').all();
+  const type = req.query.type === 'evento' ? 'evento' : 'visita';
+  const rows = db.prepare('SELECT * FROM experiences WHERE active = 1 AND type = ? ORDER BY sort_order, id').all(type);
   res.json(rows);
 });
 
@@ -1318,20 +1322,21 @@ app.get('/api/admin/experiences/:id', authAdmin, (req, res) => {
 });
 
 app.post('/api/admin/experiences', authAdmin, uploadExpImage.single('image'), (req, res) => {
-  const { name_it, name_en, description_it, description_en, included_it, included_en, price_cents, duration_minutes, max_guests, sort_order, languages, facilities } = req.body || {};
+  const { name_it, name_en, description_it, description_en, included_it, included_en, price_cents, duration_minutes, max_guests, sort_order, languages, facilities, type } = req.body || {};
   if (!name_it?.trim() || !name_en?.trim() || !price_cents) {
     return res.status(400).json({ error: 'Nome (IT/EN) e prezzo sono obbligatori.' });
   }
   const image_url = req.file ? `/uploads/experiences/${req.file.filename}` : null;
   const langStr = Array.isArray(JSON.parse(languages || '[]')) ? JSON.parse(languages || '[]').join(',') : null;
   const facStr = Array.isArray(JSON.parse(facilities || '[]')) ? JSON.parse(facilities || '[]').join(',') : null;
+  const typeVal = type === 'evento' ? 'evento' : 'visita';
   const result = db.prepare(`
-    INSERT INTO experiences (name_it, name_en, description_it, description_en, included_it, included_en, price_cents, duration_minutes, max_guests, image_url, sort_order, languages, facilities)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO experiences (name_it, name_en, description_it, description_en, included_it, included_en, price_cents, duration_minutes, max_guests, image_url, sort_order, languages, facilities, type)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(name_it.trim(), name_en.trim(), description_it?.trim() || null, description_en?.trim() || null,
          included_it?.trim() || null, included_en?.trim() || null,
          parseInt(price_cents), parseInt(duration_minutes) || 90, parseInt(max_guests) || 10, image_url, parseInt(sort_order) || 0,
-         langStr, facStr);
+         langStr, facStr, typeVal);
   res.json({ success: true, id: result.lastInsertRowid });
 });
 

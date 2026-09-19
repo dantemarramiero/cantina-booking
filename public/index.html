@@ -173,6 +173,17 @@
   </div>
 </section>
 
+<section id="eventi" style="display:none">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow" data-i18n="events_eyebrow">In cantina</p>
+      <h2 data-i18n="events_title">Eventi</h2>
+      <p class="desc" data-i18n="events_desc">Le prossime occasioni per vivere la cantina da vicino.</p>
+    </div>
+    <div class="experiences-grid" id="events-grid"></div>
+  </div>
+</section>
+
 <section class="reviews-wrap">
   <div class="container">
     <div class="section-head">
@@ -313,6 +324,10 @@ const I18N = {
     exp_eyebrow: 'Impresso nel vino',
     exp_title: 'Visita la cantina',
     exp_desc: 'Scegli il percorso di degustazione più adatto a te e prenota subito la data che preferisci.',
+    events_eyebrow: 'In cantina',
+    events_title: 'Eventi',
+    events_desc: 'Le prossime occasioni per vivere la cantina da vicino.',
+    buy_ticket: 'Acquista biglietto',
     rev_eyebrow: 'Testimonianze',
     rev_title: 'Cosa dicono i nostri ospiti',
     rev_form_title: 'Lascia una recensione',
@@ -367,6 +382,10 @@ const I18N = {
     exp_eyebrow: 'Impressed in wine',
     exp_title: 'Visit the cellar',
     exp_desc: 'Choose the tasting experience that suits you best and book your preferred date.',
+    events_eyebrow: 'At the winery',
+    events_title: 'Events',
+    events_desc: 'Upcoming occasions to experience the winery up close.',
+    buy_ticket: 'Buy ticket',
     rev_eyebrow: 'Testimonials',
     rev_title: 'What our guests say',
     rev_form_title: 'Leave a review',
@@ -419,6 +438,7 @@ const I18N = {
 let LANG = 'it';
 let CANTINA_NAME = 'Cantina';
 let EXPERIENCES = [];
+let EVENTS = [];
 let CURRENT_EXP = null;
 let SELECTED_SLOT = null;
 let DISCOUNT = { code: null, cents: 0 };
@@ -453,6 +473,13 @@ async function loadExperiences() {
   renderExperiences();
 }
 
+async function loadEvents() {
+  const res = await fetch('/api/experiences?type=evento');
+  EVENTS = await res.json();
+  document.getElementById('eventi').style.display = EVENTS.length ? 'block' : 'none';
+  renderEvents();
+}
+
 function fmtDuration(mins) {
   const h = Math.floor(mins / 60), m = mins % 60;
   return (h ? `${h}h` : '') + (m ? ` ${m}m` : '') || `${mins}m`;
@@ -478,6 +505,26 @@ function renderExperiences() {
   `).join('');
 }
 
+function renderEvents() {
+  const grid = document.getElementById('events-grid');
+  grid.innerHTML = EVENTS.map(e => `
+    <div class="exp-card">
+      <div class="img" style="${e.image_url ? `background-image:url('${e.image_url}')` : ''}"></div>
+      <div class="body">
+        <h3>${expName(e)}</h3>
+        <p class="desc">${expDesc(e) || ''}</p>
+        <div class="meta">
+          <div>
+            <div class="price">€ ${fmtEuro(e.price_cents)} <span>/ ${t('per_person')}</span></div>
+            <div class="duration">🕐 ${fmtDuration(e.duration_minutes)}</div>
+          </div>
+        </div>
+        <button class="btn" style="margin-top:18px;width:100%" onclick="openBooking(${e.id})">${t('buy_ticket')}</button>
+      </div>
+    </div>
+  `).join('');
+}
+
 async function loadReviews() {
   const res = await fetch('/api/reviews');
   const reviews = await res.json();
@@ -494,7 +541,7 @@ async function loadReviews() {
 
 // ── Booking flow ──────────────────────────────────────────────────────────────
 async function openBooking(expId) {
-  CURRENT_EXP = EXPERIENCES.find(e => e.id === expId);
+  CURRENT_EXP = EXPERIENCES.find(e => e.id === expId) || EVENTS.find(e => e.id === expId);
   SELECTED_SLOT = null;
   DISCOUNT = { code: null, cents: 0 };
   document.getElementById('f-discount').value = '';
@@ -589,7 +636,7 @@ document.getElementById('apply-discount').addEventListener('click', async () => 
 
 document.getElementById('back-to-1').addEventListener('click', () => showStep(1));
 document.getElementById('modal-close').addEventListener('click', closeBooking);
-document.getElementById('close-final').addEventListener('click', () => { closeBooking(); loadExperiences(); });
+document.getElementById('close-final').addEventListener('click', () => { closeBooking(); loadExperiences(); loadEvents(); });
 
 function showStep(n) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
@@ -697,6 +744,7 @@ document.querySelectorAll('.lang-toggle button').forEach(btn => {
     LANG = btn.dataset.lang;
     applyI18n();
     renderExperiences();
+    renderEvents();
     document.title = CANTINA_NAME + ' — ' + (LANG === 'en' ? 'Book your cellar visit' : 'Prenota la tua visita in cantina');
   });
 });
@@ -716,6 +764,7 @@ function showPaymentBanner() {
   applyI18n();
   await loadConfig();
   await loadExperiences();
+  await loadEvents();
   await loadReviews();
   showPaymentBanner();
 })();
