@@ -1205,6 +1205,12 @@
         <tbody id="b2c-orders-tbody"></tbody></table>
       </div>
       <button class="btn secondary" onclick="openB2COrderModal()">+ Aggiungi ordine</button>
+
+      <h3 style="font-size:15px;margin:22px 0 10px">Acquisti in cassa</h3>
+      <div class="table-wrap">
+        <table><thead><tr><th>Data</th><th>Contesto</th><th>Bottiglie</th><th>Pagamento</th><th>Totale</th><th>Azioni</th></tr></thead>
+        <tbody id="b2c-cassa-sales-tbody"></tbody></table>
+      </div>
     </div>
   </div>
 </div>
@@ -2613,6 +2619,16 @@ async function openB2CCustomerModal(id) {
         <td><button class="btn small danger" onclick="deleteB2COrder(${o.id})">Elimina</button></td>
       </tr>
     `).join('') : '<tr><td colspan="5" class="empty">Nessun ordine registrato.</td></tr>';
+    document.getElementById('b2c-cassa-sales-tbody').innerHTML = c.shopSales.length ? c.shopSales.map(s => `
+      <tr>
+        <td>${s.created_at}</td>
+        <td>${CASSA_CONTEXT_LABELS[s.sale_context] || s.sale_context}</td>
+        <td>${s.items.map(it => `${it.quantity}× ${esc(it.product_name)}`).join(', ')}</td>
+        <td>${CASSA_PAYMENT_LABELS[s.payment_method] || s.payment_method}</td>
+        <td>€ ${fmtEuro(s.total_cents)}</td>
+        <td><button class="btn small danger" onclick="voidB2CCassaSale(${s.id})">Annulla</button></td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" class="empty">Nessun acquisto in cassa registrato.</td></tr>';
   } else {
     document.getElementById('b2c-id').value = '';
     document.getElementById('b2c-name').value = '';
@@ -2678,6 +2694,13 @@ async function saveB2COrder() {
 async function deleteB2COrder(id) {
   if (!confirm('Eliminare questo ordine?')) return;
   await api('/api/admin/b2c-orders/' + id, { method: 'DELETE' });
+  openB2CCustomerModal(B2C_CURRENT_ID);
+  loadB2CCustomers();
+}
+
+async function voidB2CCassaSale(id) {
+  if (!confirm('Annullare questa vendita? Le giacenze scalate verranno ripristinate.')) return;
+  await api('/api/admin/shop-sales/' + id, { method: 'DELETE' });
   openB2CCustomerModal(B2C_CURRENT_ID);
   loadB2CCustomers();
 }

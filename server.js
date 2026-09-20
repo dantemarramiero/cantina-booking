@@ -1943,16 +1943,18 @@ app.get('/api/admin/b2c-customers', authAdmin, (req, res) => {
 
   const visitStats = db.prepare("SELECT COUNT(*) AS c FROM bookings WHERE b2c_customer_id = ? AND status != 'annullata'");
   const orderStats = db.prepare("SELECT channel, COUNT(*) AS c, COALESCE(SUM(amount_cents),0) AS total FROM b2c_orders WHERE customer_id = ? GROUP BY channel");
+  const cassaStats = db.prepare('SELECT COUNT(*) AS c, COALESCE(SUM(total_cents),0) AS total FROM shop_sales WHERE b2c_customer_id = ?');
 
   res.json(customers.map(c => {
     const orders = orderStats.all(c.id);
     const ecommerce = orders.find(o => o.channel === 'ecommerce') || { c: 0, total: 0 };
     const negozio = orders.find(o => o.channel === 'negozio') || { c: 0, total: 0 };
+    const cassa = cassaStats.get(c.id);
     return {
       ...c,
       visitCount: visitStats.get(c.id).c,
       ecommerceCount: ecommerce.c, ecommerceTotalCents: ecommerce.total,
-      negozioCount: negozio.c, negozioTotalCents: negozio.total,
+      negozioCount: negozio.c + cassa.c, negozioTotalCents: negozio.total + cassa.total,
     };
   }));
 });
@@ -1967,7 +1969,10 @@ app.get('/api/admin/b2c-customers/:id', authAdmin, (req, res) => {
     WHERE b.b2c_customer_id = ? ORDER BY s.date DESC
   `).all(customer.id);
   const orders = db.prepare('SELECT * FROM b2c_orders WHERE customer_id = ? ORDER BY order_date DESC').all(customer.id);
-  res.json({ ...customer, visits, orders });
+  const shopSales = db.prepare('SELECT * FROM shop_sales WHERE b2c_customer_id = ? ORDER BY created_at DESC').all(customer.id);
+  const itemsBySale = db.prepare('SELECT * FROM shop_sale_items WHERE sale_id = ? ORDER BY id');
+  for (const s of shopSales) s.items = itemsBySale.all(s.id);
+  res.json({ ...customer, visits, orders, shopSales });
 });
 
 app.post('/api/admin/b2c-customers', authAdmin, (req, res) => {
