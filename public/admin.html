@@ -534,10 +534,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
         Calendario
       </button>
-      <button data-tab="bookings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
-        Prenotazioni
-      </button>
       <button data-tab="discounts">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 12.6 12.6 20.4a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1 0-2.8L11.4 3.6a2 2 0 0 1 1.4-.6H19a2 2 0 0 1 2 2v6.6a2 2 0 0 1-.6 1.4Z"/><circle cx="15" cy="9" r="1.5"/></svg>
         Codici Sconto
@@ -553,10 +549,6 @@
       <button data-tab="operators">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="4.5"/></svg>
         Operatori
-      </button>
-      <button data-tab="crm">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
-        CRM
       </button>
     </nav>
 
@@ -778,9 +770,17 @@
             </div>
           </div>
 
-          <button class="cal-icon-btn" onclick="calExportCsv()" title="Esporta CSV">
+          <button class="cal-pill-btn" onclick="syncPayments()" title="Sincronizza i pagamenti Stripe in sospeso">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="vertical-align:-2px;margin-right:4px"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+            Sincronizza
+          </button>
+
+          <button class="cal-icon-btn" onclick="calExportCsv()" title="Esporta CSV della vista corrente">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/></svg>
           </button>
+          <a class="cal-icon-btn" id="cal-export-all-link" href="#" title="Esporta CSV di tutte le prenotazioni" style="text-decoration:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </a>
 
           <button class="btn" onclick="openManualBooking()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -876,37 +876,6 @@
       </div>
     </div>
 
-    <!-- BOOKINGS -->
-    <div class="panel" id="panel-bookings">
-      <div class="list-card">
-        <div class="list-toolbar">
-          <div class="search-input">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="bk-search" placeholder="Cerca nome o email" oninput="loadBookings()">
-          </div>
-          <div class="segmented" id="bk-status-seg">
-            <button type="button" class="active" data-status="all">Tutte</button>
-            <button type="button" data-status="in_attesa">In attesa</button>
-            <button type="button" data-status="confermata">Confermate</button>
-            <button type="button" data-status="annullata">Annullate</button>
-          </div>
-          <div class="list-spacer"></div>
-          <button class="btn-outline-pill" onclick="syncPayments()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
-            Sincronizza
-          </button>
-          <a class="btn-outline-pill" id="export-link" href="#" style="text-decoration:none">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Esporta CSV
-          </a>
-          <button class="btn-generate" style="margin-top:0;padding:9px 18px" onclick="openManualBooking()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
-            Prenotazione
-          </button>
-        </div>
-        <div class="list-rows" id="bookings-tbody"></div>
-      </div>
-    </div>
 
     <!-- DISCOUNTS -->
     <div class="panel" id="panel-discounts">
@@ -941,24 +910,6 @@
           <div class="list-toolbar-title"><h3>Operatori</h3><p>Addetti assegnabili alle visite in cantina — coincidono con gli utenti che hanno accesso al software. Per aggiungerne uno nuovo o disattivarlo, vai in Impostazioni → Utenti del portale.</p></div>
         </div>
         <div class="list-rows" id="operators-tbody"></div>
-      </div>
-    </div>
-
-    <!-- CRM B2C -->
-    <div class="panel" id="panel-crm">
-      <div class="list-card">
-        <div class="list-toolbar">
-          <div class="search-input">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="b2c-search" placeholder="Cerca nome o email" oninput="loadB2CCustomers()">
-          </div>
-          <div class="list-spacer"></div>
-          <button class="btn-generate" style="margin-top:0;padding:9px 18px" onclick="openB2CCustomerModal()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
-            Nuovo cliente
-          </button>
-        </div>
-        <div class="list-rows" id="b2c-customers-tbody"></div>
       </div>
     </div>
   </main>
@@ -1183,75 +1134,6 @@
   </div>
 </div>
 
-<!-- B2C customer detail/edit modal -->
-<div class="modal-overlay" id="b2c-modal">
-  <div class="modal-box" style="max-width:640px">
-    <h3 id="b2c-modal-title">Nuovo cliente</h3>
-    <div id="b2c-modal-msg"></div>
-    <input type="hidden" id="b2c-id">
-    <div class="field-row">
-      <div class="field"><label>Nome</label><input id="b2c-name"></div>
-      <div class="field"><label>Email</label><input type="email" id="b2c-email"></div>
-    </div>
-    <div class="field-row">
-      <div class="field"><label>Telefono</label><input id="b2c-phone"></div>
-      <div class="field"><label>Note</label><input id="b2c-notes"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn secondary" onclick="closeModal('b2c-modal')">Annulla</button>
-      <button class="btn" onclick="saveB2CCustomer()">Salva</button>
-    </div>
-
-    <div id="b2c-detail-section" style="display:none;margin-top:24px;border-top:1px solid var(--line);padding-top:18px">
-      <h3 style="font-size:15px;margin-bottom:10px">Visite effettuate</h3>
-      <div class="table-wrap" style="margin-bottom:20px">
-        <table><thead><tr><th>Data</th><th>Esperienza</th><th>Operatore</th><th>Stato</th><th>Totale</th></tr></thead>
-        <tbody id="b2c-visits-tbody"></tbody></table>
-      </div>
-      <h3 style="font-size:15px;margin-bottom:10px">Ordini negozio / e-commerce</h3>
-      <div class="table-wrap" style="margin-bottom:14px">
-        <table><thead><tr><th>Data</th><th>Canale</th><th>N. Ordine</th><th>Importo</th><th>Azioni</th></tr></thead>
-        <tbody id="b2c-orders-tbody"></tbody></table>
-      </div>
-      <button class="btn secondary" onclick="openB2COrderModal()">+ Aggiungi ordine</button>
-
-      <h3 style="font-size:15px;margin:22px 0 10px">Acquisti in cassa</h3>
-      <div class="table-wrap">
-        <table><thead><tr><th>Data</th><th>Contesto</th><th>Bottiglie</th><th>Pagamento</th><th>Totale</th><th>Azioni</th></tr></thead>
-        <tbody id="b2c-cassa-sales-tbody"></tbody></table>
-      </div>
-
-      <h3 style="font-size:15px;margin:22px 0 10px">Ordini ritiro (negozio online)</h3>
-      <div class="table-wrap">
-        <table><thead><tr><th>Data</th><th>Bottiglie</th><th>Totale</th><th>Stato</th></tr></thead>
-        <tbody id="b2c-pickup-orders-tbody"></tbody></table>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- B2C order modal -->
-<div class="modal-overlay" id="b2c-order-modal">
-  <div class="modal-box">
-    <h3>Nuovo ordine</h3>
-    <div id="b2c-order-modal-msg"></div>
-    <div class="field"><label>Canale</label>
-      <select id="bo-channel"><option value="ecommerce">E-commerce</option></select>
-      <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-soft)">Le vendite in negozio fisico si registrano dalla Cassa, non qui.</p>
-    </div>
-    <div class="field-row">
-      <div class="field"><label>Data ordine</label><input type="date" id="bo-date"></div>
-      <div class="field"><label>Importo (€)</label><input type="number" step="0.01" id="bo-amount"></div>
-    </div>
-    <div class="field"><label>N. Ordine (opzionale)</label><input id="bo-number"></div>
-    <div class="field"><label>Note</label><textarea id="bo-notes" rows="2"></textarea></div>
-    <div class="modal-actions">
-      <button class="btn secondary" onclick="closeModal('b2c-order-modal')">Annulla</button>
-      <button class="btn" onclick="saveB2COrder()">Salva</button>
-    </div>
-  </div>
-</div>
-
 <script>
 let ADMIN_KEY = null;
 let EXPERIENCES = [];
@@ -1359,7 +1241,7 @@ function closeMobileSidebar() {
 }
 
 // ── Tabs (sidebar) ──────────────────────────────────────────────────────────────
-const TAB_TITLES = { dashboard: 'Dashboard', experiences: 'Esperienze', events: 'Eventi proprietari', 'venue-events': 'Eventi terzi', cassa: 'Cassa', 'pickup-orders': 'Ritiri', calendar: 'Calendario', bookings: 'Prenotazioni', discounts: 'Codici Sconto', reviews: 'Recensioni', newsletter: 'Newsletter', operators: 'Operatori', crm: 'CRM' };
+const TAB_TITLES = { dashboard: 'Dashboard', experiences: 'Esperienze', events: 'Eventi proprietari', 'venue-events': 'Eventi terzi', cassa: 'Cassa', 'pickup-orders': 'Ritiri', calendar: 'Calendario', discounts: 'Codici Sconto', reviews: 'Recensioni', newsletter: 'Newsletter', operators: 'Operatori' };
 document.querySelectorAll('.sidebar-nav button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.sidebar-nav button').forEach(b => b.classList.remove('active'));
@@ -1394,12 +1276,10 @@ function loadPanel(tab) {
   if (tab === 'cassa') loadCassa();
   if (tab === 'pickup-orders') loadPickupOrders();
   if (tab === 'calendar') { loadExperiencesForSelects(); loadSlots(); renderCalendar(); }
-  if (tab === 'bookings') loadBookings();
   if (tab === 'discounts') loadDiscounts();
   if (tab === 'reviews') loadReviews();
   if (tab === 'newsletter') loadNewsletter();
   if (tab === 'operators') loadOperators();
-  if (tab === 'crm') loadB2CCustomers();
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -1928,6 +1808,7 @@ function calSelectedStatuses() {
 
 async function renderCalendar() {
   if (!OPERATORS.length) OPERATORS = await api('/api/admin/operators');
+  document.getElementById('cal-export-all-link').href = `/api/admin/export?key=${encodeURIComponent(ADMIN_KEY)}`;
   const days = [];
   if (CAL_MODE === 'week') {
     const start = calStartOfWeek(CAL_ANCHOR);
@@ -2034,6 +1915,7 @@ function openCalEventModal(bookingId) {
   if (b.status !== 'confermata') actions.push(`<button class="btn small ok" onclick="calAction(()=>confirmBooking(${b.id}))">Conferma</button>`);
   if (b.status !== 'annullata') actions.push(`<button class="btn small danger" onclick="calAction(()=>rejectBooking(${b.id}))">Annulla</button>`);
   if (b.status === 'confermata') actions.push(`<button class="btn small secondary" onclick="calAction(()=>checkinBooking(${b.id}))">${b.checked_in ? 'Annulla check-in' : 'Check-in'}</button>`);
+  actions.push(`<button class="btn small danger" onclick="calAction(()=>deleteBooking(${b.id}))">Elimina</button>`);
 
   const box = document.createElement('div');
   box.className = 'modal-overlay open';
@@ -2070,75 +1952,26 @@ async function calAction(fn) {
 }
 
 // ── Bookings ──────────────────────────────────────────────────────────────────
-let BK_STATUS_FILTER = 'all';
-document.querySelectorAll('#bk-status-seg button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#bk-status-seg button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    BK_STATUS_FILTER = btn.dataset.status;
-    loadBookings();
-  });
-});
-
-async function loadBookings() {
-  if (!OPERATORS.length) OPERATORS = await api('/api/admin/operators');
-  const params = new URLSearchParams();
-  const q = document.getElementById('bk-search').value.trim();
-  if (q) params.set('q', q);
-  if (BK_STATUS_FILTER && BK_STATUS_FILTER !== 'all') params.set('status', BK_STATUS_FILTER);
-  const rows = await api('/api/admin/bookings?' + params.toString());
-  document.getElementById('export-link').href = `/api/admin/export?key=${encodeURIComponent(ADMIN_KEY)}`;
-  document.getElementById('bookings-tbody').innerHTML = rows.length ? rows.map(b => `
-    <div class="list-row">
-      <div class="list-row-icon">${esc(b.customer_name).charAt(0).toUpperCase()}</div>
-      <div class="list-row-body">
-        <div class="list-row-title">${esc(b.customer_name)} · ${esc(b.experience_name)}</div>
-        <div class="list-row-sub">${b.date} · ${b.time} · ${b.guests} ${b.guests===1?'ospite':'ospiti'} · ${esc(b.email)}</div>
-      </div>
-      <div class="list-row-meta">
-        <span class="badge ${b.status}">${b.status.replace('_',' ')}</span>
-        <select onchange="updateBookingOperator(${b.id}, this.value)" style="padding:6px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;background:#fff">
-          <option value="">— Operatore —</option>
-          ${OPERATORS.filter(o => o.active && o.portal_user_id).map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
-        </select>
-        <div class="list-row-value">€ ${fmtEuro(b.amount_cents)}</div>
-        ${b.status !== 'confermata' ? `<button class="btn-outline-pill" onclick="confirmBooking(${b.id})">Conferma</button>` : ''}
-        ${b.status === 'confermata' ? `<button class="btn-outline-pill" onclick="checkinBooking(${b.id})">${b.checked_in ? '✔ Check-in' : 'Check-in'}</button>` : ''}
-        ${b.status !== 'annullata' ? `<button class="btn-outline-pill danger" onclick="rejectBooking(${b.id})">Annulla</button>` : ''}
-        <button class="btn-outline-pill danger" onclick="deleteBooking(${b.id})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-        </button>
-      </div>
-    </div>
-  `).join('') : '<div class="list-empty">Nessuna prenotazione trovata.</div>';
-}
-
-async function updateBookingOperator(id, operatorId) {
-  await api('/api/admin/bookings/' + id, { method: 'PATCH', body: JSON.stringify({ operator_id: operatorId || '' }) });
-}
-
 async function confirmBooking(id) {
-  try { await api('/api/admin/bookings/confirm/' + id, { method: 'POST' }); loadBookings(); }
+  try { await api('/api/admin/bookings/confirm/' + id, { method: 'POST' }); }
   catch (e) { alert(e.message); }
 }
 async function rejectBooking(id) {
   if (!confirm('Annullare la prenotazione? Se pagata via Stripe verrà rimborsata.')) return;
-  try { await api('/api/admin/bookings/reject/' + id, { method: 'POST' }); loadBookings(); }
+  try { await api('/api/admin/bookings/reject/' + id, { method: 'POST' }); }
   catch (e) { alert(e.message); }
 }
 async function checkinBooking(id) {
   await api('/api/admin/bookings/checkin/' + id, { method: 'POST' });
-  loadBookings();
 }
 async function deleteBooking(id) {
   if (!confirm('Eliminare definitivamente questa prenotazione?')) return;
   await api('/api/admin/bookings/' + id, { method: 'DELETE' });
-  loadBookings();
 }
 async function syncPayments() {
   const res = await api('/api/admin/sync-payments', { method: 'POST' });
   alert(`Sincronizzati ${res.synced} di ${res.total} pagamenti in sospeso.`);
-  loadBookings();
+  renderCalendar();
 }
 
 async function openManualBooking() {
@@ -2175,7 +2008,7 @@ async function saveManualBooking() {
     const res = await api('/api/admin/bookings/manual', { method: 'POST', body: JSON.stringify(body) });
     if (body.operator_id) await api('/api/admin/bookings/' + res.id, { method: 'PATCH', body: JSON.stringify({ operator_id: body.operator_id }) });
     closeModal('manual-modal');
-    loadBookings();
+    renderCalendar();
   } catch (e) {
     msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
   }
@@ -2609,158 +2442,6 @@ async function loadOperators() {
       </div>
     </div>
   `).join('') : '<div class="list-empty">Nessun operatore. Gli utenti del portale (Impostazioni → Utenti del portale) diventano automaticamente operatori assegnabili.</div>';
-}
-
-// ── CRM B2C (enoturismo) ─────────────────────────────────────────────────────
-let B2C_CURRENT_ID = null;
-
-async function loadB2CCustomers() {
-  const q = document.getElementById('b2c-search').value.trim();
-  const rows = await api('/api/admin/b2c-customers' + (q ? `?q=${encodeURIComponent(q)}` : ''));
-  document.getElementById('b2c-customers-tbody').innerHTML = rows.length ? rows.map(c => `
-    <div class="list-row">
-      <div class="list-row-icon">${esc(c.name).charAt(0).toUpperCase()}</div>
-      <div class="list-row-body">
-        <div class="list-row-title">${esc(c.name)}</div>
-        <div class="list-row-sub">${esc(c.email) || 'nessuna email'}${c.phone ? ' · ' + esc(c.phone) : ''}</div>
-      </div>
-      <div class="list-row-meta">
-        <span class="pill-stat">${c.visitCount} visite</span>
-        <span class="pill-stat">E-commerce: ${c.ecommerceCount} · € ${fmtEuro(c.ecommerceTotalCents)}</span>
-        <span class="pill-stat">Negozio: ${c.negozioCount} · € ${fmtEuro(c.negozioTotalCents)}</span>
-        <div class="list-row-value">€ ${fmtEuro(c.ecommerceTotalCents + c.negozioTotalCents)}</div>
-        <button class="btn-outline-pill" onclick="openB2CCustomerModal(${c.id})">Dettaglio</button>
-        <button class="btn-outline-pill danger" onclick="deleteB2CCustomer(${c.id})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-        </button>
-      </div>
-    </div>
-  `).join('') : '<div class="list-empty">Nessun cliente trovato.</div>';
-}
-
-async function openB2CCustomerModal(id) {
-  document.getElementById('b2c-modal-msg').innerHTML = '';
-  B2C_CURRENT_ID = id || null;
-  document.getElementById('b2c-modal-title').textContent = id ? 'Dettaglio cliente' : 'Nuovo cliente';
-  document.getElementById('b2c-detail-section').style.display = id ? 'block' : 'none';
-
-  if (id) {
-    const c = await api('/api/admin/b2c-customers/' + id);
-    document.getElementById('b2c-id').value = c.id;
-    document.getElementById('b2c-name').value = c.name;
-    document.getElementById('b2c-email').value = c.email || '';
-    document.getElementById('b2c-phone').value = c.phone || '';
-    document.getElementById('b2c-notes').value = c.notes || '';
-    document.getElementById('b2c-visits-tbody').innerHTML = c.visits.length ? c.visits.map(v => `
-      <tr>
-        <td>${v.date} ${v.time}</td>
-        <td>${esc(v.experience_name)}</td>
-        <td>${esc(v.operator_name) || '—'}</td>
-        <td><span class="badge ${v.status}">${v.status.replace('_',' ')}</span></td>
-        <td>€ ${fmtEuro(v.amount_cents)}</td>
-      </tr>
-    `).join('') : '<tr><td colspan="5" class="empty">Nessuna visita registrata.</td></tr>';
-    document.getElementById('b2c-orders-tbody').innerHTML = c.orders.length ? c.orders.map(o => `
-      <tr>
-        <td>${o.order_date}</td>
-        <td>${o.channel === 'ecommerce' ? 'E-commerce' : 'Negozio'}</td>
-        <td>${esc(o.order_number) || '—'}</td>
-        <td>€ ${fmtEuro(o.amount_cents)}</td>
-        <td><button class="btn small danger" onclick="deleteB2COrder(${o.id})">Elimina</button></td>
-      </tr>
-    `).join('') : '<tr><td colspan="5" class="empty">Nessun ordine registrato.</td></tr>';
-    document.getElementById('b2c-cassa-sales-tbody').innerHTML = c.shopSales.length ? c.shopSales.map(s => `
-      <tr>
-        <td>${s.created_at}</td>
-        <td>${CASSA_CONTEXT_LABELS[s.sale_context] || s.sale_context}</td>
-        <td>${s.items.map(it => `${it.quantity}× ${esc(it.product_name)}`).join(', ')}</td>
-        <td>${CASSA_PAYMENT_LABELS[s.payment_method] || s.payment_method}</td>
-        <td>€ ${fmtEuro(s.total_cents)}</td>
-        <td><button class="btn small danger" onclick="voidB2CCassaSale(${s.id})">Annulla</button></td>
-      </tr>
-    `).join('') : '<tr><td colspan="6" class="empty">Nessun acquisto in cassa registrato.</td></tr>';
-    document.getElementById('b2c-pickup-orders-tbody').innerHTML = c.pickupOrders.length ? c.pickupOrders.map(o => `
-      <tr>
-        <td>${o.created_at}</td>
-        <td>${o.items.map(it => `${it.quantity}× ${esc(it.product_name)}`).join(', ')}</td>
-        <td>€ ${fmtEuro(o.amount_cents)}</td>
-        <td><span class="badge ${PICKUP_STATUS_BADGE[o.status]}">${PICKUP_STATUS_LABELS[o.status] || o.status}</span></td>
-      </tr>
-    `).join('') : '<tr><td colspan="4" class="empty">Nessun ordine di ritiro registrato.</td></tr>';
-  } else {
-    document.getElementById('b2c-id').value = '';
-    document.getElementById('b2c-name').value = '';
-    document.getElementById('b2c-email').value = '';
-    document.getElementById('b2c-phone').value = '';
-    document.getElementById('b2c-notes').value = '';
-  }
-  openModal('b2c-modal');
-}
-
-async function saveB2CCustomer() {
-  const id = document.getElementById('b2c-id').value;
-  const msg = document.getElementById('b2c-modal-msg');
-  const body = {
-    name: document.getElementById('b2c-name').value.trim(),
-    email: document.getElementById('b2c-email').value.trim(),
-    phone: document.getElementById('b2c-phone').value.trim(),
-    notes: document.getElementById('b2c-notes').value.trim(),
-  };
-  try {
-    if (id) await api('/api/admin/b2c-customers/' + id, { method: 'PATCH', body: JSON.stringify(body) });
-    else await api('/api/admin/b2c-customers', { method: 'POST', body: JSON.stringify(body) });
-    closeModal('b2c-modal');
-    loadB2CCustomers();
-  } catch (e) {
-    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
-  }
-}
-async function deleteB2CCustomer(id) {
-  if (!confirm('Eliminare questo cliente e il suo storico ordini?')) return;
-  await api('/api/admin/b2c-customers/' + id, { method: 'DELETE' });
-  loadB2CCustomers();
-}
-
-function openB2COrderModal() {
-  document.getElementById('b2c-order-modal-msg').innerHTML = '';
-  document.getElementById('bo-channel').value = 'ecommerce';
-  document.getElementById('bo-date').value = new Date().toISOString().slice(0, 10);
-  document.getElementById('bo-amount').value = '';
-  document.getElementById('bo-number').value = '';
-  document.getElementById('bo-notes').value = '';
-  openModal('b2c-order-modal');
-}
-async function saveB2COrder() {
-  const msg = document.getElementById('b2c-order-modal-msg');
-  const body = {
-    customer_id: B2C_CURRENT_ID,
-    channel: document.getElementById('bo-channel').value,
-    order_date: document.getElementById('bo-date').value,
-    amount_cents: Math.round((parseFloat(document.getElementById('bo-amount').value) || 0) * 100),
-    order_number: document.getElementById('bo-number').value.trim(),
-    notes: document.getElementById('bo-notes').value.trim(),
-  };
-  try {
-    await api('/api/admin/b2c-orders', { method: 'POST', body: JSON.stringify(body) });
-    closeModal('b2c-order-modal');
-    openB2CCustomerModal(B2C_CURRENT_ID);
-    loadB2CCustomers();
-  } catch (e) {
-    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
-  }
-}
-async function deleteB2COrder(id) {
-  if (!confirm('Eliminare questo ordine?')) return;
-  await api('/api/admin/b2c-orders/' + id, { method: 'DELETE' });
-  openB2CCustomerModal(B2C_CURRENT_ID);
-  loadB2CCustomers();
-}
-
-async function voidB2CCassaSale(id) {
-  if (!confirm('Annullare questa vendita? Le giacenze scalate verranno ripristinate.')) return;
-  await api('/api/admin/shop-sales/' + id, { method: 'DELETE' });
-  openB2CCustomerModal(B2C_CURRENT_ID);
-  loadB2CCustomers();
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
