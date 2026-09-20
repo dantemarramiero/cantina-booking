@@ -499,6 +499,9 @@
   .crm-info-section { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px; margin-bottom: 18px; }
   .crm-info-section h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--wine); margin: 0 0 16px; }
   .crm-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; }
+  .crm-field { display: flex; flex-direction: column; gap: 6px; }
+  .crm-field-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #8d8274; font-weight: 600; }
+  .crm-field-value { font: 600 13.5px var(--sans); color: var(--ink); }
   .crm-info-field label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #8d8274; margin-bottom: 6px; font-weight: 600; }
   .crm-info-field input, .crm-info-field select, .crm-info-field textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-family: var(--sans); background: #fff; color: var(--ink); box-sizing: border-box; }
   .crm-info-field.checkbox { display: flex; align-items: center; gap: 8px; flex-direction: row; padding-top: 22px; }
@@ -1599,31 +1602,6 @@
 
     <div class="field"><label>Note</label><textarea id="ppl-notes" rows="2"></textarea></div>
 
-    <div id="ppl-transactions-section" style="display:none;margin-top:20px;border-top:1px solid var(--line);padding-top:16px">
-      <h3 style="font-size:15px;margin-bottom:10px">Visite ed eventi propri</h3>
-      <div class="table-wrap" style="margin-bottom:16px">
-        <table><thead><tr><th>Data</th><th>Esperienza</th><th>Stato</th><th>Totale</th></tr></thead>
-        <tbody id="ppl-visits-tbody"></tbody></table>
-      </div>
-      <h3 style="font-size:15px;margin-bottom:10px">Acquisti in cassa</h3>
-      <div class="table-wrap" style="margin-bottom:16px">
-        <table><thead><tr><th>Data</th><th>Bottiglie</th><th>Totale</th></tr></thead>
-        <tbody id="ppl-sales-tbody"></tbody></table>
-      </div>
-      <h3 style="font-size:15px;margin-bottom:10px">Ordini ritiro (negozio online)</h3>
-      <div class="table-wrap" style="margin-bottom:16px">
-        <table><thead><tr><th>Data</th><th>Bottiglie</th><th>Totale</th><th>Stato</th></tr></thead>
-        <tbody id="ppl-pickup-tbody"></tbody></table>
-      </div>
-      <div id="ppl-venue-events-wrap" style="display:none">
-        <h3 style="font-size:15px;margin-bottom:10px">Eventi terzi organizzati</h3>
-        <div class="table-wrap">
-          <table><thead><tr><th>Data</th><th>Titolo</th><th>Tariffa</th><th>Stato</th></tr></thead>
-          <tbody id="ppl-venue-events-tbody"></tbody></table>
-        </div>
-      </div>
-    </div>
-
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('people-modal')">Annulla</button>
       <button class="btn" onclick="savePerson()">Salva</button>
@@ -2198,6 +2176,32 @@
       <div class="crm2-list-panel" id="crm2-list-clienti-seguiti" style="display:none">
         <div class="crm2-list-panel-head"><h2>Clienti seguiti</h2><button class="btn-generate" style="margin-top:0" onclick="openNewCustomerForAgent()">+ Nuovo cliente</button></div>
         <div id="crm-tracked-customers"></div>
+      </div>
+
+      <div class="crm2-list-panel" id="crm2-list-transazioni" style="display:none">
+        <div class="crm2-list-panel-head"><h2>Transazioni</h2></div>
+        <h3 style="font-size:15px;margin-bottom:10px">Visite ed eventi propri</h3>
+        <div class="table-wrap" style="margin-bottom:16px">
+          <table><thead><tr><th>Data</th><th>Esperienza</th><th>Stato</th><th>Totale</th></tr></thead>
+          <tbody id="ppl-visits-tbody"></tbody></table>
+        </div>
+        <h3 style="font-size:15px;margin-bottom:10px">Acquisti in cassa</h3>
+        <div class="table-wrap" style="margin-bottom:16px">
+          <table><thead><tr><th>Data</th><th>Bottiglie</th><th>Totale</th></tr></thead>
+          <tbody id="ppl-sales-tbody"></tbody></table>
+        </div>
+        <h3 style="font-size:15px;margin-bottom:10px">Ordini ritiro (negozio online)</h3>
+        <div class="table-wrap" style="margin-bottom:16px">
+          <table><thead><tr><th>Data</th><th>Bottiglie</th><th>Totale</th><th>Stato</th></tr></thead>
+          <tbody id="ppl-pickup-tbody"></tbody></table>
+        </div>
+        <div id="ppl-venue-events-wrap" style="display:none">
+          <h3 style="font-size:15px;margin-bottom:10px">Eventi terzi organizzati</h3>
+          <div class="table-wrap">
+            <table><thead><tr><th>Data</th><th>Titolo</th><th>Tariffa</th><th>Stato</th></tr></thead>
+            <tbody id="ppl-venue-events-tbody"></tbody></table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -3470,6 +3474,11 @@ function closeFairDetail() {
   loadFairs();
 }
 
+function crmField(label, value) {
+  const display = (value == null || value === '') ? '—' : esc(value);
+  return `<div class="crm-field"><span class="crm-field-label">${esc(label)}</span><span class="crm-field-value">${display}</span></div>`;
+}
+
 async function loadFairDetail(id) {
   const f = await api('/api/admin/fairs/' + id);
   FAIR_CURRENT_DATA = f;
@@ -3746,6 +3755,7 @@ async function deleteCustomer(id) {
 // ── CRM: Persone (anagrafica unica, tag di ruolo) ──────────────────────────────
 const PEOPLE_ROLE_LABELS = { cliente_finale: 'Cliente finale', cliente_evento: 'Cliente evento', contatto: 'Contatto' };
 const PEOPLE_CHANNEL_LABELS = { negozio_fisico: 'Negozio fisico', ecommerce: 'E-commerce', visita: 'Visita', evento_proprietario: 'Evento proprietario', evento_terzo: 'Evento terzo' };
+const PPL_CONTACT_ROLE_LABELS = { titolare: 'Titolare', maitre: 'Maitre', cameriere: 'Cameriere', commerciale: 'Commerciale', referente: 'Referente' };
 
 async function loadPeople() {
   const q = document.getElementById('people-search').value.trim();
@@ -3761,8 +3771,8 @@ async function loadPeople() {
     const linkedHtml = linkedTo ? ` · <span style="cursor:pointer;color:var(--wine)" onclick="event.stopPropagation();openCrmRecord('${linkedType}', ${linkedId})">${esc(linkedTo)}</span>` : '';
     return `
     <div class="list-row">
-      <div class="list-row-icon" style="cursor:pointer" onclick='openPersonModal(${jsonAttrP(p)})'>${esc(p.name).charAt(0).toUpperCase()}</div>
-      <div class="list-row-body" style="cursor:pointer" onclick='openPersonModal(${jsonAttrP(p)})'>
+      <div class="list-row-icon" style="cursor:pointer" onclick="openCrmRecord('person', ${p.id})">${esc(p.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body" style="cursor:pointer" onclick="openCrmRecord('person', ${p.id})">
         <div class="list-row-title">${esc(p.name)}</div>
         <div class="list-row-sub">${esc(p.email) || 'nessuna email'}${linkedHtml}</div>
       </div>
@@ -3784,8 +3794,7 @@ function togglePersonContactFields() {
 }
 
 async function openPersonById(id) {
-  const p = await api('/api/admin/people/' + id);
-  await openPersonModal(p);
+  await openCrmRecord('person', id);
 }
 
 async function openPersonModal(p) {
@@ -3816,9 +3825,6 @@ async function openPersonModal(p) {
   const importers = await api('/api/admin/importers');
   document.getElementById('ppl-importer').innerHTML = '<option value="">— Nessuno —</option>' +
     importers.map(i => `<option value="${i.id}" ${p && p.importer_id === i.id ? 'selected' : ''}>${esc(i.name)}</option>`).join('');
-
-  document.getElementById('ppl-transactions-section').style.display = p ? 'block' : 'none';
-  if (p) await renderPersonTransactions(p.id);
 
   openModal('people-modal');
 }
@@ -3896,6 +3902,7 @@ async function savePerson() {
     else await api('/api/admin/people', { method: 'POST', body: JSON.stringify(body) });
     closeModal('people-modal');
     loadPeople();
+    if (CRM_CURRENT.type === 'person' && String(CRM_CURRENT.id) === id) loadCrmRecordData();
   } catch (e) {
     msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
   }
@@ -4050,12 +4057,12 @@ async function deleteSupplier(id) {
 // ══════════════════════════════════════════════════════════════════════════════
 function jsonAttrP(obj) { return JSON.stringify(obj).replace(/'/g, '&#39;'); }
 
-const CRM_ENDPOINT_MAP = { customer: 'customers', agent: 'agents', importer: 'importers', supplier: 'suppliers' };
-const CRM_SUBPANEL_MAP = { customer: 'crm-clienti', agent: 'crm-agenti', importer: 'crm-importatori', supplier: 'crm-fornitori' };
+const CRM_ENDPOINT_MAP = { customer: 'customers', agent: 'agents', importer: 'importers', supplier: 'suppliers', person: 'people' };
+const CRM_SUBPANEL_MAP = { customer: 'crm-clienti', agent: 'crm-agenti', importer: 'crm-importatori', supplier: 'crm-fornitori', person: 'crm-persone' };
 const CRM_DEAL_STAGE_LABELS = { nuovo: 'Nuovo', qualificato: 'Qualificato', proposta: 'Proposta inviata', negoziazione: 'Negoziazione', vinto: 'Vinto', perso: 'Perso' };
-const CRM_EDIT_FN_MAP = { customer: 'openCustomerModal', importer: 'openImporterModal', supplier: 'openSupplierModal', agent: 'openAgentModal' };
-const CRM_LIST_LABEL_MAP = { customer: 'Clienti', agent: 'Agenti', importer: 'Importatori', supplier: 'Fornitori' };
-const CRM_SINCE_LABEL = { customer: 'Cliente', agent: 'Agente', importer: 'Importatore', supplier: 'Fornitore' };
+const CRM_EDIT_FN_MAP = { customer: 'openCustomerModal', importer: 'openImporterModal', supplier: 'openSupplierModal', agent: 'openAgentModal', person: 'openPersonModal' };
+const CRM_LIST_LABEL_MAP = { customer: 'Clienti', agent: 'Agenti', importer: 'Importatori', supplier: 'Fornitori', person: 'Contatti' };
+const CRM_SINCE_LABEL = { customer: 'Cliente', agent: 'Agente', importer: 'Importatore', supplier: 'Fornitore', person: 'In anagrafica' };
 let CRM_CURRENT = { type: null, id: null, data: null };
 let CRM_ACTIVE_SECTION = 'contatto';
 const CRM_ANAGRAFICA_SECTIONS = ['contatto', 'sedi', 'fiscali', 'commerciali'];
@@ -4104,11 +4111,14 @@ function renderCrm2Meta() {
   const parts = [];
   if (type === 'agent') {
     if (d.provinces && d.provinces.length) parts.push(d.provinces.join(', '));
+  } else if (type === 'person') {
+    if ((d.roles || []).length) parts.push(d.roles.map(r => PEOPLE_ROLE_LABELS[r] || r).join(', '));
   } else if (d.city) {
     parts.push(d.city);
   }
   if (d.created_at) parts.push(`${CRM_SINCE_LABEL[type]} dal ${d.created_at.slice(0, 4)}`);
   if ((type === 'customer' || type === 'importer') && d.agent_name) parts.push(d.agent_name);
+  if (type === 'person') { const linkedTo = d.customer_name || d.importer_name || d.agent_name; if (linkedTo) parts.push(linkedTo); }
   document.getElementById('crm2-meta').innerHTML = parts.filter(Boolean).map((p, i) =>
     (i ? '<span class="sep">·</span>' : '') + `<span>${esc(p)}</span>`).join('');
 }
@@ -4137,6 +4147,18 @@ function renderCrm2Stats() {
       crm2Stat('Fatturato 12 mesi', '€ ' + fmtEuro(d.revenue_12m_cents || 0)),
       crm2Stat('Etichetta più venduta', d.top_product_name ? esc(d.top_product_name) : '—'),
     ].join('');
+  } else if (type === 'person') {
+    el.style.display = 'flex';
+    const totalSpentCents = (d.visits || []).reduce((s, v) => s + (v.amount_cents || 0), 0)
+      + (d.shopSales || []).reduce((s, v) => s + (v.total_cents || 0), 0)
+      + (d.pickupOrders || []).reduce((s, v) => s + (v.amount_cents || 0), 0);
+    const txCount = (d.visits || []).length + (d.shopSales || []).length + (d.pickupOrders || []).length + (d.venueEvents || []).length;
+    el.innerHTML = [
+      crm2Stat('Totale speso', '€ ' + fmtEuro(totalSpentCents)),
+      crm2Stat('Transazioni', txCount),
+      crm2Stat('Wine club', d.wine_club ? 'Sì' : 'No'),
+      crm2Stat('Newsletter', d.newsletter_opt_in ? 'Sì' : 'No'),
+    ].join('');
   } else {
     el.style.display = 'none';
     el.innerHTML = '';
@@ -4153,9 +4175,38 @@ function crm2Row(label, value, addFn) {
 
 function renderCrm2Sections() {
   const { type, data: d } = CRM_CURRENT;
+  document.getElementById('crm2-section-sedi').style.display = type === 'person' ? 'none' : '';
+  document.getElementById('crm2-section-fiscali').style.display = type === 'person' ? 'none' : '';
+  document.getElementById('crm2-section-commerciali').style.display = type === 'person' ? 'none' : '';
 
   let contattoHtml;
-  if (type === 'agent') {
+  if (type === 'person') {
+    const rolesLabel = (d.roles || []).map(r => PEOPLE_ROLE_LABELS[r] || r).join(', ') || null;
+    const channelsLabel = (d.source_channels || []).map(c => PEOPLE_CHANNEL_LABELS[c] || c).join(', ') || null;
+    const linkedType = d.customer_id ? 'customer' : (d.importer_id ? 'importer' : (d.agent_id ? 'agent' : null));
+    const linkedName = d.customer_name || d.importer_name || d.agent_name;
+    const linkedLabel = { customer: 'Azienda cliente', importer: 'Importatore', agent: 'Agente' }[linkedType] || 'Azienda collegata';
+    const rows = [
+      crm2Row('Nome', d.first_name || splitName(d.name).first),
+      crm2Row('Cognome', d.last_name || splitName(d.name).last),
+      crm2Row('Email', d.email),
+      crm2Row('Telefono', d.phone),
+      crm2Row('Ruoli', rolesLabel),
+    ];
+    if ((d.roles || []).includes('contatto')) {
+      rows.push(crm2Row('Ruolo contatto', d.contact_role ? (PPL_CONTACT_ROLE_LABELS[d.contact_role] || d.contact_role) : null));
+      rows.push(linkedName
+        ? `<div class="crm2-field-row"><span class="crm2-field-label">${esc(linkedLabel)}</span><span class="crm2-field-value"><span style="cursor:pointer;color:var(--wine)" onclick="openCrmRecord('${linkedType}', ${d[linkedType + '_id']})">${esc(linkedName)}</span></span></div>`
+        : crm2Row(linkedLabel, null));
+    }
+    rows.push(crm2Row('Canale di origine', channelsLabel));
+    rows.push(crm2Row('Newsletter', d.newsletter_opt_in ? 'Sì' : 'No'));
+    rows.push(crm2Row('Wine club', d.wine_club ? 'Sì' : 'No'));
+    rows.push(crm2Row('Note', d.notes));
+    contattoHtml = rows.join('');
+    document.getElementById('crm2-view-contatto').innerHTML = `<div class="crm2-fields-grid">${contattoHtml}</div>`;
+    return;
+  } else if (type === 'agent') {
     contattoHtml = [
       crm2Row('Nome e cognome', d.name),
       crm2Row('Codice', d.code),
@@ -4227,7 +4278,9 @@ function renderCrm2Sections() {
 
 function crm2CompletenessInfo() {
   const { type, data: d } = CRM_CURRENT;
-  const checks = type === 'agent'
+  const checks = type === 'person'
+    ? [['name', 'nome'], ['email', 'email'], ['phone', 'telefono'], ['roles', 'ruoli']]
+    : type === 'agent'
     ? [['name', 'ragione sociale'], ['vat_number', 'P.IVA'], ['address', 'indirizzo'], ['payment_terms', 'condizioni di pagamento'], ['commission_percent', 'provvigione']]
     : [['name', 'ragione sociale'], ['vat_number', 'P.IVA'], ['sdi_code_or_pec', 'SDI o PEC'], ['address', 'indirizzo di fatturazione'], ['payment_terms', 'condizioni di pagamento'],
        type === 'supplier' ? ['category', 'categoria fornitura'] : ['agent_id', 'agente collegato'],
@@ -4238,6 +4291,7 @@ function crm2CompletenessInfo() {
     let present;
     if (key === 'sdi_code_or_pec') present = !!(d.sdi_code || d.pec);
     else if (key === 'agent_id') present = !!d.agent_name;
+    else if (key === 'roles') present = !!(d.roles || []).length;
     else present = d[key] != null && d[key] !== '';
     if (present) ok++; else missing.push(label);
   });
@@ -4258,13 +4312,15 @@ function crm2CompletenessHtml() {
 
 function renderCrm2Index() {
   const { type, data: d } = CRM_CURRENT;
-  const items = [
-    { key: 'contatto', label: 'Informazioni generali' },
-    { key: 'sedi', label: type === 'agent' ? 'Sede' : 'Sedi' },
-    { key: 'fiscali', label: 'Dati fiscali' },
-    { key: 'commerciali', label: 'Condizioni commerciali' },
-    { key: 'contatti', label: 'Contatti', count: d.contacts_count },
-  ];
+  const items = [{ key: 'contatto', label: 'Informazioni generali' }];
+  if (type === 'person') {
+    items.push({ key: 'transazioni', label: 'Transazioni' });
+  } else {
+    items.push({ key: 'sedi', label: type === 'agent' ? 'Sede' : 'Sedi' });
+    items.push({ key: 'fiscali', label: 'Dati fiscali' });
+    items.push({ key: 'commerciali', label: 'Condizioni commerciali' });
+    items.push({ key: 'contatti', label: 'Contatti', count: d.contacts_count });
+  }
   if (type === 'customer' || type === 'agent') items.push({ key: 'ordini', label: 'Ordini', count: d.order_count ?? d.orderCount });
   if (type === 'customer' || type === 'agent' || type === 'importer') items.push({ key: 'bottiglie', label: 'Bottiglie' });
   if (type !== 'agent') items.push({ key: 'affari', label: 'Affari', count: d.deals_count });
@@ -4282,13 +4338,14 @@ function crmSetActiveSection(section) {
   document.querySelectorAll('#crm2-index button').forEach(b => b.classList.toggle('active', b.dataset.section === section));
   const isAnagrafica = CRM_ANAGRAFICA_SECTIONS.includes(section);
   document.getElementById('crm2-anagrafica').style.display = isAnagrafica ? 'block' : 'none';
-  ['contatti', 'ordini', 'bottiglie', 'affari', 'compiti', 'documenti', 'clienti-seguiti'].forEach(k => {
+  ['contatti', 'ordini', 'bottiglie', 'affari', 'compiti', 'documenti', 'clienti-seguiti', 'transazioni'].forEach(k => {
     const el = document.getElementById('crm2-list-' + k);
     if (el) el.style.display = k === section ? 'block' : 'none';
   });
   if (isAnagrafica) {
     document.getElementById('crm2-section-' + section)?.scrollIntoView({ block: 'nearest' });
-  } else if (section === 'contatti') loadCrmContacts();
+  } else if (section === 'transazioni') renderPersonTransactions(CRM_CURRENT.id);
+  else if (section === 'contatti') loadCrmContacts();
   else if (section === 'ordini') loadCrmOrders();
   else if (section === 'bottiglie') loadCrmBottiglieInit();
   else if (section === 'affari') loadCrmDeals();

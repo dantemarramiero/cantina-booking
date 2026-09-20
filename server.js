@@ -3349,10 +3349,18 @@ app.get('/api/admin/people', authAdmin, (req, res) => {
 });
 
 app.get('/api/admin/people/:id', authAdmin, (req, res) => {
-  const p = db.prepare('SELECT * FROM people WHERE id = ?').get(req.params.id);
+  const p = db.prepare(`
+    SELECT p.*, c.name AS customer_name, i.name AS importer_name, a.name AS agent_name
+    FROM people p
+    LEFT JOIN customers c ON c.id = p.customer_id
+    LEFT JOIN importers i ON i.id = p.importer_id
+    LEFT JOIN agents a ON a.id = p.agent_id
+    WHERE p.id = ?
+  `).get(req.params.id);
   if (!p) return res.status(404).json({ error: 'Persona non trovata.' });
   p.roles = JSON.parse(p.roles || '[]');
   p.source_channels = JSON.parse(p.source_channels || '[]');
+  Object.assign(p, crmCounts('person', p.id));
 
   p.visits = db.prepare(`
     SELECT b.id, b.status, b.guests, b.amount_cents, s.date, s.time, e.name_it AS experience_name, e.type AS experience_type
@@ -3604,7 +3612,7 @@ app.delete('/api/admin/suppliers/:id', authAdmin, (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // CRM: attività collegate a un record (note, allegati, riunioni, compiti, affari, email)
 // ══════════════════════════════════════════════════════════════════════════════
-const CRM_ENTITY_TYPES = ['customer', 'agent', 'importer', 'supplier'];
+const CRM_ENTITY_TYPES = ['customer', 'agent', 'importer', 'supplier', 'person'];
 function validEntityType(t) { return CRM_ENTITY_TYPES.includes(t); }
 
 function addFairEncounterNote(entityType, entityId, fairId) {
