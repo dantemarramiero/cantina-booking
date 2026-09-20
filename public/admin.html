@@ -207,15 +207,32 @@
   .exp-avail-row select, .exp-avail-row input { padding: 8px 9px; border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; background: #fff; color: var(--ink); font-family: var(--sans); }
   .exp-avail-row button { width: 28px; height: 28px; border: 1px solid var(--line); background: #fff; border-radius: 7px; color: var(--bad); cursor: pointer; }
   @media (max-width: 640px) { .exp-avail-row { grid-template-columns: 1fr 1fr; } }
-  .cassa-layout { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
-  @media (max-width: 900px) { .cassa-layout { grid-template-columns: 1fr; } }
-  .cassa-products { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; max-height: 560px; overflow-y: auto; padding-right: 4px; }
-  .cassa-product-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #fff; cursor: pointer; transition: border-color .15s; }
-  .cassa-product-card:hover { border-color: var(--wine); }
+  .cassa-step { display: none; }
+  .cassa-step.active { display: block; }
+  .cassa-products { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .cassa-product-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(56,17,18,0.04); display: flex; flex-direction: column; transition: box-shadow .15s; }
+  .cassa-product-card.in-cart { border-color: var(--wine); box-shadow: 0 2px 10px rgba(165,98,58,0.14); }
   .cassa-product-card.out-of-stock { opacity: .5; }
-  .cassa-product-card .name { font-weight: 600; font-size: 13px; margin-bottom: 3px; }
-  .cassa-product-card .meta { font-size: 11.5px; color: var(--ink-soft); }
-  .cassa-cart-box { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: #fff; position: sticky; top: 0; }
+  .cassa-photo { position: relative; width: 100%; aspect-ratio: 4/3; background: #f2ede3; cursor: pointer; overflow: hidden; }
+  .cassa-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .cassa-photo-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--ink-faint); }
+  .cassa-photo-placeholder svg { width: 28px; height: 28px; }
+  .cassa-photo:hover .cassa-photo-placeholder { color: var(--wine); }
+  .cassa-card-body { padding: 12px 14px 14px; flex: 1; display: flex; flex-direction: column; }
+  .cassa-card-title { font-size: 13.5px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+  .cassa-card-meta { font-size: 11.5px; color: var(--ink-soft); margin-top: 5px; }
+  .cassa-card-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--line); }
+  .cassa-card-footer .cassa-price { font-size: 15px; font-weight: 700; color: var(--ink); }
+  .cassa-stepper { display: flex; align-items: center; gap: 8px; }
+  .cassa-stepper button { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--line); background: #fff; color: var(--wine); font-size: 15px; font-weight: 700; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .cassa-stepper button:hover { background: rgba(165,98,58,0.09); }
+  .cassa-stepper .qty { min-width: 16px; text-align: center; font-weight: 700; font-size: 13px; }
+  .cassa-step-bar { position: sticky; bottom: 12px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 18px rgba(56,17,18,0.12); }
+  .cassa-step-bar .info { font-size: 13px; color: var(--ink-soft); }
+  .cassa-step-bar .info strong { color: var(--ink); font-size: 16px; }
+  .cassa-checkout-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 900px) { .cassa-checkout-layout { grid-template-columns: 1fr; } }
+  .cassa-cart-box { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: #fff; }
   .cassa-cart-row { display: grid; grid-template-columns: 1fr 54px 74px 74px 26px; gap: 6px; align-items: center; margin-bottom: 8px; font-size: 12.5px; }
   .cassa-cart-row input { width: 100%; padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; font-size: 12.5px; font-family: var(--sans); }
   .cassa-cart-row button { border: none; background: none; color: var(--bad); cursor: pointer; font-size: 16px; line-height: 1; }
@@ -630,50 +647,64 @@
 
     <!-- CASSA (negozio fisico) -->
     <div class="panel" id="panel-cassa">
-      <p style="margin:0 0 16px;font-size:12.5px;color:var(--ink-soft)">Vendita diretta in cantina. Seleziona le bottiglie, imposta quantità e prezzo, registra il pagamento — la vendita confluisce nel CRM Clienti finali.</p>
-      <div class="cassa-layout">
-        <div>
-          <div class="exp-toolbar" style="margin-bottom:14px">
-            <div class="search-input">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" id="cassa-product-search" placeholder="Cerca bottiglia..." oninput="renderCassaProducts()">
-            </div>
-            <div class="list-spacer"></div>
-            <div class="field" style="margin:0;min-width:200px">
-              <select id="cassa-price-list" onchange="renderCassaProducts()"></select>
-            </div>
+      <p style="margin:0 0 16px;font-size:12.5px;color:var(--ink-soft)">Vendita diretta in cantina. Seleziona le bottiglie come nelle Esperienze, costruisci il carrello, poi completa con i dati del cliente e il pagamento — la vendita confluisce nel CRM Clienti finali.</p>
+
+      <!-- STEP 1: selezione prodotti -->
+      <div class="cassa-step active" id="cassa-step-products">
+        <div class="exp-toolbar" style="margin-bottom:14px">
+          <div class="search-input">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="cassa-product-search" placeholder="Cerca bottiglia..." oninput="renderCassaProducts()">
           </div>
-          <div class="cassa-products" id="cassa-products"></div>
+          <div class="list-spacer"></div>
+          <div class="field" style="margin:0;min-width:200px">
+            <select id="cassa-price-list" onchange="renderCassaProducts()"></select>
+          </div>
         </div>
-        <div class="cassa-cart-box">
-          <h3 style="font-size:15px;margin-bottom:12px">Carrello</h3>
-          <div id="cassa-cart-rows"></div>
-          <div class="cassa-total-row"><span>Totale</span><span id="cassa-total">€ 0,00</span></div>
-          <div id="cassa-modal-msg" style="margin-top:10px"></div>
-          <div class="field" style="margin-top:14px"><label>Nome cliente</label><input id="cassa-customer-name"></div>
-          <div class="field-row">
-            <div class="field"><label>Email</label><input type="email" id="cassa-customer-email"></div>
-            <div class="field"><label>Telefono</label><input id="cassa-customer-phone"></div>
+        <div class="cassa-products" id="cassa-products"></div>
+        <div class="cassa-step-bar">
+          <div class="info"><strong id="cassa-bar-total">€ 0,00</strong> · <span id="cassa-bar-count">0 articoli</span></div>
+          <button class="btn" id="cassa-continue-btn" onclick="goToCassaCheckout()" disabled>Continua →</button>
+        </div>
+      </div>
+
+      <!-- STEP 2: checkout -->
+      <div class="cassa-step" id="cassa-step-checkout">
+        <button class="btn secondary" style="margin-bottom:16px" onclick="backToCassaProducts()">← Torna alle bottiglie</button>
+        <div class="cassa-checkout-layout">
+          <div class="cassa-cart-box">
+            <h3 style="font-size:15px;margin-bottom:12px">Carrello</h3>
+            <div id="cassa-cart-rows"></div>
+            <div class="cassa-total-row"><span>Totale</span><span id="cassa-total">€ 0,00</span></div>
           </div>
-          <div class="field-row">
-            <div class="field"><label>Contesto vendita</label>
-              <select id="cassa-context">
-                <option value="negozio">Negozio</option>
-                <option value="post_visita">Post visita</option>
-                <option value="post_evento">Post evento</option>
-              </select>
+          <div class="cassa-cart-box">
+            <h3 style="font-size:15px;margin-bottom:12px">Dati vendita</h3>
+            <div id="cassa-modal-msg"></div>
+            <div class="field"><label>Nome cliente</label><input id="cassa-customer-name"></div>
+            <div class="field-row">
+              <div class="field"><label>Email</label><input type="email" id="cassa-customer-email"></div>
+              <div class="field"><label>Telefono</label><input id="cassa-customer-phone"></div>
             </div>
-            <div class="field"><label>Pagamento</label>
-              <select id="cassa-payment">
-                <option value="contanti">Contanti</option>
-                <option value="carta">Carta</option>
-                <option value="altro">Altro</option>
-              </select>
+            <div class="field-row">
+              <div class="field"><label>Contesto vendita</label>
+                <select id="cassa-context">
+                  <option value="negozio">Negozio</option>
+                  <option value="post_visita">Post visita</option>
+                  <option value="post_evento">Post evento</option>
+                </select>
+              </div>
+              <div class="field"><label>Pagamento</label>
+                <select id="cassa-payment">
+                  <option value="contanti">Contanti</option>
+                  <option value="carta">Carta</option>
+                  <option value="altro">Altro</option>
+                </select>
+              </div>
             </div>
+            <div class="field"><label>Sconto (€)</label><input type="number" step="0.01" id="cassa-discount" value="0" oninput="renderCassaCart()"></div>
+            <div class="field"><label>Note</label><input id="cassa-notes"></div>
+            <button class="btn" style="width:100%;margin-top:6px" onclick="registerCassaSale()">Registra vendita</button>
           </div>
-          <div class="field"><label>Sconto (€)</label><input type="number" step="0.01" id="cassa-discount" value="0" oninput="renderCassaCart()"></div>
-          <div class="field"><label>Note</label><input id="cassa-notes"></div>
-          <button class="btn" style="width:100%;margin-top:6px" onclick="registerCassaSale()">Registra vendita</button>
         </div>
       </div>
 
@@ -2287,6 +2318,7 @@ const CASSA_PAYMENT_LABELS = { contanti: 'Contanti', carta: 'Carta', altro: 'Alt
 
 async function loadCassa() {
   document.getElementById('cassa-modal-msg').innerHTML = '';
+  backToCassaProducts();
   [CASSA_PRODUCTS, CASSA_PRICE_LISTS] = await Promise.all([
     api('/api/admin/products'),
     api('/api/admin/price-lists'),
@@ -2300,6 +2332,19 @@ async function loadCassa() {
   loadCassaSales();
 }
 
+function goToCassaCheckout() {
+  if (!CASSA_CART.length) return;
+  document.getElementById('cassa-step-products').classList.remove('active');
+  document.getElementById('cassa-step-checkout').classList.add('active');
+  renderCassaCart();
+}
+
+function backToCassaProducts() {
+  document.getElementById('cassa-step-checkout').classList.remove('active');
+  document.getElementById('cassa-step-products').classList.add('active');
+  renderCassaProducts();
+}
+
 function cassaPriceFor(productId) {
   const listId = parseInt(document.getElementById('cassa-price-list').value);
   const list = CASSA_PRICE_LISTS.find(pl => pl.id === listId);
@@ -2307,27 +2352,60 @@ function cassaPriceFor(productId) {
   return item ? item.price_cents : 0;
 }
 
+function cassaCartQtyFor(productId) {
+  return CASSA_CART.find(r => r.product_id === productId)?.quantity || 0;
+}
+
 function renderCassaProducts() {
   const q = document.getElementById('cassa-product-search').value.trim().toLowerCase();
   const rows = CASSA_PRODUCTS.filter(p => p.active && (!q || p.name.toLowerCase().includes(q) || (p.vintage || '').includes(q)));
   document.getElementById('cassa-products').innerHTML = rows.length ? rows.map(p => {
     const outOfStock = p.stock_quantity != null && p.stock_quantity <= 0;
+    const qty = cassaCartQtyFor(p.id);
     return `
-    <div class="cassa-product-card ${outOfStock ? 'out-of-stock' : ''}" onclick="addToCassaCart(${p.id})">
-      <div class="name">${esc(p.name)}${p.vintage ? ' ' + esc(p.vintage) : ''}</div>
-      <div class="meta">€ ${fmtEuro(cassaPriceFor(p.id))}${p.stock_quantity != null ? ' · ' + p.stock_quantity + ' disp.' : ''}</div>
+    <div class="cassa-product-card ${outOfStock ? 'out-of-stock' : ''} ${qty ? 'in-cart' : ''}">
+      <div class="cassa-photo" onclick="adjustCassaQty(${p.id}, 1)">
+        ${p.image_url
+          ? `<img src="${p.image_url}" alt="${esc(p.name)}">`
+          : `<div class="cassa-photo-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/></svg></div>`}
+      </div>
+      <div class="cassa-card-body">
+        <div class="cassa-card-title">${esc(p.name)}${p.vintage ? ' ' + esc(p.vintage) : ''}</div>
+        <div class="cassa-card-meta">${p.stock_quantity != null ? p.stock_quantity + ' disponibili' : 'Scorte non tracciate'}</div>
+      </div>
+      <div class="cassa-card-footer">
+        <span class="cassa-price">€ ${fmtEuro(cassaPriceFor(p.id))}</span>
+        <div class="cassa-stepper">
+          <button type="button" onclick="event.stopPropagation();adjustCassaQty(${p.id}, -1)">−</button>
+          <span class="qty">${qty}</span>
+          <button type="button" onclick="event.stopPropagation();adjustCassaQty(${p.id}, 1)">+</button>
+        </div>
+      </div>
     </div>
   `;
   }).join('') : '<p class="cassa-empty-cart">Nessuna bottiglia trovata.</p>';
+  updateCassaBar();
 }
 
-function addToCassaCart(productId) {
+function adjustCassaQty(productId, delta) {
   const p = CASSA_PRODUCTS.find(x => x.id === productId);
   if (!p) return;
   const existing = CASSA_CART.find(r => r.product_id === productId);
-  if (existing) { existing.quantity += 1; }
-  else CASSA_CART.push({ product_id: p.id, product_name: p.name + (p.vintage ? ' ' + p.vintage : ''), quantity: 1, unit_price_cents: cassaPriceFor(productId), stock_quantity: p.stock_quantity });
-  renderCassaCart();
+  if (existing) {
+    existing.quantity += delta;
+    if (existing.quantity <= 0) CASSA_CART = CASSA_CART.filter(r => r.product_id !== productId);
+  } else if (delta > 0) {
+    CASSA_CART.push({ product_id: p.id, product_name: p.name + (p.vintage ? ' ' + p.vintage : ''), quantity: 1, unit_price_cents: cassaPriceFor(productId), stock_quantity: p.stock_quantity });
+  }
+  renderCassaProducts();
+}
+
+function updateCassaBar() {
+  const count = CASSA_CART.reduce((sum, r) => sum + r.quantity, 0);
+  const total = CASSA_CART.reduce((sum, r) => sum + r.quantity * r.unit_price_cents, 0);
+  document.getElementById('cassa-bar-count').textContent = count + (count === 1 ? ' articolo' : ' articoli');
+  document.getElementById('cassa-bar-total').textContent = '€ ' + fmtEuro(total);
+  document.getElementById('cassa-continue-btn').disabled = !CASSA_CART.length;
 }
 
 function renderCassaCart() {
@@ -2349,6 +2427,7 @@ function renderCassaCart() {
   const discountCents = Math.round((parseFloat(document.getElementById('cassa-discount').value) || 0) * 100);
   const total = Math.max(0, itemsTotal - discountCents);
   document.getElementById('cassa-total').textContent = '€ ' + fmtEuro(total);
+  updateCassaBar();
 }
 
 function updateCassaCartField(index, field, value) {
@@ -2361,6 +2440,7 @@ function updateCassaCartField(index, field, value) {
 
 function removeCassaCartRow(index) {
   CASSA_CART.splice(index, 1);
+  if (!CASSA_CART.length) { backToCassaProducts(); return; }
   renderCassaCart();
 }
 
