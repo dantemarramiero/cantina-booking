@@ -3347,6 +3347,20 @@ app.get('/api/admin/people/:id', authAdmin, (req, res) => {
   if (!p) return res.status(404).json({ error: 'Persona non trovata.' });
   p.roles = JSON.parse(p.roles || '[]');
   p.source_channels = JSON.parse(p.source_channels || '[]');
+
+  p.visits = db.prepare(`
+    SELECT b.id, b.status, b.guests, b.amount_cents, s.date, s.time, e.name_it AS experience_name, e.type AS experience_type
+    FROM bookings b JOIN slots s ON s.id = b.slot_id JOIN experiences e ON e.id = b.experience_id
+    WHERE b.person_id = ? ORDER BY s.date DESC
+  `).all(p.id);
+  p.shopSales = db.prepare('SELECT * FROM shop_sales WHERE person_id = ? ORDER BY created_at DESC').all(p.id);
+  const itemsBySale = db.prepare('SELECT * FROM shop_sale_items WHERE sale_id = ? ORDER BY id');
+  for (const s of p.shopSales) s.items = itemsBySale.all(s.id);
+  p.pickupOrders = db.prepare('SELECT * FROM pickup_orders WHERE person_id = ? ORDER BY created_at DESC').all(p.id);
+  const itemsByOrder = db.prepare('SELECT * FROM pickup_order_items WHERE order_id = ? ORDER BY id');
+  for (const o of p.pickupOrders) o.items = itemsByOrder.all(o.id);
+  p.venueEvents = db.prepare('SELECT * FROM venue_events WHERE person_id = ? ORDER BY event_date DESC').all(p.id);
+
   res.json(p);
 });
 
@@ -3986,6 +4000,72 @@ app.post('/api/agent/:token/orders', authAgent, (req, res) => {
   `).run(orderNumber, customer.name, customer.country, price_list_name || null,
          orderDate, delivery_date || null, causale || 'ORDCLI',
          total, discountPercent, discountCents, paymentDueDate, customer.id, billingCustomerId, req.agent.id);
+
+  const insertItem = db.prepare(`
+    INSERT INTO order_items (order_id, product_id, product_name_raw, label_variant, quantity, unit_price_cents)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  for (const item of items) {
+    const product = item.product_id ? db.prepare('SELECT * FROM products WHERE id = ?').get(item.product_id) : null;
+    insertItem.run(result.lastInsertRowid, item.product_id || null, product?.name || item.product_name_raw || 'Prodotto',
+                    item.label_variant?.trim() || null, parseInt(item.quantity) || 1, parseInt(item.unit_price_cents) || 0);
+  }
+
+  res.json({ success: true, order_id: result.lastInsertRowid, order_number: orderNumber });
+});
+
+// Ordine inserito direttamente dall'admin, senza passare dal portale di un agente:
+// un cliente può ordinare direttamente (o tramite un agente scelto qui), l'agente non è
+// più un prerequisito per registrare un ordine.
+app.post('/api/admin/orders/manual', authAdmin, (req, res) => {
+  const { customer_id, new_customer, agent_id, order_date, delivery_date, causale, billing_customer_id, price_list_name, items, notes } = req.body || {};
+  if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'Aggiungi almeno un articolo all\'ordine.' });
+
+  let customer = null;
+  if (customer_id) {
+    customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(customer_id);
+    if (!customer) return res.status(404).json({ error: 'Cliente non trovato.' });
+  } else if (new_customer?.name?.trim()) {
+    const result = db.prepare(`
+      INSERT INTO customers (name, email, phone, address, country, province, vat_number, pec, agent_id, discount_code, discount_percent)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(new_customer.name.trim(), new_customer.email?.trim() || null, new_customer.phone?.trim() || null,
+           new_customer.address?.trim() || null, new_customer.country?.trim() || null, new_customer.province?.trim() || null,
+           new_customer.vat_number?.trim() || null, new_customer.pec?.trim() || null, agent_id || null,
+           new_customer.discount_code?.trim() || null, parseFloat(new_customer.discount_percent) || 0);
+    customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(result.lastInsertRowid);
+  } else {
+    return res.status(400).json({ error: 'Seleziona o crea un cliente.' });
+  }
+
+  const effectiveAgentId = agent_id || customer.agent_id || null;
+
+  let billingCustomerId = customer.id;
+  if (billing_customer_id) {
+    const billingCustomer = db.prepare('SELECT id FROM customers WHERE id = ?').get(billing_customer_id);
+    if (billingCustomer) billingCustomerId = billingCustomer.id;
+  }
+
+  const orderNumber = `ADM-${Date.now()}`;
+  const subtotal = items.reduce((s, i) => s + (parseInt(i.quantity) || 0) * (parseInt(i.unit_price_cents) || 0), 0);
+  const discountPercent = customer.discount_percent || 0;
+  const discountCents = Math.round(subtotal * (discountPercent / 100));
+  const total = subtotal - discountCents;
+  const orderDate = order_date || new Date().toISOString().slice(0, 10);
+  const termsDays = parsePaymentTermsDays(customer.payment_terms);
+  let paymentDueDate = null;
+  if (termsDays != null) {
+    const due = new Date(orderDate + 'T00:00:00');
+    due.setDate(due.getDate() + termsDays);
+    paymentDueDate = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}-${String(due.getDate()).padStart(2, '0')}`;
+  }
+
+  const result = db.prepare(`
+    INSERT INTO orders (order_number, customer_name, customer_country, channel, price_list_name, order_date, delivery_date, causale, total_cents, discount_percent, discount_cents, payment_due_date, source, customer_id, billing_customer_id, agent_id)
+    VALUES (?, ?, ?, 'Diretto', ?, ?, ?, ?, ?, ?, ?, ?, 'admin', ?, ?, ?)
+  `).run(orderNumber, customer.name, customer.country, price_list_name || null,
+         orderDate, delivery_date || null, causale || 'ORDCLI',
+         total, discountPercent, discountCents, paymentDueDate, customer.id, billingCustomerId, effectiveAgentId);
 
   const insertItem = db.prepare(`
     INSERT INTO order_items (order_id, product_id, product_name_raw, label_variant, quantity, unit_price_cents)

@@ -1587,9 +1587,67 @@
 
     <div class="field"><label>Note</label><textarea id="ppl-notes" rows="2"></textarea></div>
 
+    <div id="ppl-transactions-section" style="display:none;margin-top:20px;border-top:1px solid var(--line);padding-top:16px">
+      <h3 style="font-size:15px;margin-bottom:10px">Visite ed eventi propri</h3>
+      <div class="table-wrap" style="margin-bottom:16px">
+        <table><thead><tr><th>Data</th><th>Esperienza</th><th>Stato</th><th>Totale</th></tr></thead>
+        <tbody id="ppl-visits-tbody"></tbody></table>
+      </div>
+      <h3 style="font-size:15px;margin-bottom:10px">Acquisti in cassa</h3>
+      <div class="table-wrap" style="margin-bottom:16px">
+        <table><thead><tr><th>Data</th><th>Bottiglie</th><th>Totale</th></tr></thead>
+        <tbody id="ppl-sales-tbody"></tbody></table>
+      </div>
+      <h3 style="font-size:15px;margin-bottom:10px">Ordini ritiro (negozio online)</h3>
+      <div class="table-wrap" style="margin-bottom:16px">
+        <table><thead><tr><th>Data</th><th>Bottiglie</th><th>Totale</th><th>Stato</th></tr></thead>
+        <tbody id="ppl-pickup-tbody"></tbody></table>
+      </div>
+      <div id="ppl-venue-events-wrap" style="display:none">
+        <h3 style="font-size:15px;margin-bottom:10px">Eventi terzi organizzati</h3>
+        <div class="table-wrap">
+          <table><thead><tr><th>Data</th><th>Titolo</th><th>Tariffa</th><th>Stato</th></tr></thead>
+          <tbody id="ppl-venue-events-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('people-modal')">Annulla</button>
       <button class="btn" onclick="savePerson()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin order modal (ordine diretto, senza passare dal portale agente) -->
+<div class="modal-overlay" id="admin-order-modal">
+  <div class="modal-box" style="max-width:720px">
+    <h3>Nuovo ordine diretto</h3>
+    <div id="admin-order-modal-msg"></div>
+    <div class="field-row">
+      <div class="field"><label>Cliente</label><select id="aord-customer"><option value="">— Seleziona —</option></select></div>
+      <div class="field"><label>Agente (opzionale)</label><select id="aord-agent"><option value="">— Nessuno (ordine diretto) —</option></select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Data ordine</label><input type="date" id="aord-date"></div>
+      <div class="field"><label>Data consegna</label><input type="date" id="aord-delivery-date"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Causale</label><input id="aord-causale" value="ORDCLI"></div>
+      <div class="field"><label>Listino</label><select id="aord-price-list"><option value="">— Nessuno —</option></select></div>
+    </div>
+    <div class="field"><label>Note</label><input id="aord-notes"></div>
+
+    <div class="table-wrap" style="margin:14px 0">
+      <table><thead><tr><th>Bottiglia</th><th>Variante etichetta</th><th>Quantità</th><th>Prezzo unit. (€)</th><th>Totale</th><th></th></tr></thead>
+      <tbody id="aord-items-tbody"></tbody></table>
+    </div>
+    <button class="btn secondary small" onclick="addAdminOrderItemRow()">+ Aggiungi riga</button>
+    <div style="text-align:right;font-weight:700;font-size:15px;margin-top:10px" id="aord-total">Totale: € 0,00</div>
+
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('admin-order-modal')">Annulla</button>
+      <button class="btn" onclick="saveAdminOrder()">Registra ordine</button>
     </div>
   </div>
 </div>
@@ -3052,9 +3110,10 @@ async function toggleOrdNewMenu() {
   if (isOpen) { menu.classList.remove('open'); return; }
   if (!AGENTS.length) AGENTS = await api('/api/admin/agents');
   const active = AGENTS.filter(a => a.active);
-  menu.innerHTML = active.length
-    ? active.map(a => `<a href="/agent.html?token=${encodeURIComponent(a.token)}" target="_blank" rel="noopener">${esc(a.name)}</a>`).join('')
-    : '<div class="ord-new-empty">Nessun agente attivo.<br>Creane uno nel CRM.</div>';
+  menu.innerHTML = '<a href="#" onclick="event.preventDefault();document.getElementById(\'ord-new-menu\').classList.remove(\'open\');openAdminOrderModal();" style="font-weight:600">Ordine diretto (senza agente)</a>' +
+    (active.length
+      ? active.map(a => `<a href="/agent.html?token=${encodeURIComponent(a.token)}" target="_blank" rel="noopener">Tramite ${esc(a.name)}</a>`).join('')
+      : '<div class="ord-new-empty">Nessun agente attivo.</div>');
   menu.classList.add('open');
 }
 document.addEventListener('click', (e) => {
@@ -3720,7 +3779,56 @@ async function openPersonModal(p) {
   document.getElementById('ppl-importer').innerHTML = '<option value="">— Nessuno —</option>' +
     importers.map(i => `<option value="${i.id}" ${p && p.importer_id === i.id ? 'selected' : ''}>${esc(i.name)}</option>`).join('');
 
+  document.getElementById('ppl-transactions-section').style.display = p ? 'block' : 'none';
+  if (p) await renderPersonTransactions(p.id);
+
   openModal('people-modal');
+}
+
+const PPL_CONTEXT_LABELS = { negozio: 'Negozio', post_visita: 'Post visita', post_evento: 'Post evento' };
+const PPL_PICKUP_STATUS_LABELS = { in_attesa_pagamento: 'In attesa di pagamento', da_ritirare: 'Da ritirare', ritirato: 'Ritirato', annullato: 'Annullato' };
+const PPL_VENUE_STATUS_LABELS = { richiesta: 'Richiesta', confermato: 'Confermato', completato: 'Completato', annullato: 'Annullato' };
+
+async function renderPersonTransactions(personId) {
+  const p = await api('/api/admin/people/' + personId);
+  document.getElementById('ppl-visits-tbody').innerHTML = p.visits.length ? p.visits.map(v => `
+    <tr>
+      <td>${v.date} ${v.time}</td>
+      <td>${esc(v.experience_name)}${v.experience_type === 'evento' ? ' (evento)' : ''}</td>
+      <td><span class="badge ${v.status}">${v.status.replace('_', ' ')}</span></td>
+      <td>€ ${fmtEuro(v.amount_cents)}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="4" class="empty">Nessuna visita registrata.</td></tr>';
+
+  document.getElementById('ppl-sales-tbody').innerHTML = p.shopSales.length ? p.shopSales.map(s => `
+    <tr>
+      <td>${s.created_at}</td>
+      <td>${s.items.map(it => `${it.quantity}× ${esc(it.product_name)}`).join(', ')}</td>
+      <td>€ ${fmtEuro(s.total_cents)}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="3" class="empty">Nessun acquisto in cassa.</td></tr>';
+
+  document.getElementById('ppl-pickup-tbody').innerHTML = p.pickupOrders.length ? p.pickupOrders.map(o => `
+    <tr>
+      <td>${o.created_at}</td>
+      <td>${o.items.map(it => `${it.quantity}× ${esc(it.product_name)}`).join(', ')}</td>
+      <td>€ ${fmtEuro(o.amount_cents)}</td>
+      <td>${PPL_PICKUP_STATUS_LABELS[o.status] || o.status}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="4" class="empty">Nessun ordine di ritiro.</td></tr>';
+
+  const showVenue = p.roles.includes('cliente_evento') || p.venueEvents.length > 0;
+  document.getElementById('ppl-venue-events-wrap').style.display = showVenue ? 'block' : 'none';
+  if (showVenue) {
+    document.getElementById('ppl-venue-events-tbody').innerHTML = p.venueEvents.length ? p.venueEvents.map(v => `
+      <tr>
+        <td>${v.event_date}</td>
+        <td>${esc(v.title)}</td>
+        <td>€ ${fmtEuro(v.rental_fee_cents)}</td>
+        <td>${PPL_VENUE_STATUS_LABELS[v.status] || v.status}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="4" class="empty">Nessun evento organizzato.</td></tr>';
+  }
 }
 
 async function savePerson() {
@@ -4233,20 +4341,102 @@ async function saveCrmQuickActivity() {
   }
 }
 
-// ── Nuovo ordine dalla scheda: l'unico punto di inserimento ordini è il portale agente ──
+// ── Nuovo ordine dalla scheda: tramite il portale di un agente, oppure diretto ──
 function crmOpenNewOrder() {
   const { type, data: d } = CRM_CURRENT;
   const agentToken = type === 'agent' ? d.token : null;
   if (agentToken) { window.open(`/agent.html?token=${encodeURIComponent(agentToken)}`, '_blank'); return; }
-  if (type === 'customer' && d.agent_id) {
-    AGENTS.length ? openOrderForCustomerAgent(d.agent_id) : api('/api/admin/agents').then(a => { AGENTS = a; openOrderForCustomerAgent(d.agent_id); });
-    return;
-  }
-  alert('Questo cliente non ha un agente assegnato: assegnane uno da "Modifica" per poter inserire ordini dal suo portale.');
+  if (type === 'customer') { openAdminOrderModal(d.id); return; }
 }
-function openOrderForCustomerAgent(agentId) {
-  const agent = AGENTS.find(a => a.id === agentId);
-  if (agent) window.open(`/agent.html?token=${encodeURIComponent(agent.token)}`, '_blank');
+
+// ── Ordine diretto (admin, senza agente obbligatorio) ──────────────────────────
+let ADMIN_ORDER_ITEMS = [];
+let ADMIN_ORDER_ITEM_SEQ = 0;
+
+async function openAdminOrderModal(prefillCustomerId) {
+  document.getElementById('admin-order-modal-msg').innerHTML = '';
+  document.getElementById('aord-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('aord-delivery-date').value = '';
+  document.getElementById('aord-causale').value = 'ORDCLI';
+  document.getElementById('aord-notes').value = '';
+
+  const customers = await api('/api/admin/customers');
+  document.getElementById('aord-customer').innerHTML = '<option value="">— Seleziona —</option>' +
+    customers.map(c => `<option value="${c.id}" ${prefillCustomerId && c.id === prefillCustomerId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  if (!AGENTS.length) AGENTS = await api('/api/admin/agents');
+  document.getElementById('aord-agent').innerHTML = '<option value="">— Nessuno (ordine diretto) —</option>' +
+    AGENTS.filter(a => a.active).map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  const priceLists = await api('/api/admin/price-lists');
+  document.getElementById('aord-price-list').innerHTML = '<option value="">— Nessuno —</option>' +
+    priceLists.map(l => `<option value="${esc(l.name)}">${esc(l.name)}</option>`).join('');
+  if (!PRODUCTS.length) PRODUCTS = await api('/api/admin/products');
+
+  ADMIN_ORDER_ITEMS = [];
+  ADMIN_ORDER_ITEM_SEQ = 0;
+  addAdminOrderItemRow();
+  openModal('admin-order-modal');
+}
+
+function addAdminOrderItemRow() {
+  ADMIN_ORDER_ITEMS.push({ id: ++ADMIN_ORDER_ITEM_SEQ, productId: '', labelVariant: '', quantity: 1, unitPriceCents: 0 });
+  renderAdminOrderItems();
+}
+function removeAdminOrderItemRow(id) {
+  ADMIN_ORDER_ITEMS = ADMIN_ORDER_ITEMS.filter(r => r.id !== id);
+  renderAdminOrderItems();
+}
+function updateAdminOrderItemRow(id, field, value) {
+  const row = ADMIN_ORDER_ITEMS.find(r => r.id === id);
+  if (!row) return;
+  if (field === 'productId') row.productId = value;
+  else if (field === 'labelVariant') row.labelVariant = value;
+  else if (field === 'quantity') row.quantity = Math.max(1, parseInt(value) || 1);
+  else if (field === 'unitPrice') row.unitPriceCents = Math.round((parseFloat(value) || 0) * 100);
+  renderAdminOrderItems();
+}
+function renderAdminOrderItems() {
+  document.getElementById('aord-items-tbody').innerHTML = ADMIN_ORDER_ITEMS.map(row => `
+    <tr>
+      <td><select onchange="updateAdminOrderItemRow(${row.id}, 'productId', this.value)">
+        <option value="">— Seleziona —</option>
+        ${PRODUCTS.map(p => `<option value="${p.id}" ${row.productId == p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+      </select></td>
+      <td><input type="text" value="${esc(row.labelVariant)}" onchange="updateAdminOrderItemRow(${row.id}, 'labelVariant', this.value)"></td>
+      <td><input type="number" min="1" value="${row.quantity}" onchange="updateAdminOrderItemRow(${row.id}, 'quantity', this.value)"></td>
+      <td><input type="number" step="0.01" value="${(row.unitPriceCents / 100).toFixed(2)}" onchange="updateAdminOrderItemRow(${row.id}, 'unitPrice', this.value)"></td>
+      <td>€ ${fmtEuro(row.quantity * row.unitPriceCents)}</td>
+      <td><button type="button" class="btn small danger" onclick="removeAdminOrderItemRow(${row.id})">×</button></td>
+    </tr>
+  `).join('');
+  const total = ADMIN_ORDER_ITEMS.reduce((s, r) => s + r.quantity * r.unitPriceCents, 0);
+  document.getElementById('aord-total').textContent = 'Totale: € ' + fmtEuro(total);
+}
+
+async function saveAdminOrder() {
+  const msg = document.getElementById('admin-order-modal-msg');
+  const customerId = document.getElementById('aord-customer').value;
+  if (!customerId) { msg.innerHTML = '<div class="msg error">Seleziona un cliente.</div>'; return; }
+  const validItems = ADMIN_ORDER_ITEMS.filter(r => r.productId);
+  if (!validItems.length) { msg.innerHTML = '<div class="msg error">Aggiungi almeno un articolo con una bottiglia selezionata.</div>'; return; }
+  const body = {
+    customer_id: customerId,
+    agent_id: document.getElementById('aord-agent').value || '',
+    order_date: document.getElementById('aord-date').value,
+    delivery_date: document.getElementById('aord-delivery-date').value,
+    causale: document.getElementById('aord-causale').value.trim(),
+    price_list_name: document.getElementById('aord-price-list').value || null,
+    notes: document.getElementById('aord-notes').value.trim(),
+    items: validItems.map(r => ({ product_id: r.productId, label_variant: r.labelVariant, quantity: r.quantity, unit_price_cents: r.unitPriceCents })),
+  };
+  try {
+    const res = await api('/api/admin/orders/manual', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('admin-order-modal');
+    loadOrders();
+    if (CRM_CURRENT.type === 'customer' && String(CRM_CURRENT.id) === customerId) loadCrmRecordData();
+    alert('Ordine ' + res.order_number + ' registrato.');
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
 }
 
 const CRM_TC_STATUS_LABELS = { attivo: 'Clienti attivi', semi_attivo: 'Clienti semi attivi', inattivo: 'Clienti inattivi' };
