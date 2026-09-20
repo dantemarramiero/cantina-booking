@@ -2129,7 +2129,7 @@
     <div id="crm2-content">
       <div id="crm2-anagrafica">
         <div class="crm2-section" id="crm2-section-contatto">
-          <div class="crm2-section-head"><h2>Contatto</h2><span class="crm2-edit-link" onclick="crmEditSection('contatto')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>Modifica</span></div>
+          <div class="crm2-section-head"><h2>Informazioni generali</h2><span class="crm2-edit-link" onclick="crmEditSection('contatto')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>Modifica</span></div>
           <div id="crm2-view-contatto"></div>
         </div>
         <div class="crm2-section" id="crm2-section-sedi">
@@ -3758,11 +3758,11 @@ async function loadPeople() {
     const linkedTo = p.customer_name || p.importer_name || p.agent_name;
     const linkedType = p.customer_name ? 'customer' : (p.importer_name ? 'importer' : (p.agent_name ? 'agent' : null));
     const linkedId = p.customer_id || p.importer_id || p.agent_id;
-    const linkedHtml = linkedTo ? ` · <span style="cursor:pointer;color:var(--wine)" onclick="openCrmRecord('${linkedType}', ${linkedId})">${esc(linkedTo)}</span>` : '';
+    const linkedHtml = linkedTo ? ` · <span style="cursor:pointer;color:var(--wine)" onclick="event.stopPropagation();openCrmRecord('${linkedType}', ${linkedId})">${esc(linkedTo)}</span>` : '';
     return `
     <div class="list-row">
-      <div class="list-row-icon">${esc(p.name).charAt(0).toUpperCase()}</div>
-      <div class="list-row-body">
+      <div class="list-row-icon" style="cursor:pointer" onclick='openPersonModal(${jsonAttrP(p)})'>${esc(p.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body" style="cursor:pointer" onclick='openPersonModal(${jsonAttrP(p)})'>
         <div class="list-row-title">${esc(p.name)}</div>
         <div class="list-row-sub">${esc(p.email) || 'nessuna email'}${linkedHtml}</div>
       </div>
@@ -4259,7 +4259,7 @@ function crm2CompletenessHtml() {
 function renderCrm2Index() {
   const { type, data: d } = CRM_CURRENT;
   const items = [
-    { key: 'contatto', label: 'Contatto' },
+    { key: 'contatto', label: 'Informazioni generali' },
     { key: 'sedi', label: type === 'agent' ? 'Sede' : 'Sedi' },
     { key: 'fiscali', label: 'Dati fiscali' },
     { key: 'commerciali', label: 'Condizioni commerciali' },
