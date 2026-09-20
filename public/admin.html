@@ -526,6 +526,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
         Cassa
       </button>
+      <button data-tab="pickup-orders">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg>
+        Ritiri
+      </button>
       <button data-tab="calendar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
         Calendario
@@ -712,6 +716,15 @@
       <div class="table-wrap">
         <table><thead><tr><th>Data</th><th>Cliente</th><th>Contesto</th><th>Pagamento</th><th>Articoli</th><th>Totale</th><th>Azioni</th></tr></thead>
         <tbody id="cassa-sales-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- RITIRI (negozio online: prenotazione + pagamento anticipato) -->
+    <div class="panel" id="panel-pickup-orders">
+      <p style="margin:0 0 16px;font-size:12.5px;color:var(--ink-soft)">Ordini pagati online sul sito pubblico, da consegnare al ritiro in cantina. Il cliente riceve un codice/QR di conferma da mostrare al ritiro; da qui puoi anche segnare manualmente un ordine come ritirato.</p>
+      <div class="table-wrap">
+        <table><thead><tr><th>Data</th><th>Cliente</th><th>Bottiglie</th><th>Totale</th><th>Stato</th><th>Azioni</th></tr></thead>
+        <tbody id="pickup-orders-tbody"></tbody></table>
       </div>
     </div>
 
@@ -1211,6 +1224,12 @@
         <table><thead><tr><th>Data</th><th>Contesto</th><th>Bottiglie</th><th>Pagamento</th><th>Totale</th><th>Azioni</th></tr></thead>
         <tbody id="b2c-cassa-sales-tbody"></tbody></table>
       </div>
+
+      <h3 style="font-size:15px;margin:22px 0 10px">Ordini ritiro (negozio online)</h3>
+      <div class="table-wrap">
+        <table><thead><tr><th>Data</th><th>Bottiglie</th><th>Totale</th><th>Stato</th></tr></thead>
+        <tbody id="b2c-pickup-orders-tbody"></tbody></table>
+      </div>
     </div>
   </div>
 </div>
@@ -1343,7 +1362,7 @@ function closeMobileSidebar() {
 }
 
 // ── Tabs (sidebar) ──────────────────────────────────────────────────────────────
-const TAB_TITLES = { dashboard: 'Dashboard', experiences: 'Esperienze', events: 'Eventi proprietari', 'venue-events': 'Eventi terzi', cassa: 'Cassa', calendar: 'Calendario', bookings: 'Prenotazioni', discounts: 'Codici Sconto', reviews: 'Recensioni', newsletter: 'Newsletter', operators: 'Operatori', crm: 'CRM' };
+const TAB_TITLES = { dashboard: 'Dashboard', experiences: 'Esperienze', events: 'Eventi proprietari', 'venue-events': 'Eventi terzi', cassa: 'Cassa', 'pickup-orders': 'Ritiri', calendar: 'Calendario', bookings: 'Prenotazioni', discounts: 'Codici Sconto', reviews: 'Recensioni', newsletter: 'Newsletter', operators: 'Operatori', crm: 'CRM' };
 document.querySelectorAll('.sidebar-nav button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.sidebar-nav button').forEach(b => b.classList.remove('active'));
@@ -1376,6 +1395,7 @@ function loadPanel(tab) {
   if (tab === 'events') loadEvents();
   if (tab === 'venue-events') loadVenueEvents();
   if (tab === 'cassa') loadCassa();
+  if (tab === 'pickup-orders') loadPickupOrders();
   if (tab === 'calendar') { loadExperiencesForSelects(); loadSlots(); renderCalendar(); }
   if (tab === 'bookings') loadBookings();
   if (tab === 'discounts') loadDiscounts();
@@ -2500,6 +2520,42 @@ async function voidCassaSale(id) {
   await loadCassa();
 }
 
+// ── Ritiri (negozio online) ──────────────────────────────────────────────────────
+const PICKUP_STATUS_LABELS = { in_attesa_pagamento: 'In attesa di pagamento', da_ritirare: 'Da ritirare', ritirato: 'Ritirato', annullato: 'Annullato' };
+const PICKUP_STATUS_BADGE = { in_attesa_pagamento: 'in_attesa', da_ritirare: 'in_attesa', ritirato: 'confermata', annullato: 'annullata' };
+
+async function loadPickupOrders() {
+  const rows = await api('/api/admin/pickup-orders');
+  document.getElementById('pickup-orders-tbody').innerHTML = rows.length ? rows.map(o => `
+    <tr>
+      <td>${o.created_at}</td>
+      <td>${esc(o.customer_name)}<br><span style="font-size:11px;color:var(--ink-soft)">${esc(o.customer_email)}</span></td>
+      <td>${o.items_count}</td>
+      <td>€ ${fmtEuro(o.amount_cents)}</td>
+      <td><span class="badge ${PICKUP_STATUS_BADGE[o.status]}">${PICKUP_STATUS_LABELS[o.status] || o.status}</span></td>
+      <td class="actions-cell">
+        ${o.status === 'da_ritirare' ? `<button class="btn small ok" onclick="markPickupOrderPicked(${o.id})">Segna ritirato</button>` : ''}
+        ${o.status !== 'annullato' && o.status !== 'ritirato' ? `<button class="btn small danger" onclick="cancelPickupOrder(${o.id})">Annulla</button>` : ''}
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" class="empty">Nessun ordine di ritiro registrato.</td></tr>';
+}
+
+async function markPickupOrderPicked(id) {
+  try {
+    await api('/api/admin/pickup-orders/' + id + '/pickup', { method: 'POST' });
+    loadPickupOrders();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function cancelPickupOrder(id) {
+  if (!confirm('Annullare questo ordine? Le eventuali giacenze scalate verranno ripristinate.')) return;
+  await api('/api/admin/pickup-orders/' + id, { method: 'DELETE' });
+  loadPickupOrders();
+}
+
 // ── Reviews ───────────────────────────────────────────────────────────────────
 async function loadReviews() {
   const rows = await api('/api/admin/reviews');
@@ -2629,6 +2685,14 @@ async function openB2CCustomerModal(id) {
         <td><button class="btn small danger" onclick="voidB2CCassaSale(${s.id})">Annulla</button></td>
       </tr>
     `).join('') : '<tr><td colspan="6" class="empty">Nessun acquisto in cassa registrato.</td></tr>';
+    document.getElementById('b2c-pickup-orders-tbody').innerHTML = c.pickupOrders.length ? c.pickupOrders.map(o => `
+      <tr>
+        <td>${o.created_at}</td>
+        <td>${o.items.map(it => `${it.quantity}× ${esc(it.product_name)}`).join(', ')}</td>
+        <td>€ ${fmtEuro(o.amount_cents)}</td>
+        <td><span class="badge ${PICKUP_STATUS_BADGE[o.status]}">${PICKUP_STATUS_LABELS[o.status] || o.status}</span></td>
+      </tr>
+    `).join('') : '<tr><td colspan="4" class="empty">Nessun ordine di ritiro registrato.</td></tr>';
   } else {
     document.getElementById('b2c-id').value = '';
     document.getElementById('b2c-name').value = '';

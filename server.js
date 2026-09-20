@@ -110,6 +110,55 @@ async function sendBookingEmail(booking) {
   await sendMail({ to: booking.email, subject, html: bookingSummaryHtml(booking, lang) });
 }
 
+function pickupOrderSummaryHtml(order, lang) {
+  const t = lang === 'en'
+    ? { title: 'Order confirmed', ref: 'Reference', total: 'Total', intro: 'Your order is paid and ready — pick it up at the winery whenever suits you.' }
+    : { title: 'Ordine confermato', ref: 'Riferimento', total: 'Totale', intro: 'Il tuo ordine è pagato e pronto — puoi ritirarlo in cantina quando preferisci.' };
+  const ref = '#' + String(order.id).padStart(4, '0');
+  const rows = order.items.map(it => `
+    <tr><td style="padding:8px 0;border-bottom:1px solid rgba(244,237,226,0.08);font-size:14px;color:#f4ede2;">${it.quantity}× ${it.product_name}</td>
+        <td style="padding:8px 0;border-bottom:1px solid rgba(244,237,226,0.08);font-size:14px;color:#f4ede2;text-align:right;">€ ${fmtPrice(it.line_total_cents)}</td></tr>
+  `).join('');
+  return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+  <body style="margin:0;padding:0;background:#f4ede2;font-family:Georgia,serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4ede2;padding:40px 0;">
+  <tr><td align="center">
+  <table width="580" cellpadding="0" cellspacing="0" style="background:#241014;max-width:580px;width:100%;">
+    <tr><td style="padding:44px 44px 28px;border-bottom:1px solid rgba(138,69,80,0.3);">
+      <p style="margin:0;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#8a4550;">${CANTINA_NAME}</p>
+      <h1 style="margin:12px 0 0;font-size:30px;font-weight:400;color:#f4ede2;">${t.title}</h1>
+    </td></tr>
+    <tr><td style="padding:32px 44px 24px;">
+      <h2 style="margin:0 0 16px;font-size:22px;font-weight:400;color:#f4ede2;">${order.customer_name},</h2>
+      <p style="margin:0;font-size:15px;line-height:1.7;color:rgba(244,237,226,0.75);">${t.intro}</p>
+    </td></tr>
+    <tr><td style="padding:0 44px 36px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(138,69,80,0.08);border:1px solid rgba(138,69,80,0.2);">
+        <tr><td style="padding:24px 24px 8px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr><td style="padding:8px 0;border-bottom:1px solid rgba(244,237,226,0.08);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(244,237,226,0.5);">${t.ref}</td>
+                <td style="padding:8px 0;border-bottom:1px solid rgba(244,237,226,0.08);font-size:18px;color:#8a4550;text-align:right;font-style:italic;">${ref}</td></tr>
+            ${rows}
+            <tr><td style="padding:14px 0 0;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(244,237,226,0.5);">${t.total}</td>
+                <td style="padding:14px 0 0;font-size:22px;color:#8a4550;text-align:right;">€ ${fmtPrice(order.amount_cents)}</td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:24px;"></td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="padding:24px 44px;border-top:1px solid rgba(138,69,80,0.2);">
+      <p style="margin:0;font-size:12px;color:rgba(244,237,226,0.3);line-height:1.7;">${CANTINA_NAME}</p>
+    </td></tr>
+  </table>
+  </td></tr></table></body></html>`;
+}
+
+async function sendPickupOrderEmail(order) {
+  const lang = order.language === 'en' ? 'en' : 'it';
+  const subject = lang === 'en' ? `Order confirmed — ${CANTINA_NAME}` : `Ordine confermato — ${CANTINA_NAME}`;
+  await sendMail({ to: order.customer_email, subject, html: pickupOrderSummaryHtml(order, lang) });
+}
+
 // ── Database ──────────────────────────────────────────────────────────────────
 const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA foreign_keys = ON');
@@ -304,6 +353,40 @@ db.exec(`
     unit_price_cents  INTEGER NOT NULL,
     line_total_cents  INTEGER NOT NULL,
     FOREIGN KEY (sale_id) REFERENCES shop_sales(id)
+  )
+`);
+
+// ── Enoturismo: negozio fisico — prenotazione e pagamento anticipato (ritiro in cantina) ──
+db.exec(`
+  CREATE TABLE IF NOT EXISTS pickup_orders (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_name         TEXT NOT NULL,
+    customer_email        TEXT NOT NULL,
+    customer_phone        TEXT,
+    b2c_customer_id       INTEGER,
+    language              TEXT DEFAULT 'it',
+    status                TEXT NOT NULL DEFAULT 'in_attesa_pagamento',
+    amount_cents          INTEGER NOT NULL DEFAULT 0,
+    pickup_token          TEXT UNIQUE,
+    stripe_session_id     TEXT,
+    payment_intent_id     TEXT,
+    stripe_payment_status TEXT,
+    notes                 TEXT,
+    picked_up_at          TEXT,
+    created_at            TEXT DEFAULT (datetime('now','localtime')),
+    FOREIGN KEY (b2c_customer_id) REFERENCES b2c_customers(id)
+  )
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS pickup_order_items (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id          INTEGER NOT NULL,
+    product_id        INTEGER,
+    product_name      TEXT NOT NULL,
+    quantity          INTEGER NOT NULL,
+    unit_price_cents  INTEGER NOT NULL,
+    line_total_cents  INTEGER NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES pickup_orders(id)
   )
 `);
 
@@ -1149,12 +1232,26 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) =
       const full = bookingWithDetails(bookingId);
       if (full) sendBookingEmail(full).catch(console.error);
     }
+    const pid = session.metadata?.pickup_order_id;
+    if (pid) {
+      const orderId = parseInt(pid);
+      const paymentIntentId = session.payment_intent || null;
+      db.prepare("UPDATE pickup_orders SET status = 'da_ritirare', payment_intent_id = ?, stripe_payment_status = 'paid' WHERE id = ?")
+        .run(paymentIntentId, orderId);
+      const items = db.prepare('SELECT * FROM pickup_order_items WHERE order_id = ?').all(orderId);
+      const decrementStock = db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ? AND stock_quantity IS NOT NULL');
+      for (const it of items) if (it.product_id) decrementStock.run(it.quantity, it.product_id);
+      const order = db.prepare('SELECT * FROM pickup_orders WHERE id = ?').get(orderId);
+      if (order) { order.items = items; sendPickupOrderEmail(order).catch(console.error); }
+    }
   }
 
   if (event.type === 'checkout.session.expired') {
     const session = event.data.object;
     const bid = session.metadata?.booking_id;
     if (bid) db.prepare("UPDATE bookings SET status = 'annullata' WHERE id = ?").run(parseInt(bid));
+    const pid = session.metadata?.pickup_order_id;
+    if (pid) db.prepare("UPDATE pickup_orders SET status = 'annullato' WHERE id = ?").run(parseInt(pid));
   }
 
   res.json({ received: true });
@@ -1293,6 +1390,118 @@ app.post('/api/create-checkout-session', async (req, res) => {
     console.error('STRIPE ERROR:', err.message);
     res.status(500).json({ error: 'Errore Stripe: ' + err.message });
   }
+});
+
+// ── Public: negozio online — prenotazione e pagamento anticipato con ritiro ───
+app.get('/api/shop-products', (req, res) => {
+  const priceListId = parseInt(getSetting('shop_price_list_id', ''));
+  if (!priceListId) return res.json([]);
+  const rows = db.prepare(`
+    SELECT p.id, p.name, p.vintage, p.varietal, p.description, p.image_url, p.wine_type, p.stock_quantity, pli.price_cents
+    FROM products p JOIN price_list_items pli ON pli.product_id = p.id AND pli.price_list_id = ?
+    WHERE p.active = 1
+    ORDER BY p.name
+  `).all(priceListId);
+  res.json(rows);
+});
+
+app.post('/api/create-pickup-checkout-session', async (req, res) => {
+  const { customer_name, email, phone, items, notes, language } = req.body || {};
+  if (!customer_name?.trim() || !email?.trim() || !Array.isArray(items) || !items.length) {
+    return res.status(400).json({ error: 'Compila tutti i campi obbligatori e aggiungi almeno una bottiglia.' });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Indirizzo email non valido.' });
+
+  const priceListId = parseInt(getSetting('shop_price_list_id', ''));
+  if (!priceListId) return res.status(400).json({ error: 'Negozio online non disponibile al momento.' });
+
+  const resolvedItems = [];
+  for (const it of items) {
+    const product = db.prepare(`
+      SELECT p.id, p.name, p.vintage, p.stock_quantity, pli.price_cents
+      FROM products p JOIN price_list_items pli ON pli.product_id = p.id AND pli.price_list_id = ?
+      WHERE p.id = ? AND p.active = 1
+    `).get(priceListId, it.product_id);
+    if (!product) return res.status(404).json({ error: 'Una delle bottiglie selezionate non è più disponibile.' });
+    const qty = Math.max(1, parseInt(it.quantity) || 1);
+    if (product.stock_quantity != null && qty > product.stock_quantity) {
+      return res.status(409).json({ error: `Disponibilità insufficiente per ${product.name}.` });
+    }
+    resolvedItems.push({ product_id: product.id, product_name: product.name + (product.vintage ? ' ' + product.vintage : ''), quantity: qty, unit_price_cents: product.price_cents });
+  }
+
+  const amountCents = resolvedItems.reduce((sum, it) => sum + it.quantity * it.unit_price_cents, 0);
+  const lang = language === 'en' ? 'en' : 'it';
+  const emailClean = email.toLowerCase().trim();
+  const b2cCustomerId = findOrCreateB2CCustomer(customer_name.trim(), emailClean, phone?.trim());
+  const pickupToken = crypto.randomBytes(16).toString('hex');
+
+  const orderResult = db.prepare(`
+    INSERT INTO pickup_orders (customer_name, customer_email, customer_phone, b2c_customer_id, language, status, amount_cents, pickup_token, notes)
+    VALUES (?, ?, ?, ?, ?, 'in_attesa_pagamento', ?, ?, ?)
+  `).run(customer_name.trim(), emailClean, phone?.trim() || null, b2cCustomerId, lang, amountCents, pickupToken, notes?.trim() || null);
+  const orderId = orderResult.lastInsertRowid;
+  const insertItem = db.prepare('INSERT INTO pickup_order_items (order_id, product_id, product_name, quantity, unit_price_cents, line_total_cents) VALUES (?, ?, ?, ?, ?, ?)');
+  for (const it of resolvedItems) insertItem.run(orderId, it.product_id, it.product_name, it.quantity, it.unit_price_cents, it.quantity * it.unit_price_cents);
+
+  if (!stripe) {
+    db.prepare('DELETE FROM pickup_order_items WHERE order_id = ?').run(orderId);
+    db.prepare('DELETE FROM pickup_orders WHERE id = ?').run(orderId);
+    return res.status(500).json({ error: 'Pagamento online non configurato.' });
+  }
+
+  const origin = `${req.protocol}://${req.get('host')}`;
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      customer_email: emailClean,
+      line_items: resolvedItems.map(it => ({
+        price_data: { currency: 'eur', product_data: { name: `${CANTINA_NAME} — ${it.product_name}` }, unit_amount: it.unit_price_cents },
+        quantity: it.quantity,
+      })),
+      mode: 'payment',
+      success_url: `${origin}/?pickup=success&token=${pickupToken}`,
+      cancel_url: `${origin}/?pickup=cancelled`,
+      metadata: { pickup_order_id: String(orderId) },
+      expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+    });
+    db.prepare('UPDATE pickup_orders SET stripe_session_id = ? WHERE id = ?').run(session.id, orderId);
+    res.json({ url: session.url });
+  } catch (err) {
+    db.prepare('DELETE FROM pickup_order_items WHERE order_id = ?').run(orderId);
+    db.prepare('DELETE FROM pickup_orders WHERE id = ?').run(orderId);
+    console.error('STRIPE ERROR:', err.message);
+    res.status(500).json({ error: 'Errore Stripe: ' + err.message });
+  }
+});
+
+function pickupOrderPublicView(order) {
+  return {
+    id: order.id,
+    ref: '#' + String(order.id).padStart(4, '0'),
+    customer_name: order.customer_name,
+    status: order.status,
+    amount_cents: order.amount_cents,
+    picked_up_at: order.picked_up_at,
+    items: db.prepare('SELECT product_name, quantity, unit_price_cents, line_total_cents FROM pickup_order_items WHERE order_id = ?').all(order.id),
+  };
+}
+
+app.get('/api/pickup-orders/verify/:token', (req, res) => {
+  const order = db.prepare('SELECT * FROM pickup_orders WHERE pickup_token = ?').get(req.params.token);
+  if (!order) return res.status(404).json({ error: 'Ordine non trovato.' });
+  res.json(pickupOrderPublicView(order));
+});
+
+app.post('/api/pickup-orders/verify/:token/pickup', (req, res) => {
+  const order = db.prepare('SELECT * FROM pickup_orders WHERE pickup_token = ?').get(req.params.token);
+  if (!order) return res.status(404).json({ error: 'Ordine non trovato.' });
+  if (order.status === 'in_attesa_pagamento') return res.status(409).json({ error: 'Il pagamento non risulta ancora completato.' });
+  if (order.status === 'annullato') return res.status(409).json({ error: 'Questo ordine è stato annullato.' });
+  if (order.status !== 'ritirato') {
+    db.prepare("UPDATE pickup_orders SET status = 'ritirato', picked_up_at = datetime('now','localtime') WHERE id = ?").run(order.id);
+  }
+  res.json(pickupOrderPublicView(db.prepare('SELECT * FROM pickup_orders WHERE id = ?').get(order.id)));
 });
 
 // ── Public: reviews ───────────────────────────────────────────────────────────
@@ -1932,6 +2141,43 @@ app.delete('/api/admin/shop-sales/:id', authAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// ── Negozio online: ritiri in cantina (admin) ─────────────────────────────────
+app.get('/api/admin/pickup-orders', authAdmin, (req, res) => {
+  const rows = db.prepare(`
+    SELECT o.*, (SELECT COUNT(*) FROM pickup_order_items i WHERE i.order_id = o.id) AS items_count
+    FROM pickup_orders o ORDER BY o.created_at DESC, o.id DESC
+  `).all();
+  res.json(rows);
+});
+
+app.get('/api/admin/pickup-orders/:id', authAdmin, (req, res) => {
+  const order = db.prepare('SELECT * FROM pickup_orders WHERE id = ?').get(req.params.id);
+  if (!order) return res.status(404).json({ error: 'Ordine non trovato.' });
+  order.items = db.prepare('SELECT * FROM pickup_order_items WHERE order_id = ? ORDER BY id').all(order.id);
+  res.json(order);
+});
+
+app.post('/api/admin/pickup-orders/:id/pickup', authAdmin, (req, res) => {
+  const order = db.prepare('SELECT * FROM pickup_orders WHERE id = ?').get(req.params.id);
+  if (!order) return res.status(404).json({ error: 'Ordine non trovato.' });
+  if (order.status !== 'da_ritirare') return res.status(409).json({ error: 'Solo un ordine pagato e in attesa di ritiro può essere segnato come ritirato.' });
+  db.prepare("UPDATE pickup_orders SET status = 'ritirato', picked_up_at = datetime('now','localtime') WHERE id = ?").run(order.id);
+  res.json({ success: true });
+});
+
+app.delete('/api/admin/pickup-orders/:id', authAdmin, (req, res) => {
+  const order = db.prepare('SELECT * FROM pickup_orders WHERE id = ?').get(req.params.id);
+  if (!order) return res.status(404).json({ error: 'Ordine non trovato.' });
+  if (order.status === 'da_ritirare') {
+    const items = db.prepare('SELECT * FROM pickup_order_items WHERE order_id = ?').all(order.id);
+    const restoreStock = db.prepare('UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ? AND stock_quantity IS NOT NULL');
+    for (const it of items) if (it.product_id) restoreStock.run(it.quantity, it.product_id);
+  }
+  db.prepare('DELETE FROM pickup_order_items WHERE order_id = ?').run(order.id);
+  db.prepare('DELETE FROM pickup_orders WHERE id = ?').run(order.id);
+  res.json({ success: true });
+});
+
 // ── CRM B2C: clienti (visitatori + negozio + e-commerce) ──────────────────────
 app.get('/api/admin/b2c-customers', authAdmin, (req, res) => {
   const { q } = req.query;
@@ -1972,7 +2218,10 @@ app.get('/api/admin/b2c-customers/:id', authAdmin, (req, res) => {
   const shopSales = db.prepare('SELECT * FROM shop_sales WHERE b2c_customer_id = ? ORDER BY created_at DESC').all(customer.id);
   const itemsBySale = db.prepare('SELECT * FROM shop_sale_items WHERE sale_id = ? ORDER BY id');
   for (const s of shopSales) s.items = itemsBySale.all(s.id);
-  res.json({ ...customer, visits, orders, shopSales });
+  const pickupOrders = db.prepare('SELECT * FROM pickup_orders WHERE b2c_customer_id = ? ORDER BY created_at DESC').all(customer.id);
+  const itemsByOrder = db.prepare('SELECT * FROM pickup_order_items WHERE order_id = ? ORDER BY id');
+  for (const o of pickupOrders) o.items = itemsByOrder.all(o.id);
+  res.json({ ...customer, visits, orders, shopSales, pickupOrders });
 });
 
 app.post('/api/admin/b2c-customers', authAdmin, (req, res) => {
@@ -2055,6 +2304,7 @@ app.get('/api/admin/settings', authAdmin, (req, res) => {
     procurement_alert_email: getSetting('procurement_alert_email', ''),
     active_months_threshold: getSetting('active_months_threshold', '6'),
     semi_active_months_threshold: getSetting('semi_active_months_threshold', '12'),
+    shop_price_list_id: getSetting('shop_price_list_id', ''),
     ...company,
   });
 });
@@ -2123,9 +2373,10 @@ app.post('/api/admin/dashboard-widgets', authAdmin, (req, res) => {
 });
 
 app.post('/api/admin/settings', authAdmin, (req, res) => {
-  const { commercial_alert_email, procurement_alert_email, active_months_threshold, semi_active_months_threshold } = req.body || {};
+  const { commercial_alert_email, procurement_alert_email, active_months_threshold, semi_active_months_threshold, shop_price_list_id } = req.body || {};
   if (commercial_alert_email !== undefined) setSetting('commercial_alert_email', commercial_alert_email);
   if (procurement_alert_email !== undefined) setSetting('procurement_alert_email', procurement_alert_email);
+  if (shop_price_list_id !== undefined) setSetting('shop_price_list_id', shop_price_list_id);
   if (active_months_threshold !== undefined) {
     const n = parseInt(active_months_threshold);
     if (!n || n < 1) return res.status(400).json({ error: 'La soglia clienti attivi deve essere un numero di mesi valido.' });

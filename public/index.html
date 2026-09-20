@@ -66,6 +66,27 @@
   .exp-card .price span { font-size: 11px; color: var(--ink-soft); font-family: 'Montserrat', sans-serif; font-weight: 500; text-transform: uppercase; }
   .exp-card .duration { font-size: 12px; color: var(--ink-soft); letter-spacing: 0.03em; }
 
+  /* Negozio online (click&collect) */
+  .shop-card .img { background: linear-gradient(150deg, var(--cream-dim), var(--cream) 70%); }
+  .shop-card .stock-note { font-size: 11.5px; color: var(--ink-soft); margin-top: 4px; }
+  .shop-stepper { display: flex; align-items: center; gap: 10px; }
+  .shop-stepper button { width: 30px; height: 30px; border-radius: 4px; border: 1px solid var(--cream-dim); background: #fff; color: var(--wine); font-size: 16px; font-weight: 700; cursor: pointer; }
+  .shop-stepper button:hover { background: var(--cream); }
+  .shop-stepper .qty { min-width: 18px; text-align: center; font-weight: 700; font-size: 14px; }
+  .shop-card.out-of-stock { opacity: .5; }
+  .shop-cart-bar { position: sticky; bottom: 16px; margin-top: 28px; background: #fff; border: 1px solid var(--cream-dim); border-radius: 6px; padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 6px 24px rgba(20,10,14,0.12); }
+  .shop-cart-bar .info { font-size: 14px; color: var(--ink-soft); }
+  .shop-cart-bar .info strong { color: var(--ink); font-size: 18px; font-family: 'Bodoni Moda', serif; }
+  .shop-cart-list { margin: 16px 0; }
+  .shop-cart-row { display: flex; justify-content: space-between; font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--cream-dim); }
+  .qr-box { text-align: center; margin: 20px 0; }
+  .qr-box img { width: 200px; height: 200px; border: 1px solid var(--cream-dim); padding: 10px; background: #fff; }
+  #verify-view { display: none; min-height: 100vh; background: var(--cream); padding: 60px 20px; }
+  #verify-view .verify-box { max-width: 480px; margin: 0 auto; background: #fff; border: 1px solid var(--cream-dim); border-radius: 8px; padding: 36px; text-align: center; }
+  #verify-view .verify-box h2 { color: var(--wine); text-transform: uppercase; margin-bottom: 8px; }
+  #verify-view.active { display: block; }
+  body.verify-mode > *:not(#verify-view) { display: none !important; }
+
   /* Reviews */
   .reviews-wrap { background: var(--wine-dark); color: var(--cream); }
   .reviews-wrap .section-head h2 { color: #fff; }
@@ -181,6 +202,21 @@
       <p class="desc" data-i18n="events_desc">Le prossime occasioni per vivere la cantina da vicino.</p>
     </div>
     <div class="experiences-grid" id="events-grid"></div>
+  </div>
+</section>
+
+<section id="negozio" style="display:none">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow" data-i18n="shop_eyebrow">Le nostre bottiglie</p>
+      <h2 data-i18n="shop_title">Negozio</h2>
+      <p class="desc" data-i18n="shop_desc">Scegli le bottiglie, paga online e ritirale comodamente in cantina.</p>
+    </div>
+    <div class="experiences-grid" id="shop-products-grid"></div>
+    <div class="shop-cart-bar" id="shop-cart-bar" style="display:none">
+      <div class="info"><strong id="shop-bar-total">€ 0,00</strong> · <span id="shop-bar-count"></span></div>
+      <button class="btn" onclick="openShopCheckout()" data-i18n="shop_checkout_btn">Procedi al pagamento</button>
+    </div>
   </div>
 </section>
 
@@ -315,6 +351,56 @@
   </div>
 </div>
 
+<!-- Shop checkout modal -->
+<div class="overlay" id="shop-checkout-overlay">
+  <div class="modal">
+    <button class="close" id="shop-checkout-close">&times;</button>
+    <h3 data-i18n="shop_checkout_title">Il tuo ordine</h3>
+    <div class="shop-cart-list" id="shop-checkout-cart"></div>
+    <div class="summary-box" id="shop-checkout-summary"></div>
+    <div id="shop-checkout-msg"></div>
+    <div class="field-row">
+      <div class="field">
+        <label data-i18n="full_name">Nome e cognome</label>
+        <input type="text" id="shop-f-name">
+      </div>
+      <div class="field">
+        <label data-i18n="email">Email</label>
+        <input type="email" id="shop-f-email">
+      </div>
+    </div>
+    <div class="field">
+      <label data-i18n="phone">Telefono</label>
+      <input type="tel" id="shop-f-phone">
+    </div>
+    <p class="desc" style="font-size:12.5px;margin:6px 0 0" data-i18n="shop_pickup_notice">Il pagamento avviene online. Ritirerai le bottiglie direttamente in cantina.</p>
+    <div class="modal-actions">
+      <button class="btn secondary-modal" id="shop-checkout-back" data-i18n="back">Indietro</button>
+      <button class="btn" id="shop-checkout-submit" data-i18n="shop_pay_btn">Paga e prenota il ritiro</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pickup confirmation (QR) modal -->
+<div class="overlay" id="pickup-confirm-overlay">
+  <div class="modal">
+    <button class="close" id="pickup-confirm-close">&times;</button>
+    <h3 data-i18n="pickup_confirmed_title">Ordine confermato</h3>
+    <p class="desc" data-i18n="pickup_confirmed_desc">Mostra questo codice in cantina al momento del ritiro.</p>
+    <div class="qr-box" id="pickup-qr-box"></div>
+    <div class="shop-cart-list" id="pickup-confirm-items"></div>
+    <div class="summary-box" id="pickup-confirm-summary"></div>
+  </div>
+</div>
+
+<!-- Staff verify view (opened by scanning the QR) -->
+<div id="verify-view">
+  <div class="verify-box">
+    <h2 data-i18n="verify_title">Verifica ritiro</h2>
+    <div id="verify-content"></div>
+  </div>
+</div>
+
 <script>
 const I18N = {
   it: {
@@ -374,6 +460,26 @@ const I18N = {
     review_thanks: 'Grazie! La tua recensione sarà pubblicata dopo la verifica.',
     review_need_rating: 'Seleziona una valutazione e inserisci il tuo nome.',
     nl_thanks: 'Iscrizione ricevuta, grazie!',
+    shop_eyebrow: 'Le nostre bottiglie',
+    shop_title: 'Negozio',
+    shop_desc: 'Scegli le bottiglie, paga online e ritirale comodamente in cantina.',
+    shop_checkout_btn: 'Procedi al pagamento',
+    shop_checkout_title: 'Il tuo ordine',
+    shop_pickup_notice: 'Il pagamento avviene online. Ritirerai le bottiglie direttamente in cantina.',
+    shop_pay_btn: 'Paga e prenota il ritiro',
+    shop_out_of_stock: 'Esaurito',
+    shop_available: 'disponibili',
+    shop_empty_cart: 'Aggiungi almeno una bottiglia.',
+    pickup_confirmed_title: 'Ordine confermato',
+    pickup_confirmed_desc: 'Mostra questo codice in cantina al momento del ritiro.',
+    pickup_cancel_banner: 'Pagamento annullato. Nessun addebito è stato effettuato.',
+    verify_title: 'Verifica ritiro',
+    verify_not_found: 'Ordine non trovato.',
+    verify_pending: 'Pagamento non ancora completato.',
+    verify_cancelled: 'Questo ordine è stato annullato.',
+    verify_confirm_btn: 'Conferma consegna',
+    verify_picked_up: 'Ordine già ritirato il',
+    verify_success: 'Consegna confermata.',
   },
   en: {
     hero_title: 'Where time teaches restraint',
@@ -432,6 +538,26 @@ const I18N = {
     review_thanks: 'Thank you! Your review will be published after moderation.',
     review_need_rating: 'Please select a rating and enter your name.',
     nl_thanks: 'Subscribed, thank you!',
+    shop_eyebrow: 'Our bottles',
+    shop_title: 'Shop',
+    shop_desc: 'Choose your bottles, pay online and pick them up at the winery.',
+    shop_checkout_btn: 'Proceed to payment',
+    shop_checkout_title: 'Your order',
+    shop_pickup_notice: 'Payment happens online. You will pick up the bottles directly at the winery.',
+    shop_pay_btn: 'Pay and reserve pickup',
+    shop_out_of_stock: 'Sold out',
+    shop_available: 'available',
+    shop_empty_cart: 'Add at least one bottle.',
+    pickup_confirmed_title: 'Order confirmed',
+    pickup_confirmed_desc: 'Show this code at the winery when you pick up your order.',
+    pickup_cancel_banner: 'Payment cancelled. You have not been charged.',
+    verify_title: 'Pickup verification',
+    verify_not_found: 'Order not found.',
+    verify_pending: 'Payment not completed yet.',
+    verify_cancelled: 'This order has been cancelled.',
+    verify_confirm_btn: 'Confirm handover',
+    verify_picked_up: 'Order already picked up on',
+    verify_success: 'Handover confirmed.',
   }
 };
 
@@ -523,6 +649,177 @@ function renderEvents() {
       </div>
     </div>
   `).join('');
+}
+
+function esc(s) { return (s ?? '').toString().replace(/</g, '&lt;'); }
+
+// ── Negozio online (prenotazione e pagamento anticipato con ritiro) ──────────
+let SHOP_PRODUCTS = [];
+let SHOP_CART = [];
+
+async function loadShop() {
+  try {
+    const res = await fetch('/api/shop-products');
+    SHOP_PRODUCTS = await res.json();
+  } catch { SHOP_PRODUCTS = []; }
+  document.getElementById('negozio').style.display = SHOP_PRODUCTS.length ? 'block' : 'none';
+  renderShopProducts();
+}
+
+function shopCartQtyFor(productId) {
+  return SHOP_CART.find(r => r.product_id === productId)?.quantity || 0;
+}
+
+function renderShopProducts() {
+  const grid = document.getElementById('shop-products-grid');
+  grid.innerHTML = SHOP_PRODUCTS.map(p => {
+    const outOfStock = p.stock_quantity != null && p.stock_quantity <= 0;
+    const qty = shopCartQtyFor(p.id);
+    const name = p.name + (p.vintage ? ' ' + p.vintage : '');
+    return `
+    <div class="exp-card shop-card ${outOfStock ? 'out-of-stock' : ''}">
+      <div class="img" style="${p.image_url ? `background-image:url('${p.image_url}')` : ''}"></div>
+      <div class="body">
+        <h3>${esc(name)}</h3>
+        <p class="desc">${esc(p.description) || ''}</p>
+        <div class="stock-note">${outOfStock ? t('shop_out_of_stock') : (p.stock_quantity != null ? p.stock_quantity + ' ' + t('shop_available') : '')}</div>
+        <div class="meta">
+          <div class="price">€ ${fmtEuro(p.price_cents)}</div>
+          <div class="shop-stepper">
+            <button type="button" onclick="adjustShopQty(${p.id}, -1)">−</button>
+            <span class="qty">${qty}</span>
+            <button type="button" onclick="adjustShopQty(${p.id}, 1)" ${outOfStock ? 'disabled' : ''}>+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  }).join('');
+  updateShopBar();
+}
+
+function adjustShopQty(productId, delta) {
+  const p = SHOP_PRODUCTS.find(x => x.id === productId);
+  if (!p) return;
+  const existing = SHOP_CART.find(r => r.product_id === productId);
+  if (existing) {
+    existing.quantity += delta;
+    if (existing.quantity <= 0) SHOP_CART = SHOP_CART.filter(r => r.product_id !== productId);
+  } else if (delta > 0) {
+    SHOP_CART.push({ product_id: p.id, product_name: p.name + (p.vintage ? ' ' + p.vintage : ''), quantity: 1, unit_price_cents: p.price_cents });
+  }
+  renderShopProducts();
+}
+
+function updateShopBar() {
+  const bar = document.getElementById('shop-cart-bar');
+  const count = SHOP_CART.reduce((sum, r) => sum + r.quantity, 0);
+  const total = SHOP_CART.reduce((sum, r) => sum + r.quantity * r.unit_price_cents, 0);
+  bar.style.display = count ? 'flex' : 'none';
+  document.getElementById('shop-bar-total').textContent = '€ ' + fmtEuro(total);
+  document.getElementById('shop-bar-count').textContent = count + (count === 1 ? ' bottiglia' : ' bottiglie');
+}
+
+function renderShopCheckoutCart() {
+  document.getElementById('shop-checkout-cart').innerHTML = SHOP_CART.map(r => `
+    <div class="shop-cart-row"><span>${r.quantity}× ${esc(r.product_name)}</span><span>€ ${fmtEuro(r.quantity * r.unit_price_cents)}</span></div>
+  `).join('');
+  const total = SHOP_CART.reduce((sum, r) => sum + r.quantity * r.unit_price_cents, 0);
+  document.getElementById('shop-checkout-summary').innerHTML = `<div class="row total"><span>${t('total')}</span><span>€ ${fmtEuro(total)}</span></div>`;
+}
+
+function openShopCheckout() {
+  if (!SHOP_CART.length) return;
+  document.getElementById('shop-checkout-msg').innerHTML = '';
+  renderShopCheckoutCart();
+  document.getElementById('shop-checkout-overlay').classList.add('open');
+}
+function closeShopCheckout() { document.getElementById('shop-checkout-overlay').classList.remove('open'); }
+
+async function submitShopCheckout() {
+  const msg = document.getElementById('shop-checkout-msg');
+  msg.innerHTML = '';
+  if (!SHOP_CART.length) { msg.innerHTML = `<div class="msg error">${t('shop_empty_cart')}</div>`; return; }
+  const name = document.getElementById('shop-f-name').value.trim();
+  const email = document.getElementById('shop-f-email').value.trim();
+  const phone = document.getElementById('shop-f-phone').value.trim();
+  if (!name || !email) { msg.innerHTML = `<div class="msg error">${t('fill_fields')}</div>`; return; }
+  try {
+    const res = await fetch('/api/create-pickup-checkout-session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer_name: name, email, phone, language: LANG,
+        items: SHOP_CART.map(r => ({ product_id: r.product_id, quantity: r.quantity })),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || t('generic_error'));
+    window.location.href = data.url;
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${e.message}</div>`;
+  }
+}
+
+document.getElementById('shop-checkout-close').addEventListener('click', closeShopCheckout);
+document.getElementById('shop-checkout-back').addEventListener('click', closeShopCheckout);
+document.getElementById('shop-checkout-submit').addEventListener('click', submitShopCheckout);
+
+// ── Pickup confirmation (QR) ───────────────────────────────────────────────────
+async function showPickupConfirmation(token) {
+  try {
+    const res = await fetch('/api/pickup-orders/verify/' + token);
+    if (!res.ok) return;
+    const order = await res.json();
+    const verifyUrl = `${window.location.origin}/?verify=${token}`;
+    document.getElementById('pickup-qr-box').innerHTML =
+      `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(verifyUrl)}" alt="QR">`;
+    document.getElementById('pickup-confirm-items').innerHTML = order.items.map(it => `
+      <div class="shop-cart-row"><span>${it.quantity}× ${esc(it.product_name)}</span><span>€ ${fmtEuro(it.line_total_cents)}</span></div>
+    `).join('');
+    document.getElementById('pickup-confirm-summary').innerHTML = `<div class="row total"><span>${t('total')}</span><span>€ ${fmtEuro(order.amount_cents)}</span></div>`;
+    document.getElementById('pickup-confirm-overlay').classList.add('open');
+  } catch (e) { console.error(e); }
+}
+document.getElementById('pickup-confirm-close').addEventListener('click', () => {
+  document.getElementById('pickup-confirm-overlay').classList.remove('open');
+});
+
+// ── Staff verify view (?verify=token from the QR) ─────────────────────────────
+async function initVerifyView(token) {
+  document.body.classList.add('verify-mode');
+  document.getElementById('verify-view').classList.add('active');
+  const content = document.getElementById('verify-content');
+  try {
+    const res = await fetch('/api/pickup-orders/verify/' + token);
+    if (!res.ok) { content.innerHTML = `<p>${t('verify_not_found')}</p>`; return; }
+    const order = await res.json();
+    renderVerifyContent(order, token);
+  } catch { content.innerHTML = `<p>${t('verify_not_found')}</p>`; }
+}
+
+function renderVerifyContent(order, token) {
+  const content = document.getElementById('verify-content');
+  const itemsHtml = order.items.map(it => `
+    <div class="shop-cart-row"><span>${it.quantity}× ${esc(it.product_name)}</span><span>€ ${fmtEuro(it.line_total_cents)}</span></div>
+  `).join('');
+  const summaryHtml = `<div class="summary-box"><div class="row total"><span>${t('total')}</span><span>€ ${fmtEuro(order.amount_cents)}</span></div></div>`;
+  let statusHtml = '';
+  if (order.status === 'in_attesa_pagamento') statusHtml = `<p class="desc">${t('verify_pending')}</p>`;
+  else if (order.status === 'annullato') statusHtml = `<p class="desc">${t('verify_cancelled')}</p>`;
+  else if (order.status === 'ritirato') statusHtml = `<p class="desc">${t('verify_picked_up')} ${order.picked_up_at}</p>`;
+  else statusHtml = `<button class="btn" style="width:100%" onclick="confirmVerifyPickup('${token}')">${t('verify_confirm_btn')}</button>`;
+  content.innerHTML = `<p style="font-weight:600;margin:8px 0">${esc(order.customer_name)} — ${order.ref}</p>` + itemsHtml + summaryHtml + statusHtml;
+}
+
+async function confirmVerifyPickup(token) {
+  try {
+    const res = await fetch(`/api/pickup-orders/verify/${token}/pickup`, { method: 'POST' });
+    const order = await res.json();
+    if (!res.ok) throw new Error(order.error || t('generic_error'));
+    renderVerifyContent(order, token);
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
 async function loadReviews() {
@@ -745,6 +1042,7 @@ document.querySelectorAll('.lang-toggle button').forEach(btn => {
     applyI18n();
     renderExperiences();
     renderEvents();
+    renderShopProducts();
     document.title = CANTINA_NAME + ' — ' + (LANG === 'en' ? 'Book your cellar visit' : 'Prenota la tua visita in cantina');
   });
 });
@@ -757,14 +1055,26 @@ function showPaymentBanner() {
     container.innerHTML = `<div class="banner">${t('payment_success_banner')}</div>`;
   } else if (params.get('payment') === 'cancelled') {
     container.innerHTML = `<div class="banner cancel">${t('payment_cancel_banner')}</div>`;
+  } else if (params.get('pickup') === 'success' && params.get('token')) {
+    showPickupConfirmation(params.get('token'));
+  } else if (params.get('pickup') === 'cancelled') {
+    container.innerHTML = `<div class="banner cancel">${t('pickup_cancel_banner')}</div>`;
   }
 }
 
 (async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const verifyToken = params.get('verify');
+  if (verifyToken) {
+    applyI18n();
+    await initVerifyView(verifyToken);
+    return;
+  }
   applyI18n();
   await loadConfig();
   await loadExperiences();
   await loadEvents();
+  await loadShop();
   await loadReviews();
   showPaymentBanner();
 })();
