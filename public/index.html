@@ -307,19 +307,25 @@
       </div>
       <div class="field-row">
         <div class="field">
-          <label data-i18n="full_name">Nome e cognome</label>
-          <input type="text" id="f-name">
+          <label data-i18n="first_name">Nome</label>
+          <input type="text" id="f-first-name">
         </div>
         <div class="field">
-          <label data-i18n="email">Email</label>
-          <input type="email" id="f-email">
+          <label data-i18n="last_name">Cognome</label>
+          <input type="text" id="f-last-name">
         </div>
       </div>
       <div class="field-row">
         <div class="field">
+          <label data-i18n="email">Email</label>
+          <input type="email" id="f-email">
+        </div>
+        <div class="field">
           <label data-i18n="phone">Telefono</label>
           <input type="tel" id="f-phone">
         </div>
+      </div>
+      <div class="field-row">
         <div class="field">
           <label data-i18n="discount_code">Codice sconto</label>
           <div class="discount-row">
@@ -361,17 +367,23 @@
     <div id="shop-checkout-msg"></div>
     <div class="field-row">
       <div class="field">
-        <label data-i18n="full_name">Nome e cognome</label>
-        <input type="text" id="shop-f-name">
+        <label data-i18n="first_name">Nome</label>
+        <input type="text" id="shop-f-first-name">
       </div>
+      <div class="field">
+        <label data-i18n="last_name">Cognome</label>
+        <input type="text" id="shop-f-last-name">
+      </div>
+    </div>
+    <div class="field-row">
       <div class="field">
         <label data-i18n="email">Email</label>
         <input type="email" id="shop-f-email">
       </div>
-    </div>
-    <div class="field">
-      <label data-i18n="phone">Telefono</label>
-      <input type="tel" id="shop-f-phone">
+      <div class="field">
+        <label data-i18n="phone">Telefono</label>
+        <input type="tel" id="shop-f-phone">
+      </div>
     </div>
     <p class="desc" style="font-size:12.5px;margin:6px 0 0" data-i18n="shop_pickup_notice">Il pagamento avviene online. Ritirerai le bottiglie direttamente in cantina.</p>
     <div class="modal-actions">
@@ -434,7 +446,8 @@ const I18N = {
     pick_date: 'Scegli data e orario',
     your_details: 'I tuoi dati',
     guests: 'Numero di ospiti',
-    full_name: 'Nome e cognome',
+    first_name: 'Nome',
+    last_name: 'Cognome',
     email: 'Email',
     phone: 'Telefono',
     discount_code: 'Codice sconto',
@@ -512,7 +525,8 @@ const I18N = {
     pick_date: 'Pick a date and time',
     your_details: 'Your details',
     guests: 'Number of guests',
-    full_name: 'Full name',
+    first_name: 'First name',
+    last_name: 'Last name',
     email: 'Email',
     phone: 'Phone',
     discount_code: 'Discount code',
@@ -740,15 +754,16 @@ async function submitShopCheckout() {
   const msg = document.getElementById('shop-checkout-msg');
   msg.innerHTML = '';
   if (!SHOP_CART.length) { msg.innerHTML = `<div class="msg error">${t('shop_empty_cart')}</div>`; return; }
-  const name = document.getElementById('shop-f-name').value.trim();
+  const firstName = document.getElementById('shop-f-first-name').value.trim();
+  const lastName = document.getElementById('shop-f-last-name').value.trim();
   const email = document.getElementById('shop-f-email').value.trim();
   const phone = document.getElementById('shop-f-phone').value.trim();
-  if (!name || !email) { msg.innerHTML = `<div class="msg error">${t('fill_fields')}</div>`; return; }
+  if (!firstName || !lastName || !email) { msg.innerHTML = `<div class="msg error">${t('fill_fields')}</div>`; return; }
   try {
     const res = await fetch('/api/create-pickup-checkout-session', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        customer_name: name, email, phone, language: LANG,
+        first_name: firstName, last_name: lastName, email, phone, language: LANG,
         items: SHOP_CART.map(r => ({ product_id: r.product_id, quantity: r.quantity })),
       }),
     });
@@ -843,7 +858,8 @@ async function openBooking(expId) {
   DISCOUNT = { code: null, cents: 0 };
   document.getElementById('f-discount').value = '';
   document.getElementById('f-guests').value = 1;
-  document.getElementById('f-name').value = '';
+  document.getElementById('f-first-name').value = '';
+  document.getElementById('f-last-name').value = '';
   document.getElementById('f-email').value = '';
   document.getElementById('f-phone').value = '';
   document.getElementById('f-notes').value = '';
@@ -944,13 +960,14 @@ function closeBooking() { document.getElementById('booking-overlay').classList.r
 document.getElementById('submit-booking').addEventListener('click', async () => {
   const msg = document.getElementById('modal-msg-2');
   msg.innerHTML = '';
-  const name = document.getElementById('f-name').value.trim();
+  const firstName = document.getElementById('f-first-name').value.trim();
+  const lastName = document.getElementById('f-last-name').value.trim();
   const email = document.getElementById('f-email').value.trim();
   const phone = document.getElementById('f-phone').value.trim();
   const notes = document.getElementById('f-notes').value.trim();
   const guests = Math.max(1, parseInt(document.getElementById('f-guests').value) || 1);
 
-  if (!name || !email || !SELECTED_SLOT) {
+  if (!firstName || !lastName || !email || !SELECTED_SLOT) {
     msg.innerHTML = `<div class="msg error">${t('fill_fields')}</div>`;
     return;
   }
@@ -962,7 +979,7 @@ document.getElementById('submit-booking').addEventListener('click', async () => 
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         experience_id: CURRENT_EXP.id, slot_id: SELECTED_SLOT.id,
-        customer_name: name, email, phone, guests, notes,
+        first_name: firstName, last_name: lastName, email, phone, guests, notes,
         discount_code: DISCOUNT.code, language: LANG
       })
     });

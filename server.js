@@ -638,6 +638,8 @@ db.exec(`
     FOREIGN KEY (agent_id) REFERENCES agents(id)
   )
 `);
+try { db.exec('ALTER TABLE people ADD COLUMN first_name TEXT'); } catch {}
+try { db.exec('ALTER TABLE people ADD COLUMN last_name TEXT'); } catch {}
 
 // ── CRM: anagrafica estesa (Informazioni di contatto / indirizzo / business) ──
 try { db.exec('ALTER TABLE customers ADD COLUMN contact_person TEXT'); } catch {}
@@ -1092,9 +1094,11 @@ function findOrCreateB2CCustomer(name, email, phone) {
 
 // Trova o crea una Persona (CRM unificato) aggiungendo ruolo/canale a quelli già presenti
 // invece di sovrascriverli — la stessa persona può accumulare più ruoli/canali nel tempo.
-function findOrCreatePerson({ name, email, phone, role, channel }) {
+function findOrCreatePerson({ name, firstName, lastName, email, phone, role, channel }) {
   const emailClean = email?.toLowerCase().trim() || null;
   const nameClean = name?.trim() || null;
+  const firstNameClean = firstName?.trim() || null;
+  const lastNameClean = lastName?.trim() || null;
   if (!emailClean && !nameClean) return null;
 
   const person = emailClean ? db.prepare('SELECT * FROM people WHERE email = ?').get(emailClean) : null;
@@ -1103,13 +1107,13 @@ function findOrCreatePerson({ name, email, phone, role, channel }) {
     const channels = new Set(JSON.parse(person.source_channels || '[]'));
     if (role) roles.add(role);
     if (channel) channels.add(channel);
-    db.prepare('UPDATE people SET roles = ?, source_channels = ?, phone = COALESCE(phone, ?) WHERE id = ?')
-      .run(JSON.stringify([...roles]), JSON.stringify([...channels]), phone?.trim() || null, person.id);
+    db.prepare('UPDATE people SET roles = ?, source_channels = ?, phone = COALESCE(phone, ?), first_name = COALESCE(first_name, ?), last_name = COALESCE(last_name, ?) WHERE id = ?')
+      .run(JSON.stringify([...roles]), JSON.stringify([...channels]), phone?.trim() || null, firstNameClean, lastNameClean, person.id);
     return person.id;
   }
 
-  const result = db.prepare('INSERT INTO people (name, email, phone, roles, source_channels) VALUES (?, ?, ?, ?, ?)')
-    .run(nameClean || emailClean, emailClean, phone?.trim() || null, JSON.stringify(role ? [role] : []), JSON.stringify(channel ? [channel] : []));
+  const result = db.prepare('INSERT INTO people (name, first_name, last_name, email, phone, roles, source_channels) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(nameClean || emailClean, firstNameClean, lastNameClean, emailClean, phone?.trim() || null, JSON.stringify(role ? [role] : []), JSON.stringify(channel ? [channel] : []));
   return result.lastInsertRowid;
 }
 function validateDiscount(code, amountCents) {
@@ -1462,9 +1466,10 @@ app.post('/api/discount/validate', (req, res) => {
 
 // ── Checkout / booking request ───────────────────────────────────────────────
 app.post('/api/create-checkout-session', async (req, res) => {
-  const { experience_id, slot_id, customer_name, email, phone, guests, notes, discount_code, language } = req.body || {};
+  const { experience_id, slot_id, first_name, last_name, email, phone, guests, notes, discount_code, language } = req.body || {};
+  const customer_name = `${first_name?.trim() || ''} ${last_name?.trim() || ''}`.trim();
 
-  if (!customer_name?.trim() || !email?.trim() || !experience_id || !slot_id) {
+  if (!first_name?.trim() || !last_name?.trim() || !email?.trim() || !experience_id || !slot_id) {
     return res.status(400).json({ error: 'Compila tutti i campi obbligatori.' });
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -1501,7 +1506,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
   const b2cCustomerId = findOrCreateB2CCustomer(customer_name.trim(), emailClean, phone?.trim());
   const personId = findOrCreatePerson({
-    name: customer_name.trim(), email: emailClean, phone: phone?.trim(),
+    name: customer_name.trim(), firstName: first_name, lastName: last_name, email: emailClean, phone: phone?.trim(),
     role: 'cliente_finale', channel: exp.type === 'evento' ? 'evento_proprietario' : 'visita',
   });
 
@@ -1568,8 +1573,9 @@ app.get('/api/shop-products', (req, res) => {
 });
 
 app.post('/api/create-pickup-checkout-session', async (req, res) => {
-  const { customer_name, email, phone, items, notes, language } = req.body || {};
-  if (!customer_name?.trim() || !email?.trim() || !Array.isArray(items) || !items.length) {
+  const { first_name, last_name, email, phone, items, notes, language } = req.body || {};
+  const customer_name = `${first_name?.trim() || ''} ${last_name?.trim() || ''}`.trim();
+  if (!first_name?.trim() || !last_name?.trim() || !email?.trim() || !Array.isArray(items) || !items.length) {
     return res.status(400).json({ error: 'Compila tutti i campi obbligatori e aggiungi almeno una bottiglia.' });
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Indirizzo email non valido.' });
@@ -1598,7 +1604,7 @@ app.post('/api/create-pickup-checkout-session', async (req, res) => {
   const emailClean = email.toLowerCase().trim();
   const b2cCustomerId = findOrCreateB2CCustomer(customer_name.trim(), emailClean, phone?.trim());
   const personId = findOrCreatePerson({
-    name: customer_name.trim(), email: emailClean, phone: phone?.trim(),
+    name: customer_name.trim(), firstName: first_name, lastName: last_name, email: emailClean, phone: phone?.trim(),
     role: 'cliente_finale', channel: 'negozio_fisico',
   });
   const pickupToken = crypto.randomBytes(16).toString('hex');
@@ -3322,7 +3328,7 @@ app.get('/api/admin/customers/:id', authAdmin, (req, res) => {
 });
 
 // ── CRM: Persone (anagrafica unica, tag di ruolo) ──────────────────────────────
-const PEOPLE_FIELDS = ['name', 'email', 'phone', 'notes', 'contact_role', 'customer_id', 'importer_id', 'agent_id'];
+const PEOPLE_FIELDS = ['name', 'first_name', 'last_name', 'email', 'phone', 'notes', 'contact_role', 'customer_id', 'importer_id', 'agent_id'];
 
 app.get('/api/admin/people', authAdmin, (req, res) => {
   const { q, role } = req.query;
@@ -3704,7 +3710,7 @@ app.get('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) =
   const { entityType, entityId } = req.params;
   if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
   if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
-    const rows = db.prepare(`SELECT id, name, contact_role AS role, email, phone, notes FROM people WHERE ${peopleFkColumn(entityType)} = ? AND roles LIKE '%"contatto"%' ORDER BY name`).all(entityId);
+    const rows = db.prepare(`SELECT id, name, first_name, last_name, contact_role AS role, email, phone, notes FROM people WHERE ${peopleFkColumn(entityType)} = ? AND roles LIKE '%"contatto"%' ORDER BY name`).all(entityId);
     return res.json(rows);
   }
   res.json(db.prepare('SELECT * FROM contacts WHERE entity_type = ? AND entity_id = ? ORDER BY name').all(entityType, entityId));
@@ -3712,8 +3718,9 @@ app.get('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) =
 app.post('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) => {
   const { entityType, entityId } = req.params;
   if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
-  const { name, role, email, phone, mobile, notes, source_fair_id } = req.body || {};
-  if (!name?.trim()) return res.status(400).json({ error: 'Il nome del contatto è obbligatorio.' });
+  const { first_name, last_name, role, email, phone, mobile, notes, source_fair_id } = req.body || {};
+  const name = `${first_name?.trim() || ''} ${last_name?.trim() || ''}`.trim();
+  if (!name) return res.status(400).json({ error: 'Il nome del contatto è obbligatorio.' });
   let finalNotes = notes?.trim() || null;
   if (source_fair_id) {
     const fair = db.prepare('SELECT * FROM fairs WHERE id = ?').get(source_fair_id);
@@ -3725,23 +3732,30 @@ app.post('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) 
   }
   if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
     const result = db.prepare(`
-      INSERT INTO people (name, contact_role, email, phone, notes, roles, source_channels, ${peopleFkColumn(entityType)})
-      VALUES (?, ?, ?, ?, ?, '["contatto"]', '[]', ?)
-    `).run(name.trim(), role?.trim() || null, email?.trim() || null, phone?.trim() || null, finalNotes, entityId);
+      INSERT INTO people (name, first_name, last_name, contact_role, email, phone, notes, roles, source_channels, ${peopleFkColumn(entityType)})
+      VALUES (?, ?, ?, ?, ?, ?, ?, '["contatto"]', '[]', ?)
+    `).run(name, first_name?.trim() || null, last_name?.trim() || null, role?.trim() || null, email?.trim() || null, phone?.trim() || null, finalNotes, entityId);
     return res.json({ success: true, id: result.lastInsertRowid });
   }
   const result = db.prepare('INSERT INTO contacts (entity_type, entity_id, name, role, email, phone, mobile, notes, source_fair_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(entityType, entityId, name.trim(), role?.trim() || null, email?.trim() || null, phone?.trim() || null, mobile?.trim() || null, finalNotes, source_fair_id || null);
+    .run(entityType, entityId, name, role?.trim() || null, email?.trim() || null, phone?.trim() || null, mobile?.trim() || null, finalNotes, source_fair_id || null);
   res.json({ success: true, id: result.lastInsertRowid });
 });
 app.patch('/api/admin/crm/:entityType/contacts/:id', authAdmin, (req, res) => {
   const { entityType, id } = req.params;
   if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
   if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
-    const fields = ['name', 'email', 'phone', 'notes'];
+    const body = { ...req.body };
+    if (body.first_name !== undefined || body.last_name !== undefined) {
+      const current = db.prepare('SELECT first_name, last_name FROM people WHERE id = ?').get(id) || {};
+      const fn = body.first_name !== undefined ? body.first_name : current.first_name;
+      const ln = body.last_name !== undefined ? body.last_name : current.last_name;
+      body.name = `${fn?.trim() || ''} ${ln?.trim() || ''}`.trim();
+    }
+    const fields = ['name', 'first_name', 'last_name', 'email', 'phone', 'notes'];
     const updates = [], params = [];
-    for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
-    if (req.body.role !== undefined) { updates.push('contact_role = ?'); params.push(req.body.role || null); }
+    for (const f of fields) if (body[f] !== undefined) { updates.push(`${f} = ?`); params.push(body[f] === '' ? null : body[f]); }
+    if (body.role !== undefined) { updates.push('contact_role = ?'); params.push(body.role || null); }
     if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
     params.push(id);
     db.prepare(`UPDATE people SET ${updates.join(', ')} WHERE id = ?`).run(...params);

@@ -1195,7 +1195,10 @@
             <div class="box" style="max-width:520px">
               <h3>Il mio profilo</h3>
               <div id="my-profile-msg"></div>
-              <div class="field"><label>Nome e cognome</label><input id="mp-name"></div>
+              <div class="field-row">
+                <div class="field"><label>Nome</label><input id="mp-first-name"></div>
+                <div class="field"><label>Cognome</label><input id="mp-last-name"></div>
+              </div>
               <div class="field"><label>Email</label><input type="email" id="mp-email"></div>
               <div class="field"><label>Username</label><input id="mp-username"></div>
               <button class="btn" onclick="saveMyProfile()">Salva profilo</button>
@@ -1443,11 +1446,17 @@
     <div id="agent-modal-msg"></div>
     <input type="hidden" id="agent-id">
 
-    <div class="avail-row" style="grid-template-columns:1fr 110px 140px">
+    <div class="avail-row" style="grid-template-columns:1fr 1fr">
       <div class="avail-field">
         <label>Nome</label>
-        <input id="agent-name" class="pill-input" placeholder="Nome e cognome">
+        <input id="agent-first-name" class="pill-input">
       </div>
+      <div class="avail-field">
+        <label>Cognome</label>
+        <input id="agent-last-name" class="pill-input">
+      </div>
+    </div>
+    <div class="avail-row" style="grid-template-columns:110px 140px">
       <div class="avail-field">
         <label>Genere</label>
         <select id="agent-gender" class="pill-input">
@@ -1531,10 +1540,13 @@
     <div id="people-modal-msg"></div>
     <input type="hidden" id="ppl-id">
     <div class="field-row">
-      <div class="field"><label>Nome e cognome</label><input id="ppl-name"></div>
-      <div class="field"><label>Email</label><input type="email" id="ppl-email"></div>
+      <div class="field"><label>Nome</label><input id="ppl-first-name"></div>
+      <div class="field"><label>Cognome</label><input id="ppl-last-name"></div>
     </div>
-    <div class="field"><label>Telefono</label><input id="ppl-phone"></div>
+    <div class="field-row">
+      <div class="field"><label>Email</label><input type="email" id="ppl-email"></div>
+      <div class="field"><label>Telefono</label><input id="ppl-phone"></div>
+    </div>
 
     <div class="field">
       <label>Ruoli</label>
@@ -1789,7 +1801,10 @@
     <h3 id="portal-user-modal-title">Nuovo utente</h3>
     <div id="portal-user-modal-msg"></div>
     <input type="hidden" id="pu-id">
-    <div class="field"><label>Nome e cognome</label><input id="pu-name"></div>
+    <div class="field-row">
+      <div class="field"><label>Nome</label><input id="pu-first-name"></div>
+      <div class="field"><label>Cognome</label><input id="pu-last-name"></div>
+    </div>
     <div class="field"><label>Email</label><input type="email" id="pu-email" placeholder="usato per il recupero password"></div>
     <div class="field"><label>Username</label><input id="pu-username"></div>
     <div class="field"><label>Ruolo</label><select id="pu-role"><option value="">— Accesso completo —</option></select></div>
@@ -1890,7 +1905,10 @@
       <div class="field"><label id="fair-contact-entity-label">Cliente</label><select id="fair-contact-entity"></select></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Nome e cognome</label><input id="fair-contact-name"></div>
+      <div class="field"><label>Nome</label><input id="fair-contact-first-name"></div>
+      <div class="field"><label>Cognome</label><input id="fair-contact-last-name"></div>
+    </div>
+    <div class="field-row">
       <div class="field"><label>Ruolo</label><input id="fair-contact-role"></div>
     </div>
     <div class="field-row">
@@ -2308,7 +2326,10 @@
     <div id="crm-contact-modal-msg"></div>
     <input type="hidden" id="crm-contact-id">
     <div class="field-row">
-      <div class="field"><label>Nome e cognome</label><input id="crm-contact-name"></div>
+      <div class="field"><label>Nome</label><input id="crm-contact-first-name"></div>
+      <div class="field"><label>Cognome</label><input id="crm-contact-last-name"></div>
+    </div>
+    <div class="field-row">
       <div class="field"><label>Ruolo</label>
         <select id="crm-contact-role">
           <option value="">— Nessuno —</option>
@@ -2448,6 +2469,10 @@ async function api(path, opts = {}) {
 
 function fmtEuro(cents) { return ((cents || 0) / 100).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function esc(s) { return (s ?? '').toString().replace(/</g, '&lt;'); }
+function splitName(full) {
+  const parts = (full || '').trim().split(/\s+/);
+  return { first: parts[0] || '', last: parts.slice(1).join(' ') };
+}
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function stockBadge(qty, threshold) {
@@ -3162,7 +3187,8 @@ function openAgentModal(a) {
   document.getElementById('agent-created-msg').innerHTML = '';
   document.getElementById('agent-modal-title').textContent = a ? 'Modifica agente' : 'Nuovo agente';
   document.getElementById('agent-id').value = a ? a.id : '';
-  document.getElementById('agent-name').value = a ? a.name : '';
+  document.getElementById('agent-first-name').value = a ? splitName(a.name).first : '';
+  document.getElementById('agent-last-name').value = a ? splitName(a.name).last : '';
   document.getElementById('agent-code').value = a ? (a.code || '') : '';
   document.getElementById('agent-gender').value = a ? (a.gender || '') : '';
   document.getElementById('agent-email').value = a ? (a.email || '') : '';
@@ -3179,7 +3205,7 @@ async function saveAgent() {
   const id = document.getElementById('agent-id').value;
   const msg = document.getElementById('agent-modal-msg');
   const body = {
-    name: document.getElementById('agent-name').value.trim(),
+    name: `${document.getElementById('agent-first-name').value.trim()} ${document.getElementById('agent-last-name').value.trim()}`.trim(),
     code: document.getElementById('agent-code').value.trim(),
     gender: document.getElementById('agent-gender').value,
     email: document.getElementById('agent-email').value.trim(),
@@ -3537,7 +3563,8 @@ const FAIR_CONTACT_ENTITY_LABELS = { customer: 'Cliente', importer: 'Importatore
 
 function openFairContactModal() {
   document.getElementById('fair-contact-modal-msg').innerHTML = '';
-  document.getElementById('fair-contact-name').value = '';
+  document.getElementById('fair-contact-first-name').value = '';
+  document.getElementById('fair-contact-last-name').value = '';
   document.getElementById('fair-contact-role').value = '';
   document.getElementById('fair-contact-email').value = '';
   document.getElementById('fair-contact-phone').value = '';
@@ -3570,12 +3597,14 @@ async function saveFairContact() {
   const msg = document.getElementById('fair-contact-modal-msg');
   const entityType = document.getElementById('fair-contact-entity-type').value;
   const entityId = document.getElementById('fair-contact-entity').value;
-  const name = document.getElementById('fair-contact-name').value.trim();
+  const firstName = document.getElementById('fair-contact-first-name').value.trim();
+  const lastName = document.getElementById('fair-contact-last-name').value.trim();
   if (!entityId) { msg.innerHTML = `<div class="msg error">Seleziona ${FAIR_CONTACT_ENTITY_LABELS[entityType].toLowerCase()} a cui collegare il contatto.</div>`; return; }
-  if (!name) { msg.innerHTML = '<div class="msg error">Il nome è obbligatorio.</div>'; return; }
+  if (!firstName || !lastName) { msg.innerHTML = '<div class="msg error">Nome e cognome sono obbligatori.</div>'; return; }
   try {
     await api(`/api/admin/crm/${entityType}/${entityId}/contacts`, { method: 'POST', body: JSON.stringify({
-      name,
+      first_name: firstName,
+      last_name: lastName,
       role: document.getElementById('fair-contact-role').value.trim(),
       email: document.getElementById('fair-contact-email').value.trim(),
       phone: document.getElementById('fair-contact-phone').value.trim(),
@@ -3763,7 +3792,8 @@ async function openPersonModal(p) {
   document.getElementById('people-modal-msg').innerHTML = '';
   document.getElementById('people-modal-title').textContent = p ? 'Modifica contatto' : 'Nuovo contatto';
   document.getElementById('ppl-id').value = p ? p.id : '';
-  document.getElementById('ppl-name').value = p ? p.name : '';
+  document.getElementById('ppl-first-name').value = p ? (p.first_name || splitName(p.name).first) : '';
+  document.getElementById('ppl-last-name').value = p ? (p.last_name || splitName(p.name).last) : '';
   document.getElementById('ppl-email').value = p ? (p.email || '') : '';
   document.getElementById('ppl-phone').value = p ? (p.phone || '') : '';
   document.getElementById('ppl-notes').value = p ? (p.notes || '') : '';
@@ -3842,10 +3872,13 @@ async function renderPersonTransactions(personId) {
 async function savePerson() {
   const id = document.getElementById('ppl-id').value;
   const msg = document.getElementById('people-modal-msg');
-  const name = document.getElementById('ppl-name').value.trim();
-  if (!name) { msg.innerHTML = '<div class="msg error">Il nome è obbligatorio.</div>'; return; }
+  const firstName = document.getElementById('ppl-first-name').value.trim();
+  const lastName = document.getElementById('ppl-last-name').value.trim();
+  if (!firstName || !lastName) { msg.innerHTML = '<div class="msg error">Nome e cognome sono obbligatori.</div>'; return; }
   const body = {
-    name,
+    name: `${firstName} ${lastName}`.trim(),
+    first_name: firstName,
+    last_name: lastName,
     email: document.getElementById('ppl-email').value.trim(),
     phone: document.getElementById('ppl-phone').value.trim(),
     notes: document.getElementById('ppl-notes').value.trim(),
@@ -4554,7 +4587,8 @@ function openCrmContactModal(c) {
   document.getElementById('crm-contact-modal-msg').innerHTML = '';
   document.getElementById('crm-contact-modal-title').textContent = c ? 'Modifica contatto' : 'Nuovo contatto';
   document.getElementById('crm-contact-id').value = c ? c.id : '';
-  document.getElementById('crm-contact-name').value = c ? c.name : '';
+  document.getElementById('crm-contact-first-name').value = c ? (c.first_name || splitName(c.name).first) : '';
+  document.getElementById('crm-contact-last-name').value = c ? (c.last_name || splitName(c.name).last) : '';
   document.getElementById('crm-contact-role').value = c ? (c.role || '') : '';
   document.getElementById('crm-contact-email').value = c ? (c.email || '') : '';
   document.getElementById('crm-contact-phone').value = c ? (c.phone || '') : '';
@@ -4567,10 +4601,13 @@ async function saveCrmContact() {
   const { type, id } = CRM_CURRENT;
   const contactId = document.getElementById('crm-contact-id').value;
   const msg = document.getElementById('crm-contact-modal-msg');
-  const name = document.getElementById('crm-contact-name').value.trim();
-  if (!name) { msg.innerHTML = '<div class="msg error">Il nome è obbligatorio.</div>'; return; }
+  const firstName = document.getElementById('crm-contact-first-name').value.trim();
+  const lastName = document.getElementById('crm-contact-last-name').value.trim();
+  if (!firstName || !lastName) { msg.innerHTML = '<div class="msg error">Nome e cognome sono obbligatori.</div>'; return; }
   const body = {
-    name,
+    name: `${firstName} ${lastName}`.trim(),
+    first_name: firstName,
+    last_name: lastName,
     role: document.getElementById('crm-contact-role').value.trim(),
     email: document.getElementById('crm-contact-email').value.trim(),
     phone: document.getElementById('crm-contact-phone').value.trim(),
@@ -5159,7 +5196,8 @@ async function openPortalUserModal(u) {
   document.getElementById('portal-user-modal-msg').innerHTML = '';
   document.getElementById('portal-user-modal-title').textContent = u ? 'Modifica utente' : 'Nuovo utente';
   document.getElementById('pu-id').value = u ? u.id : '';
-  document.getElementById('pu-name').value = u ? u.name : '';
+  document.getElementById('pu-first-name').value = u ? splitName(u.name).first : '';
+  document.getElementById('pu-last-name').value = u ? splitName(u.name).last : '';
   document.getElementById('pu-email').value = u ? u.email : '';
   document.getElementById('pu-username').value = u ? u.username : '';
   document.getElementById('pu-password').value = '';
@@ -5174,7 +5212,7 @@ async function savePortalUser() {
   const id = document.getElementById('pu-id').value;
   const msg = document.getElementById('portal-user-modal-msg');
   const body = {
-    name: document.getElementById('pu-name').value.trim(),
+    name: `${document.getElementById('pu-first-name').value.trim()} ${document.getElementById('pu-last-name').value.trim()}`.trim(),
     email: document.getElementById('pu-email').value.trim(),
     username: document.getElementById('pu-username').value.trim(),
     role_id: document.getElementById('pu-role').value || '',
@@ -5285,7 +5323,8 @@ async function openMyProfilePanel() {
   if (!me.isMaster) {
     document.getElementById('my-profile-msg').innerHTML = '';
     document.getElementById('my-password-msg').innerHTML = '';
-    document.getElementById('mp-name').value = me.name;
+    document.getElementById('mp-first-name').value = splitName(me.name).first;
+    document.getElementById('mp-last-name').value = splitName(me.name).last;
     document.getElementById('mp-email').value = me.email;
     document.getElementById('mp-username').value = me.username;
     document.getElementById('mp-current-password').value = '';
@@ -5298,7 +5337,7 @@ async function saveMyProfile() {
   const msg = document.getElementById('my-profile-msg');
   try {
     await api('/api/admin/my-profile', { method: 'PATCH', body: JSON.stringify({
-      name: document.getElementById('mp-name').value.trim(),
+      name: `${document.getElementById('mp-first-name').value.trim()} ${document.getElementById('mp-last-name').value.trim()}`.trim(),
       email: document.getElementById('mp-email').value.trim(),
       username: document.getElementById('mp-username').value.trim(),
     }) });
