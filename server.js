@@ -949,6 +949,52 @@ if (expCount === 0) {
   );
 }
 
+// ── Indici ────────────────────────────────────────────────────────────────────
+// Le colonne usate in JOIN/WHERE non hanno indice automatico in SQLite (solo PK e UNIQUE lo hanno).
+// Con poche righe non si nota; questi indici evitano scansioni complete delle tabelle quando i dati crescono.
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_slots_experience ON slots(experience_id);
+  CREATE INDEX IF NOT EXISTS idx_bookings_slot ON bookings(slot_id);
+  CREATE INDEX IF NOT EXISTS idx_bookings_experience ON bookings(experience_id);
+  CREATE INDEX IF NOT EXISTS idx_bookings_b2c_customer ON bookings(b2c_customer_id);
+  CREATE INDEX IF NOT EXISTS idx_bookings_operator ON bookings(operator_id);
+  CREATE INDEX IF NOT EXISTS idx_experience_images_experience ON experience_images(experience_id);
+  CREATE INDEX IF NOT EXISTS idx_experience_products_experience ON experience_products(experience_id);
+  CREATE INDEX IF NOT EXISTS idx_experience_availability_experience ON experience_availability(experience_id);
+  CREATE INDEX IF NOT EXISTS idx_reviews_experience ON reviews(experience_id);
+  CREATE INDEX IF NOT EXISTS idx_b2c_orders_customer ON b2c_orders(customer_id);
+  CREATE INDEX IF NOT EXISTS idx_shop_sales_b2c_customer ON shop_sales(b2c_customer_id);
+  CREATE INDEX IF NOT EXISTS idx_shop_sale_items_sale ON shop_sale_items(sale_id);
+  CREATE INDEX IF NOT EXISTS idx_shop_sale_items_product ON shop_sale_items(product_id);
+  CREATE INDEX IF NOT EXISTS idx_pickup_orders_b2c_customer ON pickup_orders(b2c_customer_id);
+  CREATE INDEX IF NOT EXISTS idx_pickup_order_items_order ON pickup_order_items(order_id);
+  CREATE INDEX IF NOT EXISTS idx_pickup_order_items_product ON pickup_order_items(product_id);
+  CREATE INDEX IF NOT EXISTS idx_price_list_items_price_list ON price_list_items(price_list_id);
+  CREATE INDEX IF NOT EXISTS idx_price_list_items_product ON price_list_items(product_id);
+  CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
+  CREATE INDEX IF NOT EXISTS idx_orders_agent ON orders(agent_id);
+  CREATE INDEX IF NOT EXISTS idx_orders_billing_customer ON orders(billing_customer_id);
+  CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+  CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id);
+  CREATE INDEX IF NOT EXISTS idx_agent_provinces_agent ON agent_provinces(agent_id);
+  CREATE INDEX IF NOT EXISTS idx_customers_agent ON customers(agent_id);
+  CREATE INDEX IF NOT EXISTS idx_customers_source_fair ON customers(source_fair_id);
+  CREATE INDEX IF NOT EXISTS idx_importers_agent ON importers(agent_id);
+  CREATE INDEX IF NOT EXISTS idx_crm_notes_entity ON crm_notes(entity_type, entity_id);
+  CREATE INDEX IF NOT EXISTS idx_crm_attachments_entity ON crm_attachments(entity_type, entity_id);
+  CREATE INDEX IF NOT EXISTS idx_crm_meetings_entity ON crm_meetings(entity_type, entity_id);
+  CREATE INDEX IF NOT EXISTS idx_crm_tasks_entity ON crm_tasks(entity_type, entity_id);
+  CREATE INDEX IF NOT EXISTS idx_crm_deals_entity ON crm_deals(entity_type, entity_id);
+  CREATE INDEX IF NOT EXISTS idx_crm_emails_entity ON crm_emails(entity_type, entity_id);
+  CREATE INDEX IF NOT EXISTS idx_contacts_entity ON contacts(entity_type, entity_id);
+  CREATE INDEX IF NOT EXISTS idx_contacts_source_fair ON contacts(source_fair_id);
+  CREATE INDEX IF NOT EXISTS idx_fair_attachments_fair ON fair_attachments(fair_id);
+  CREATE INDEX IF NOT EXISTS idx_portal_users_role ON portal_users(role_id);
+  CREATE INDEX IF NOT EXISTS idx_warehouse_finished_product ON warehouse_finished(product_id);
+  CREATE INDEX IF NOT EXISTS idx_sales_targets_area ON sales_targets(area_id);
+  CREATE INDEX IF NOT EXISTS idx_venue_events_date ON venue_events(event_date);
+`);
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getExperience(id) {
   return db.prepare('SELECT * FROM experiences WHERE id = ?').get(id);
@@ -1786,7 +1832,7 @@ app.get('/api/admin/bookings', authAdmin, (req, res) => {
     sql += ' AND (b.customer_name LIKE ? OR b.email LIKE ?)';
     const like = `%${q}%`; params.push(like, like);
   }
-  sql += ' ORDER BY s.date DESC, s.time DESC';
+  sql += ' ORDER BY s.date DESC, s.time DESC LIMIT 500';
   res.json(db.prepare(sql).all(...params));
 });
 
@@ -2196,18 +2242,28 @@ app.get('/api/admin/b2c-customers', authAdmin, (req, res) => {
   sql += ' ORDER BY name';
   const customers = db.prepare(sql).all(...params);
 
-  const visitStats = db.prepare("SELECT COUNT(*) AS c FROM bookings WHERE b2c_customer_id = ? AND status != 'annullata'");
-  const orderStats = db.prepare("SELECT channel, COUNT(*) AS c, COALESCE(SUM(amount_cents),0) AS total FROM b2c_orders WHERE customer_id = ? GROUP BY channel");
-  const cassaStats = db.prepare('SELECT COUNT(*) AS c, COALESCE(SUM(total_cents),0) AS total FROM shop_sales WHERE b2c_customer_id = ?');
+  // Aggregati calcolati in blocco (4 query totali) invece che per singolo cliente,
+  // per evitare N query ripetute man mano che la lista clienti cresce.
+  const visitRows = db.prepare("SELECT b2c_customer_id AS id, COUNT(*) AS c FROM bookings WHERE status != 'annullata' AND b2c_customer_id IS NOT NULL GROUP BY b2c_customer_id").all();
+  const orderRows = db.prepare("SELECT customer_id AS id, channel, COUNT(*) AS c, COALESCE(SUM(amount_cents),0) AS total FROM b2c_orders GROUP BY customer_id, channel").all();
+  const cassaRows = db.prepare("SELECT b2c_customer_id AS id, COUNT(*) AS c, COALESCE(SUM(total_cents),0) AS total FROM shop_sales WHERE b2c_customer_id IS NOT NULL GROUP BY b2c_customer_id").all();
+
+  const visitById = new Map(visitRows.map(r => [r.id, r.c]));
+  const cassaById = new Map(cassaRows.map(r => [r.id, r]));
+  const ordersById = new Map();
+  for (const r of orderRows) {
+    if (!ordersById.has(r.id)) ordersById.set(r.id, []);
+    ordersById.get(r.id).push(r);
+  }
 
   res.json(customers.map(c => {
-    const orders = orderStats.all(c.id);
+    const orders = ordersById.get(c.id) || [];
     const ecommerce = orders.find(o => o.channel === 'ecommerce') || { c: 0, total: 0 };
     const negozio = orders.find(o => o.channel === 'negozio') || { c: 0, total: 0 };
-    const cassa = cassaStats.get(c.id);
+    const cassa = cassaById.get(c.id) || { c: 0, total: 0 };
     return {
       ...c,
-      visitCount: visitStats.get(c.id).c,
+      visitCount: visitById.get(c.id) || 0,
       ecommerceCount: ecommerce.c, ecommerceTotalCents: ecommerce.total,
       negozioCount: negozio.c + cassa.c, negozioTotalCents: negozio.total + cassa.total,
     };
@@ -2522,10 +2578,16 @@ app.get('/api/admin/orders', authAdmin, (req, res) => {
   if (from) { sql += ' AND o.order_date >= ?'; params.push(from); }
   if (to)   { sql += ' AND o.order_date <= ?'; params.push(to); }
   if (q) { sql += ' AND (o.order_number LIKE ? OR o.customer_name LIKE ?)'; const like = `%${q}%`; params.push(like, like); }
-  sql += ' ORDER BY o.order_date DESC, o.id DESC';
+  sql += ' ORDER BY o.order_date DESC, o.id DESC LIMIT 500';
   const orders = db.prepare(sql).all(...params);
-  const itemCount = db.prepare('SELECT COUNT(*) AS c, COALESCE(SUM(quantity),0) AS q FROM order_items WHERE order_id = ?');
-  res.json(orders.map(o => ({ ...o, ...itemCount.get(o.id) })));
+  const orderIds = orders.map(o => o.id);
+  const itemCountById = new Map();
+  if (orderIds.length) {
+    const placeholders = orderIds.map(() => '?').join(',');
+    db.prepare(`SELECT order_id, COUNT(*) AS c, COALESCE(SUM(quantity),0) AS q FROM order_items WHERE order_id IN (${placeholders}) GROUP BY order_id`)
+      .all(...orderIds).forEach(r => itemCountById.set(r.order_id, { c: r.c, q: r.q }));
+  }
+  res.json(orders.map(o => ({ ...o, ...(itemCountById.get(o.id) || { c: 0, q: 0 }) })));
 });
 
 app.get('/api/admin/orders/:id', authAdmin, (req, res) => {
@@ -3637,9 +3699,15 @@ app.get('/api/agent/:token/price-lists', authAgent, (req, res) => {
 });
 
 app.get('/api/agent/:token/orders', authAgent, (req, res) => {
-  const orders = db.prepare('SELECT * FROM orders WHERE agent_id = ? ORDER BY order_date DESC, id DESC').all(req.agent.id);
-  const itemCount = db.prepare('SELECT COUNT(*) AS c, COALESCE(SUM(quantity),0) AS q FROM order_items WHERE order_id = ?');
-  res.json(orders.map(o => ({ ...o, ...itemCount.get(o.id) })));
+  const orders = db.prepare('SELECT * FROM orders WHERE agent_id = ? ORDER BY order_date DESC, id DESC LIMIT 500').all(req.agent.id);
+  const orderIds = orders.map(o => o.id);
+  const itemCountById = new Map();
+  if (orderIds.length) {
+    const placeholders = orderIds.map(() => '?').join(',');
+    db.prepare(`SELECT order_id, COUNT(*) AS c, COALESCE(SUM(quantity),0) AS q FROM order_items WHERE order_id IN (${placeholders}) GROUP BY order_id`)
+      .all(...orderIds).forEach(r => itemCountById.set(r.order_id, { c: r.c, q: r.q }));
+  }
+  res.json(orders.map(o => ({ ...o, ...(itemCountById.get(o.id) || { c: 0, q: 0 }) })));
 });
 
 app.post('/api/agent/:token/orders', authAgent, (req, res) => {
