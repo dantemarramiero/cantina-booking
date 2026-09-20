@@ -660,10 +660,6 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" id="cassa-product-search" placeholder="Cerca bottiglia..." oninput="renderCassaProducts()">
           </div>
-          <div class="list-spacer"></div>
-          <div class="field" style="margin:0;min-width:200px">
-            <select id="cassa-price-list" onchange="renderCassaProducts()"></select>
-          </div>
         </div>
         <div class="cassa-products" id="cassa-products"></div>
         <div class="cassa-step-bar">
@@ -2337,7 +2333,7 @@ async function deleteVenueEvent(id) {
 
 // ── Cassa (negozio fisico) ──────────────────────────────────────────────────────
 let CASSA_PRODUCTS = [];
-let CASSA_PRICE_LISTS = [];
+let CASSA_SHOP_PRICES = {};
 let CASSA_CART = [];
 const CASSA_CONTEXT_LABELS = { negozio: 'Negozio', post_visita: 'Post visita', post_evento: 'Post evento' };
 const CASSA_PAYMENT_LABELS = { contanti: 'Contanti', carta: 'Carta', altro: 'Altro' };
@@ -2345,14 +2341,14 @@ const CASSA_PAYMENT_LABELS = { contanti: 'Contanti', carta: 'Carta', altro: 'Alt
 async function loadCassa() {
   document.getElementById('cassa-modal-msg').innerHTML = '';
   backToCassaProducts();
-  [CASSA_PRODUCTS, CASSA_PRICE_LISTS] = await Promise.all([
+  const [products, priceLists] = await Promise.all([
     api('/api/admin/products'),
     api('/api/admin/price-lists'),
   ]);
-  const sel = document.getElementById('cassa-price-list');
-  const prevValue = sel.value;
-  sel.innerHTML = CASSA_PRICE_LISTS.map(pl => `<option value="${pl.id}">${esc(pl.name)}</option>`).join('');
-  if (prevValue && CASSA_PRICE_LISTS.some(pl => String(pl.id) === prevValue)) sel.value = prevValue;
+  const shopList = priceLists.find(pl => pl.name === 'Listino Negozio');
+  CASSA_SHOP_PRICES = {};
+  (shopList?.items || []).forEach(i => { CASSA_SHOP_PRICES[i.product_id] = i.price_cents; });
+  CASSA_PRODUCTS = products.filter(p => p.active && CASSA_SHOP_PRICES[p.id] != null);
   renderCassaProducts();
   renderCassaCart();
   loadCassaSales();
@@ -2372,10 +2368,7 @@ function backToCassaProducts() {
 }
 
 function cassaPriceFor(productId) {
-  const listId = parseInt(document.getElementById('cassa-price-list').value);
-  const list = CASSA_PRICE_LISTS.find(pl => pl.id === listId);
-  const item = list?.items.find(i => i.product_id === productId);
-  return item ? item.price_cents : 0;
+  return CASSA_SHOP_PRICES[productId] || 0;
 }
 
 function cassaCartQtyFor(productId) {
@@ -2409,7 +2402,7 @@ function renderCassaProducts() {
       </div>
     </div>
   `;
-  }).join('') : '<p class="cassa-empty-cart">Nessuna bottiglia trovata.</p>';
+  }).join('') : `<p class="cassa-empty-cart">${!CASSA_PRODUCTS.length ? 'Nessuna bottiglia ha un prezzo nel "Listino Negozio" — aggiungilo da Commerciale → Listini.' : 'Nessuna bottiglia trovata.'}</p>`;
   updateCassaBar();
 }
 

@@ -1255,9 +1255,8 @@
           </div>
 
           <div class="box" style="max-width:520px">
-            <h3>Negozio online</h3>
-            <p style="margin:0 0 14px;font-size:12.5px;color:var(--ink-soft)">Il listino usato per il "Negozio" sul sito pubblico (prenotazione e pagamento anticipato con ritiro in cantina). Senza un listino selezionato la sezione resta nascosta ai visitatori.</p>
-            <div class="field"><label>Listino</label><select id="rule-shop-price-list" onchange="saveRules()"><option value="">— Nessuno (negozio online disattivato) —</option></select></div>
+            <h3>Negozio online e cassa</h3>
+            <p style="margin:0;font-size:12.5px;color:var(--ink-soft)">Cassa e Negozio online usano sempre il listino obbligatorio <strong>"Listino Negozio"</strong> (Commerciale → Listini) come prezzo di riferimento — non è configurabile qui. Aggiungi le bottiglie a quel listino per renderle disponibili in cassa e, in futuro, sull'e-commerce; senza prezzo in quel listino una bottiglia non compare nel Negozio online.</p>
           </div>
         </div>
 
@@ -2791,7 +2790,9 @@ async function loadPriceLists() {
   container.innerHTML = lists.map(l => `
     <div class="box">
       <h3>${esc(l.name)} <span style="font-size:12px;color:var(--ink-soft)">(${esc(l.currency)})</span>
-        <button class="btn small danger" style="float:right" onclick="deletePriceList(${l.id})">Elimina listino</button>
+        ${l.name === 'Listino Negozio'
+          ? `<span class="pill-stat" style="float:right">Obbligatorio — usato da Cassa e Negozio online</span>`
+          : `<button class="btn small danger" style="float:right" onclick="deletePriceList(${l.id})">Elimina listino</button>`}
       </h3>
       <div class="table-wrap">
         <table><thead><tr><th>Bottiglia</th><th>Prezzo</th><th>Azioni</th></tr></thead>
@@ -4608,10 +4609,6 @@ async function loadSettings() {
   document.getElementById('set-procurement-email').value = s.procurement_alert_email || '';
   document.getElementById('rule-active-months').value = s.active_months_threshold || 6;
   document.getElementById('rule-semi-active-months').value = s.semi_active_months_threshold || 12;
-  const priceLists = await api('/api/admin/price-lists');
-  const sel = document.getElementById('rule-shop-price-list');
-  sel.innerHTML = '<option value="">— Nessuno (negozio online disattivato) —</option>' + priceLists.map(pl => `<option value="${pl.id}">${esc(pl.name)}</option>`).join('');
-  sel.value = s.shop_price_list_id || '';
 }
 async function saveSettings() {
   const msg = document.getElementById('settings-msg');
@@ -4631,7 +4628,6 @@ async function saveRules() {
     await api('/api/admin/settings', { method: 'POST', body: JSON.stringify({
       active_months_threshold: document.getElementById('rule-active-months').value,
       semi_active_months_threshold: document.getElementById('rule-semi-active-months').value,
-      shop_price_list_id: document.getElementById('rule-shop-price-list').value,
     }) });
     await loadActivityThresholds();
     msg.innerHTML = '<div class="msg success">Regole salvate.</div>';

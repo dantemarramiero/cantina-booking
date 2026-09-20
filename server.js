@@ -466,6 +466,15 @@ db.exec(`
     FOREIGN KEY (product_id) REFERENCES products(id)
   )
 `);
+// "Listino Negozio" è obbligatorio: prezzi di riferimento per la cassa del negozio fisico
+// e per il negozio online (click&collect, futuro e-commerce). Sempre presente, non eliminabile.
+const SHOP_PRICE_LIST_NAME = 'Listino Negozio';
+if (!db.prepare('SELECT id FROM price_lists WHERE name = ?').get(SHOP_PRICE_LIST_NAME)) {
+  db.prepare('INSERT INTO price_lists (name, currency) VALUES (?, ?)').run(SHOP_PRICE_LIST_NAME, 'EUR');
+}
+function getShopPriceListId() {
+  return db.prepare('SELECT id FROM price_lists WHERE name = ?').get(SHOP_PRICE_LIST_NAME)?.id || null;
+}
 
 // ── ERP: ordini commerciali (import da Excel/gestionale) ──────────────────────
 db.exec(`
@@ -1394,7 +1403,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
 // ── Public: negozio online — prenotazione e pagamento anticipato con ritiro ───
 app.get('/api/shop-products', (req, res) => {
-  const priceListId = parseInt(getSetting('shop_price_list_id', ''));
+  const priceListId = getShopPriceListId();
   if (!priceListId) return res.json([]);
   const rows = db.prepare(`
     SELECT p.id, p.name, p.vintage, p.varietal, p.description, p.image_url, p.wine_type, p.stock_quantity, pli.price_cents
@@ -1412,7 +1421,7 @@ app.post('/api/create-pickup-checkout-session', async (req, res) => {
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Indirizzo email non valido.' });
 
-  const priceListId = parseInt(getSetting('shop_price_list_id', ''));
+  const priceListId = getShopPriceListId();
   if (!priceListId) return res.status(400).json({ error: 'Negozio online non disponibile al momento.' });
 
   const resolvedItems = [];
@@ -2304,7 +2313,6 @@ app.get('/api/admin/settings', authAdmin, (req, res) => {
     procurement_alert_email: getSetting('procurement_alert_email', ''),
     active_months_threshold: getSetting('active_months_threshold', '6'),
     semi_active_months_threshold: getSetting('semi_active_months_threshold', '12'),
-    shop_price_list_id: getSetting('shop_price_list_id', ''),
     ...company,
   });
 });
@@ -2373,10 +2381,9 @@ app.post('/api/admin/dashboard-widgets', authAdmin, (req, res) => {
 });
 
 app.post('/api/admin/settings', authAdmin, (req, res) => {
-  const { commercial_alert_email, procurement_alert_email, active_months_threshold, semi_active_months_threshold, shop_price_list_id } = req.body || {};
+  const { commercial_alert_email, procurement_alert_email, active_months_threshold, semi_active_months_threshold } = req.body || {};
   if (commercial_alert_email !== undefined) setSetting('commercial_alert_email', commercial_alert_email);
   if (procurement_alert_email !== undefined) setSetting('procurement_alert_email', procurement_alert_email);
-  if (shop_price_list_id !== undefined) setSetting('shop_price_list_id', shop_price_list_id);
   if (active_months_threshold !== undefined) {
     const n = parseInt(active_months_threshold);
     if (!n || n < 1) return res.status(400).json({ error: 'La soglia clienti attivi deve essere un numero di mesi valido.' });
@@ -2457,6 +2464,14 @@ app.post('/api/admin/price-lists', authAdmin, (req, res) => {
 });
 
 app.patch('/api/admin/price-lists/:id', authAdmin, (req, res) => {
+  const current = db.prepare('SELECT * FROM price_lists WHERE id = ?').get(req.params.id);
+  if (!current) return res.status(404).json({ error: 'Listino non trovato.' });
+  if (current.name === SHOP_PRICE_LIST_NAME && req.body.name !== undefined && req.body.name.trim() !== SHOP_PRICE_LIST_NAME) {
+    return res.status(400).json({ error: `Il listino "${SHOP_PRICE_LIST_NAME}" è obbligatorio e non può essere rinominato.` });
+  }
+  if (current.name === SHOP_PRICE_LIST_NAME && req.body.active !== undefined && !req.body.active) {
+    return res.status(400).json({ error: `Il listino "${SHOP_PRICE_LIST_NAME}" è obbligatorio e non può essere disattivato.` });
+  }
   const fields = ['name', 'currency', 'active'];
   const updates = [], params = [];
   for (const f of fields) {
@@ -2469,6 +2484,10 @@ app.patch('/api/admin/price-lists/:id', authAdmin, (req, res) => {
 });
 
 app.delete('/api/admin/price-lists/:id', authAdmin, (req, res) => {
+  const current = db.prepare('SELECT * FROM price_lists WHERE id = ?').get(req.params.id);
+  if (current?.name === SHOP_PRICE_LIST_NAME) {
+    return res.status(400).json({ error: `Il listino "${SHOP_PRICE_LIST_NAME}" è obbligatorio e non può essere eliminato.` });
+  }
   db.prepare('DELETE FROM price_list_items WHERE price_list_id = ?').run(req.params.id);
   db.prepare('DELETE FROM price_lists WHERE id = ?').run(req.params.id);
   res.json({ success: true });
