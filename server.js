@@ -442,7 +442,8 @@ db.exec(`
   )
 `);
 try { db.exec('ALTER TABLE products ADD COLUMN wine_type TEXT'); } catch {}
-// stock_quantity: giacenza per la vendita diretta (cassa negozio fisico). NULL = scorte non tracciate per questa bottiglia.
+// stock_quantity: colonna dismessa (era la giacenza per la cassa, prima di unificare la fonte di verità
+// su Magazzino → Prodotti finiti / warehouse_finished). Lasciata per non rompere DB esistenti; non più letta né scritta.
 try { db.exec('ALTER TABLE products ADD COLUMN stock_quantity INTEGER'); } catch {}
 
 // ── ERP: listini ──────────────────────────────────────────────────────────────
@@ -1261,6 +1262,20 @@ async function checkStockThreshold({ table, id, name, quantity, threshold, alert
   catch (e) { console.error('Alert email error:', e.message); }
 }
 
+// Fonte di verità unica per le giacenze vendibili: il Magazzino → Prodotti finiti
+// (warehouse_finished). Un prodotto senza riga lì è "non tracciato" — sempre vendibile,
+// nessun tetto. delta negativo = vendita, positivo = ripristino (annullo vendita/ordine).
+function adjustWarehouseStock(productId, delta) {
+  const wf = db.prepare('SELECT wf.*, p.name AS product_name FROM warehouse_finished wf JOIN products p ON p.id = wf.product_id WHERE wf.product_id = ?').get(productId);
+  if (!wf) return;
+  const newQuantity = wf.quantity + delta;
+  db.prepare("UPDATE warehouse_finished SET quantity = ?, updated_at = datetime('now','localtime') WHERE id = ?").run(newQuantity, wf.id);
+  checkStockThreshold({
+    table: 'warehouse_finished', id: wf.id, name: wf.product_name, quantity: newQuantity,
+    threshold: wf.threshold, alertEmail: wf.alert_email, defaultEmailKey: 'commercial_alert_email', kind: 'finished',
+  }).catch(console.error);
+}
+
 // ── Stripe webhook (raw body — before express.json) ──────────────────────────
 app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) => {
   if (!stripe || !WEBHOOK_SECRET) return res.status(400).json({ error: 'Stripe non configurato.' });
@@ -1294,8 +1309,7 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) =
       db.prepare("UPDATE pickup_orders SET status = 'da_ritirare', payment_intent_id = ?, stripe_payment_status = 'paid' WHERE id = ?")
         .run(paymentIntentId, orderId);
       const items = db.prepare('SELECT * FROM pickup_order_items WHERE order_id = ?').all(orderId);
-      const decrementStock = db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ? AND stock_quantity IS NOT NULL');
-      for (const it of items) if (it.product_id) decrementStock.run(it.quantity, it.product_id);
+      for (const it of items) if (it.product_id) adjustWarehouseStock(it.product_id, -it.quantity);
       const order = db.prepare('SELECT * FROM pickup_orders WHERE id = ?').get(orderId);
       if (order) { order.items = items; sendPickupOrderEmail(order).catch(console.error); }
     }
@@ -1452,8 +1466,9 @@ app.get('/api/shop-products', (req, res) => {
   const priceListId = getShopPriceListId();
   if (!priceListId) return res.json([]);
   const rows = db.prepare(`
-    SELECT p.id, p.name, p.vintage, p.varietal, p.description, p.image_url, p.wine_type, p.stock_quantity, pli.price_cents
+    SELECT p.id, p.name, p.vintage, p.varietal, p.description, p.image_url, p.wine_type, wf.quantity AS stock_quantity, pli.price_cents
     FROM products p JOIN price_list_items pli ON pli.product_id = p.id AND pli.price_list_id = ?
+    LEFT JOIN warehouse_finished wf ON wf.product_id = p.id
     WHERE p.active = 1
     ORDER BY p.name
   `).all(priceListId);
@@ -1473,8 +1488,9 @@ app.post('/api/create-pickup-checkout-session', async (req, res) => {
   const resolvedItems = [];
   for (const it of items) {
     const product = db.prepare(`
-      SELECT p.id, p.name, p.vintage, p.stock_quantity, pli.price_cents
+      SELECT p.id, p.name, p.vintage, wf.quantity AS stock_quantity, pli.price_cents
       FROM products p JOIN price_list_items pli ON pli.product_id = p.id AND pli.price_list_id = ?
+      LEFT JOIN warehouse_finished wf ON wf.product_id = p.id
       WHERE p.id = ? AND p.active = 1
     `).get(priceListId, it.product_id);
     if (!product) return res.status(404).json({ error: 'Una delle bottiglie selezionate non è più disponibile.' });
@@ -2178,10 +2194,9 @@ app.post('/api/admin/shop-sales', authAdmin, (req, res) => {
   const saleId = saleResult.lastInsertRowid;
 
   const insertItem = db.prepare('INSERT INTO shop_sale_items (sale_id, product_id, product_name, quantity, unit_price_cents, line_total_cents) VALUES (?, ?, ?, ?, ?, ?)');
-  const decrementStock = db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ? AND stock_quantity IS NOT NULL');
   for (const it of items) {
     insertItem.run(saleId, it.product_id || null, it.product_name.trim(), it.quantity, it.unit_price_cents || 0, it.quantity * (it.unit_price_cents || 0));
-    if (it.product_id) decrementStock.run(it.quantity, it.product_id);
+    if (it.product_id) adjustWarehouseStock(it.product_id, -it.quantity);
   }
 
   res.json({ success: true, id: saleId });
@@ -2189,8 +2204,7 @@ app.post('/api/admin/shop-sales', authAdmin, (req, res) => {
 
 app.delete('/api/admin/shop-sales/:id', authAdmin, (req, res) => {
   const items = db.prepare('SELECT * FROM shop_sale_items WHERE sale_id = ?').all(req.params.id);
-  const restoreStock = db.prepare('UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ? AND stock_quantity IS NOT NULL');
-  for (const it of items) if (it.product_id) restoreStock.run(it.quantity, it.product_id);
+  for (const it of items) if (it.product_id) adjustWarehouseStock(it.product_id, it.quantity);
   db.prepare('DELETE FROM shop_sale_items WHERE sale_id = ?').run(req.params.id);
   db.prepare('DELETE FROM shop_sales WHERE id = ?').run(req.params.id);
   res.json({ success: true });
@@ -2225,8 +2239,7 @@ app.delete('/api/admin/pickup-orders/:id', authAdmin, (req, res) => {
   if (!order) return res.status(404).json({ error: 'Ordine non trovato.' });
   if (order.status === 'da_ritirare') {
     const items = db.prepare('SELECT * FROM pickup_order_items WHERE order_id = ?').all(order.id);
-    const restoreStock = db.prepare('UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ? AND stock_quantity IS NOT NULL');
-    for (const it of items) if (it.product_id) restoreStock.run(it.quantity, it.product_id);
+    for (const it of items) if (it.product_id) adjustWarehouseStock(it.product_id, it.quantity);
   }
   db.prepare('DELETE FROM pickup_order_items WHERE order_id = ?').run(order.id);
   db.prepare('DELETE FROM pickup_orders WHERE id = ?').run(order.id);
@@ -2458,18 +2471,22 @@ app.post('/api/admin/settings', authAdmin, (req, res) => {
 
 // ── Prodotti (bottiglie) ───────────────────────────────────────────────────────
 app.get('/api/admin/products', authAdmin, (req, res) => {
-  res.json(db.prepare('SELECT * FROM products ORDER BY name').all());
+  res.json(db.prepare(`
+    SELECT p.*, wf.quantity AS stock_quantity
+    FROM products p LEFT JOIN warehouse_finished wf ON wf.product_id = p.id
+    ORDER BY p.name
+  `).all());
 });
 
 app.post('/api/admin/products', authAdmin, upload.single('image'), (req, res) => {
-  const { sku, name, vintage, varietal, description, wine_type, stock_quantity } = req.body || {};
+  const { sku, name, vintage, varietal, description, wine_type } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'Il nome della bottiglia è obbligatorio.' });
   const image_url = req.file ? `/uploads/products/${req.file.filename}` : null;
   try {
     const result = db.prepare(`
-      INSERT INTO products (sku, name, vintage, varietal, description, image_url, wine_type, stock_quantity)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(sku?.trim() || null, name.trim(), vintage?.trim() || null, varietal?.trim() || null, description?.trim() || null, image_url, wine_type || null, stock_quantity === '' || stock_quantity === undefined ? null : parseInt(stock_quantity));
+      INSERT INTO products (sku, name, vintage, varietal, description, image_url, wine_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(sku?.trim() || null, name.trim(), vintage?.trim() || null, varietal?.trim() || null, description?.trim() || null, image_url, wine_type || null);
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (e) {
     res.status(409).json({ error: 'SKU già esistente.' });
@@ -2477,13 +2494,10 @@ app.post('/api/admin/products', authAdmin, upload.single('image'), (req, res) =>
 });
 
 app.patch('/api/admin/products/:id', authAdmin, upload.single('image'), (req, res) => {
-  const fields = ['sku', 'name', 'vintage', 'varietal', 'description', 'active', 'wine_type', 'stock_quantity'];
+  const fields = ['sku', 'name', 'vintage', 'varietal', 'description', 'active', 'wine_type'];
   const updates = [], params = [];
   for (const f of fields) {
-    if (req.body[f] !== undefined) {
-      updates.push(`${f} = ?`);
-      params.push(f === 'stock_quantity' && req.body[f] === '' ? null : req.body[f]);
-    }
+    if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }
   }
   if (req.file) { updates.push('image_url = ?'); params.push(`/uploads/products/${req.file.filename}`); }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });

@@ -1363,7 +1363,7 @@
       </select>
     </div>
     <div class="field"><label>Descrizione</label><textarea id="prod-description" rows="3"></textarea></div>
-    <div class="field"><label>Giacenza negozio (vuoto = scorte non tracciate)</label><input type="number" id="prod-stock-quantity" min="0"></div>
+    <p style="margin:0 0 14px;font-size:11.5px;color:var(--ink-soft)">La giacenza si gestisce da Magazzino → Prodotti finiti (usata anche da Cassa e Negozio online).</p>
     <div class="field"><label>Foto bottiglia</label><input type="file" id="prod-image" accept="image/*"></div>
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('product-modal')">Annulla</button>
@@ -2752,7 +2752,6 @@ function openProductModal(p) {
   document.getElementById('prod-varietal').value = p ? (p.varietal || '') : '';
   document.getElementById('prod-wine-type').value = p ? (p.wine_type || '') : '';
   document.getElementById('prod-description').value = p ? (p.description || '') : '';
-  document.getElementById('prod-stock-quantity').value = p && p.stock_quantity != null ? p.stock_quantity : '';
   document.getElementById('prod-image').value = '';
   openModal('product-modal');
 }
@@ -2766,7 +2765,6 @@ async function saveProduct() {
   fd.append('varietal', document.getElementById('prod-varietal').value.trim());
   fd.append('wine_type', document.getElementById('prod-wine-type').value);
   fd.append('description', document.getElementById('prod-description').value.trim());
-  fd.append('stock_quantity', document.getElementById('prod-stock-quantity').value);
   const imageFile = document.getElementById('prod-image').files[0];
   if (imageFile) fd.append('image', imageFile);
   try {
