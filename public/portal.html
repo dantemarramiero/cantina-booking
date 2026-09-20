@@ -721,6 +721,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
         Dashboard
       </button>
+      <button data-sub="crm-persone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"/></svg>
+        Persone
+      </button>
       <button data-sub="crm-clienti">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
         Clienti
@@ -1052,6 +1056,29 @@
     <div class="module" id="module-crm">
       <div class="subpanel active" id="sub-crm-dashboard">
         <div class="crm-overview-cards" id="crm-dashboard-cards"></div>
+      </div>
+
+      <div class="subpanel" id="sub-crm-persone">
+        <div class="list-card">
+          <div class="list-toolbar">
+            <div class="search-input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="people-search" placeholder="Cerca persona" oninput="loadPeople()">
+            </div>
+            <select id="people-role-filter" onchange="loadPeople()" style="padding:9px 30px 9px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:13px">
+              <option value="">Tutti i ruoli</option>
+              <option value="cliente_finale">Cliente finale</option>
+              <option value="cliente_evento">Cliente evento</option>
+              <option value="contatto">Contatto</option>
+            </select>
+            <div class="list-spacer"></div>
+            <button class="btn-generate" onclick="openPersonModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+              Nuova persona
+            </button>
+          </div>
+          <div class="list-rows" id="people-tbody"></div>
+        </div>
       </div>
 
       <div class="subpanel" id="sub-crm-clienti">
@@ -1497,6 +1524,76 @@
   </div>
 </div>
 
+<!-- Person modal -->
+<div class="modal-overlay" id="people-modal">
+  <div class="modal-box" style="max-width:560px">
+    <h3 id="people-modal-title">Nuova persona</h3>
+    <div id="people-modal-msg"></div>
+    <input type="hidden" id="ppl-id">
+    <div class="field-row">
+      <div class="field"><label>Nome e cognome</label><input id="ppl-name"></div>
+      <div class="field"><label>Email</label><input type="email" id="ppl-email"></div>
+    </div>
+    <div class="field"><label>Telefono</label><input id="ppl-phone"></div>
+
+    <div class="field">
+      <label>Ruoli</label>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" class="ppl-role" value="cliente_finale"> Cliente finale</label>
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" class="ppl-role" value="cliente_evento"> Cliente evento</label>
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" class="ppl-role" value="contatto" onchange="togglePersonContactFields()"> Contatto</label>
+      </div>
+    </div>
+
+    <div id="ppl-contact-fields" style="display:none">
+      <div class="field-row">
+        <div class="field"><label>Ruolo del contatto</label>
+          <select id="ppl-contact-role">
+            <option value="">— Nessuno —</option>
+            <option value="titolare">Titolare</option>
+            <option value="maitre">Maitre</option>
+            <option value="cameriere">Cameriere</option>
+            <option value="commerciale">Commerciale</option>
+            <option value="referente">Referente</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Azienda cliente</label><select id="ppl-customer"><option value="">— Nessuna —</option></select></div>
+        <div class="field"><label>Importatore</label><select id="ppl-importer"><option value="">— Nessuno —</option></select></div>
+      </div>
+      <div class="field"><label>Agente</label><select id="ppl-agent"><option value="">— Nessuno —</option></select></div>
+    </div>
+
+    <div class="field">
+      <label>Canale di origine</label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" class="ppl-channel" value="negozio_fisico"> Negozio fisico</label>
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" class="ppl-channel" value="ecommerce"> E-commerce</label>
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" class="ppl-channel" value="visita"> Visita</label>
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" class="ppl-channel" value="evento_proprietario"> Evento proprietario</label>
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" class="ppl-channel" value="evento_terzo"> Evento terzo</label>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field" style="display:flex;align-items:center;padding-top:20px">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" id="ppl-newsletter"> Consenso newsletter</label>
+      </div>
+      <div class="field" style="display:flex;align-items:center;padding-top:20px">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" id="ppl-wine-club"> Wine club</label>
+      </div>
+    </div>
+
+    <div class="field"><label>Note</label><textarea id="ppl-notes" rows="2"></textarea></div>
+
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('people-modal')">Annulla</button>
+      <button class="btn" onclick="savePerson()">Salva</button>
+    </div>
+  </div>
+</div>
+
 <!-- Customer modal -->
 <div class="modal-overlay" id="customer-modal">
   <div class="modal-box" style="max-width:640px">
@@ -1575,6 +1672,29 @@
       <div class="field"><label>Sconto automatico (%)</label><input type="number" id="cust-discount-percent" min="0" max="100" step="0.5" placeholder="0"></div>
     </div>
     <div class="field"><label>Volume d'affari stimato (€/anno)</label><input type="number" id="cust-estimated-volume" step="0.01"></div>
+
+    <div class="form-section-title">Relazioni CRM</div>
+    <div class="field-row">
+      <div class="field"><label>Tipo</label>
+        <select id="cust-business-type">
+          <option value="">— Non specificato —</option>
+          <option value="ristoratore">Ristoratore</option>
+          <option value="distributore">Distributore</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Relazione con noi</label>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" class="cust-relationship" value="diretta"> Diretta</label>
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" class="cust-relationship" value="tramite_importatore"> Tramite importatore</label>
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:400;color:var(--ink);font-size:13px"><input type="checkbox" class="cust-relationship" value="tramite_distributore"> Tramite distributore</label>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Fornito da (importatore)</label><select id="cust-supplied-by-importer"><option value="">— Nessuno —</option></select></div>
+      <div class="field"><label>Fornito da (distributore)</label><select id="cust-supplied-by-distributor"><option value="">— Nessuno —</option></select></div>
+    </div>
 
     <div class="form-section-title">Operativo</div>
     <div class="field-row">
@@ -2398,6 +2518,7 @@ function loadSubpanel(sub) {
   if (sub === 'prod-righe') loadProductionItems();
   if (sub === 'mag-dashboard') loadMagazzinoDashboard();
   if (sub === 'crm-dashboard') loadCrmDashboard();
+  if (sub === 'crm-persone') loadPeople();
   if (sub === 'crm-clienti') loadCustomers();
   if (sub === 'crm-agenti') loadAgents();
   if (sub === 'crm-importatori') loadImporters();
@@ -3448,6 +3569,7 @@ const CUSTOMER_FIELD_MAP = {
   payment_terms: 'cust-payment-terms', category: 'cust-category',
   discount_code: 'cust-discount-code', discount_percent: 'cust-discount-percent',
   closing_days: 'cust-closing-days', delivery_notes: 'cust-delivery-notes', notes: 'cust-notes',
+  business_type: 'cust-business-type',
 };
 
 async function openCustomerModal(c) {
@@ -3465,6 +3587,17 @@ async function openCustomerModal(c) {
   const priceLists = await api('/api/admin/price-lists');
   document.getElementById('cust-price-list').innerHTML = '<option value="">— Nessuno —</option>' +
     priceLists.map(l => `<option value="${l.id}" ${c && c.price_list_id === l.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
+
+  const relationship = c && c.relationship_type ? JSON.parse(c.relationship_type || '[]') : [];
+  document.querySelectorAll('.cust-relationship').forEach(cb => { cb.checked = relationship.includes(cb.value); });
+  const importers = await api('/api/admin/importers');
+  document.getElementById('cust-supplied-by-importer').innerHTML = '<option value="">— Nessuno —</option>' +
+    importers.map(i => `<option value="${i.id}" ${c && c.supplied_by_importer_id === i.id ? 'selected' : ''}>${esc(i.name)}</option>`).join('');
+  const allCustomers = await api('/api/admin/customers');
+  const distributors = allCustomers.filter(x => x.business_type === 'distributore' && (!c || x.id !== c.id));
+  document.getElementById('cust-supplied-by-distributor').innerHTML = '<option value="">— Nessuno —</option>' +
+    distributors.map(d => `<option value="${d.id}" ${c && c.supplied_by_distributor_id === d.id ? 'selected' : ''}>${esc(d.name)}</option>`).join('');
+
   openModal('customer-modal');
 }
 
@@ -3491,6 +3624,9 @@ async function saveCustomer() {
   body.estimated_volume_cents = volVal ? Math.round(parseFloat(volVal) * 100) : '';
   body.agent_id = document.getElementById('cust-agent').value || '';
   body.price_list_id = document.getElementById('cust-price-list').value || '';
+  body.relationship_type = JSON.stringify([...document.querySelectorAll('.cust-relationship:checked')].map(cb => cb.value));
+  body.supplied_by_importer_id = document.getElementById('cust-supplied-by-importer').value || '';
+  body.supplied_by_distributor_id = document.getElementById('cust-supplied-by-distributor').value || '';
   if (!id && CUSTOMER_MODAL_SOURCE_FAIR_ID) body.source_fair_id = CUSTOMER_MODAL_SOURCE_FAIR_ID;
   try {
     if (id) await api('/api/admin/customers/' + id, { method: 'PATCH', body: JSON.stringify(body) });
@@ -3508,6 +3644,109 @@ async function deleteCustomer(id) {
   if (!confirm('Eliminare questo cliente?')) return;
   await api('/api/admin/customers/' + id, { method: 'DELETE' });
   loadCustomers();
+}
+
+// ── CRM: Persone (anagrafica unica, tag di ruolo) ──────────────────────────────
+const PEOPLE_ROLE_LABELS = { cliente_finale: 'Cliente finale', cliente_evento: 'Cliente evento', contatto: 'Contatto' };
+const PEOPLE_CHANNEL_LABELS = { negozio_fisico: 'Negozio fisico', ecommerce: 'E-commerce', visita: 'Visita', evento_proprietario: 'Evento proprietario', evento_terzo: 'Evento terzo' };
+
+async function loadPeople() {
+  const q = document.getElementById('people-search').value.trim();
+  const role = document.getElementById('people-role-filter').value;
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (role) params.set('role', role);
+  const rows = await api('/api/admin/people' + (params.toString() ? '?' + params.toString() : ''));
+  document.getElementById('people-tbody').innerHTML = rows.length ? rows.map(p => {
+    const linkedTo = p.customer_name || p.importer_name || p.agent_name;
+    return `
+    <div class="list-row">
+      <div class="list-row-icon">${esc(p.name).charAt(0).toUpperCase()}</div>
+      <div class="list-row-body">
+        <div class="list-row-title">${esc(p.name)}</div>
+        <div class="list-row-sub">${esc(p.email) || 'nessuna email'}${linkedTo ? ' · ' + esc(linkedTo) : ''}</div>
+      </div>
+      <div class="list-row-meta">
+        ${p.roles.map(r => `<span class="pill-stat">${PEOPLE_ROLE_LABELS[r] || r}</span>`).join('')}
+        <button class="btn-outline-pill" onclick='openPersonModal(${jsonAttrP(p)})'>Modifica</button>
+        <button class="btn-outline-pill danger" onclick="deletePerson(${p.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+  `;
+  }).join('') : '<div class="list-empty">Nessuna persona trovata.</div>';
+}
+
+function togglePersonContactFields() {
+  const isContact = document.querySelector('.ppl-role[value="contatto"]').checked;
+  document.getElementById('ppl-contact-fields').style.display = isContact ? 'block' : 'none';
+}
+
+async function openPersonModal(p) {
+  document.getElementById('people-modal-msg').innerHTML = '';
+  document.getElementById('people-modal-title').textContent = p ? 'Modifica persona' : 'Nuova persona';
+  document.getElementById('ppl-id').value = p ? p.id : '';
+  document.getElementById('ppl-name').value = p ? p.name : '';
+  document.getElementById('ppl-email').value = p ? (p.email || '') : '';
+  document.getElementById('ppl-phone').value = p ? (p.phone || '') : '';
+  document.getElementById('ppl-notes').value = p ? (p.notes || '') : '';
+  document.getElementById('ppl-newsletter').checked = !!(p && p.newsletter_opt_in);
+  document.getElementById('ppl-wine-club').checked = !!(p && p.wine_club);
+  document.getElementById('ppl-contact-role').value = p ? (p.contact_role || '') : '';
+
+  const roles = p ? (p.roles || []) : [];
+  document.querySelectorAll('.ppl-role').forEach(cb => { cb.checked = roles.includes(cb.value); });
+  const channels = p ? (p.source_channels || []) : [];
+  document.querySelectorAll('.ppl-channel').forEach(cb => { cb.checked = channels.includes(cb.value); });
+  togglePersonContactFields();
+
+  if (!AGENTS.length) AGENTS = await api('/api/admin/agents');
+  document.getElementById('ppl-agent').innerHTML = '<option value="">— Nessuno —</option>' +
+    AGENTS.map(a => `<option value="${a.id}" ${p && p.agent_id === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('');
+  const customers = await api('/api/admin/customers');
+  document.getElementById('ppl-customer').innerHTML = '<option value="">— Nessuna —</option>' +
+    customers.map(c => `<option value="${c.id}" ${p && p.customer_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  const importers = await api('/api/admin/importers');
+  document.getElementById('ppl-importer').innerHTML = '<option value="">— Nessuno —</option>' +
+    importers.map(i => `<option value="${i.id}" ${p && p.importer_id === i.id ? 'selected' : ''}>${esc(i.name)}</option>`).join('');
+
+  openModal('people-modal');
+}
+
+async function savePerson() {
+  const id = document.getElementById('ppl-id').value;
+  const msg = document.getElementById('people-modal-msg');
+  const name = document.getElementById('ppl-name').value.trim();
+  if (!name) { msg.innerHTML = '<div class="msg error">Il nome è obbligatorio.</div>'; return; }
+  const body = {
+    name,
+    email: document.getElementById('ppl-email').value.trim(),
+    phone: document.getElementById('ppl-phone').value.trim(),
+    notes: document.getElementById('ppl-notes').value.trim(),
+    contact_role: document.getElementById('ppl-contact-role').value,
+    customer_id: document.getElementById('ppl-customer').value || '',
+    importer_id: document.getElementById('ppl-importer').value || '',
+    agent_id: document.getElementById('ppl-agent').value || '',
+    roles: [...document.querySelectorAll('.ppl-role:checked')].map(cb => cb.value),
+    source_channels: [...document.querySelectorAll('.ppl-channel:checked')].map(cb => cb.value),
+    newsletter_opt_in: document.getElementById('ppl-newsletter').checked ? 1 : 0,
+    wine_club: document.getElementById('ppl-wine-club').checked ? 1 : 0,
+  };
+  try {
+    if (id) await api('/api/admin/people/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+    else await api('/api/admin/people', { method: 'POST', body: JSON.stringify(body) });
+    closeModal('people-modal');
+    loadPeople();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function deletePerson(id) {
+  if (!confirm('Eliminare questa persona?')) return;
+  await api('/api/admin/people/' + id, { method: 'DELETE' });
+  loadPeople();
 }
 
 // ── CRM: Importatori ────────────────────────────────────────────────────────────

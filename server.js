@@ -594,6 +594,43 @@ try { db.exec('ALTER TABLE orders ADD COLUMN payment_status TEXT DEFAULT \'non_p
 try { db.exec('ALTER TABLE orders ADD COLUMN payment_due_date TEXT'); } catch {}
 try { db.exec('ALTER TABLE orders ADD COLUMN paid_at TEXT'); } catch {}
 
+// ── CRM: modello "Aziende clienti" (tipo + catena distributore→ristoratore) ────
+// business_type: ristoratore|distributore. relationship_type: JSON, elenco tra
+// diretta/tramite_importatore/tramite_distributore. Le relazioni inverse (chi rifornisce
+// chi, quali clienti segue un agente) si leggono filtrando su queste colonne — non serve
+// una colonna simmetrica sull'altra tabella.
+try { db.exec('ALTER TABLE customers ADD COLUMN business_type TEXT'); } catch {}
+try { db.exec("ALTER TABLE customers ADD COLUMN relationship_type TEXT NOT NULL DEFAULT '[]'"); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN supplied_by_importer_id INTEGER'); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN supplied_by_distributor_id INTEGER'); } catch {}
+
+// ── CRM: Persone (anagrafica unica di persona fisica, con tag di ruolo) ────────
+// Una persona può essere Cliente finale, Cliente evento e/o Contatto (di un'azienda
+// cliente, di un importatore o di un agente) — anche più ruoli insieme. Sostituisce,
+// per le anagrafiche future, il fatto di dover scegliere a priori "è un B2C o un
+// contatto B2B?": lo stesso essere umano può essere entrambi nel tempo.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS people (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    name              TEXT NOT NULL,
+    email             TEXT,
+    phone             TEXT,
+    notes             TEXT,
+    roles             TEXT NOT NULL DEFAULT '[]',
+    contact_role      TEXT,
+    source_channels   TEXT NOT NULL DEFAULT '[]',
+    newsletter_opt_in INTEGER NOT NULL DEFAULT 0,
+    wine_club         INTEGER NOT NULL DEFAULT 0,
+    customer_id       INTEGER,
+    importer_id       INTEGER,
+    agent_id          INTEGER,
+    created_at        TEXT DEFAULT (datetime('now','localtime')),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (importer_id) REFERENCES importers(id),
+    FOREIGN KEY (agent_id) REFERENCES agents(id)
+  )
+`);
+
 // ── CRM: anagrafica estesa (Informazioni di contatto / indirizzo / business) ──
 try { db.exec('ALTER TABLE customers ADD COLUMN contact_person TEXT'); } catch {}
 try { db.exec('ALTER TABLE customers ADD COLUMN contact_person_secondary TEXT'); } catch {}
@@ -983,6 +1020,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_agent_provinces_agent ON agent_provinces(agent_id);
   CREATE INDEX IF NOT EXISTS idx_customers_agent ON customers(agent_id);
   CREATE INDEX IF NOT EXISTS idx_customers_source_fair ON customers(source_fair_id);
+  CREATE INDEX IF NOT EXISTS idx_customers_supplied_by_importer ON customers(supplied_by_importer_id);
+  CREATE INDEX IF NOT EXISTS idx_customers_supplied_by_distributor ON customers(supplied_by_distributor_id);
+  CREATE INDEX IF NOT EXISTS idx_people_customer ON people(customer_id);
+  CREATE INDEX IF NOT EXISTS idx_people_importer ON people(importer_id);
+  CREATE INDEX IF NOT EXISTS idx_people_agent ON people(agent_id);
   CREATE INDEX IF NOT EXISTS idx_importers_agent ON importers(agent_id);
   CREATE INDEX IF NOT EXISTS idx_crm_notes_entity ON crm_notes(entity_type, entity_id);
   CREATE INDEX IF NOT EXISTS idx_crm_attachments_entity ON crm_attachments(entity_type, entity_id);
@@ -3157,6 +3199,7 @@ const CUSTOMER_FIELDS = [
   'contact_person', 'contact_person_secondary', 'newsletter_subscribed', 'website',
   'shipping_address', 'shipping_city', 'shipping_province', 'shipping_postal_code', 'shipping_country',
   'estimated_volume_cents', 'source_fair_id',
+  'business_type', 'relationship_type', 'supplied_by_importer_id', 'supplied_by_distributor_id',
 ];
 
 app.get('/api/admin/customers', authAdmin, (req, res) => {
@@ -3218,6 +3261,74 @@ app.get('/api/admin/customers/:id', authAdmin, (req, res) => {
   c.activity_status = customerActivityStatus(c.last_order_date);
   Object.assign(c, crmSalesStats('customer_id', c.id), crmCounts('customer', c.id));
   res.json(c);
+});
+
+// ── CRM: Persone (anagrafica unica, tag di ruolo) ──────────────────────────────
+const PEOPLE_FIELDS = ['name', 'email', 'phone', 'notes', 'contact_role', 'customer_id', 'importer_id', 'agent_id'];
+
+app.get('/api/admin/people', authAdmin, (req, res) => {
+  const { q, role } = req.query;
+  let sql = `
+    SELECT p.*, c.name AS customer_name, i.name AS importer_name, a.name AS agent_name
+    FROM people p
+    LEFT JOIN customers c ON c.id = p.customer_id
+    LEFT JOIN importers i ON i.id = p.importer_id
+    LEFT JOIN agents a ON a.id = p.agent_id
+    WHERE 1=1`;
+  const params = [];
+  if (q) { sql += ' AND (p.name LIKE ? OR p.email LIKE ?)'; const like = `%${q}%`; params.push(like, like); }
+  if (role) { sql += ' AND p.roles LIKE ?'; params.push(`%"${role}"%`); }
+  sql += ' ORDER BY p.name';
+  const rows = db.prepare(sql).all(...params);
+  rows.forEach(r => { r.roles = JSON.parse(r.roles || '[]'); r.source_channels = JSON.parse(r.source_channels || '[]'); });
+  res.json(rows);
+});
+
+app.get('/api/admin/people/:id', authAdmin, (req, res) => {
+  const p = db.prepare('SELECT * FROM people WHERE id = ?').get(req.params.id);
+  if (!p) return res.status(404).json({ error: 'Persona non trovata.' });
+  p.roles = JSON.parse(p.roles || '[]');
+  p.source_channels = JSON.parse(p.source_channels || '[]');
+  res.json(p);
+});
+
+app.post('/api/admin/people', authAdmin, (req, res) => {
+  const body = req.body || {};
+  if (!body.name?.trim()) return res.status(400).json({ error: 'Il nome è obbligatorio.' });
+  const cols = ['roles', 'source_channels', 'newsletter_opt_in', 'wine_club'];
+  const values = [
+    JSON.stringify(Array.isArray(body.roles) ? body.roles : []),
+    JSON.stringify(Array.isArray(body.source_channels) ? body.source_channels : []),
+    body.newsletter_opt_in ? 1 : 0,
+    body.wine_club ? 1 : 0,
+  ];
+  for (const f of PEOPLE_FIELDS) {
+    if (body[f] !== undefined && body[f] !== '') { cols.push(f); values.push(typeof body[f] === 'string' ? body[f].trim() : body[f]); }
+  }
+  const placeholders = cols.map(() => '?').join(', ');
+  const result = db.prepare(`INSERT INTO people (${cols.join(', ')}) VALUES (${placeholders})`).run(...values);
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+
+app.patch('/api/admin/people/:id', authAdmin, (req, res) => {
+  const body = req.body || {};
+  const updates = [], params = [];
+  if (body.roles !== undefined) { updates.push('roles = ?'); params.push(JSON.stringify(Array.isArray(body.roles) ? body.roles : [])); }
+  if (body.source_channels !== undefined) { updates.push('source_channels = ?'); params.push(JSON.stringify(Array.isArray(body.source_channels) ? body.source_channels : [])); }
+  if (body.newsletter_opt_in !== undefined) { updates.push('newsletter_opt_in = ?'); params.push(body.newsletter_opt_in ? 1 : 0); }
+  if (body.wine_club !== undefined) { updates.push('wine_club = ?'); params.push(body.wine_club ? 1 : 0); }
+  for (const f of PEOPLE_FIELDS) {
+    if (body[f] !== undefined) { updates.push(`${f} = ?`); params.push(body[f] === '' ? null : body[f]); }
+  }
+  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  params.push(req.params.id);
+  db.prepare(`UPDATE people SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  res.json({ success: true });
+});
+
+app.delete('/api/admin/people/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM people WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
