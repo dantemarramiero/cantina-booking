@@ -3727,12 +3727,15 @@ async function loadPeople() {
   const rows = await api('/api/admin/people' + (params.toString() ? '?' + params.toString() : ''));
   document.getElementById('people-tbody').innerHTML = rows.length ? rows.map(p => {
     const linkedTo = p.customer_name || p.importer_name || p.agent_name;
+    const linkedType = p.customer_name ? 'customer' : (p.importer_name ? 'importer' : (p.agent_name ? 'agent' : null));
+    const linkedId = p.customer_id || p.importer_id || p.agent_id;
+    const linkedHtml = linkedTo ? ` · <span style="cursor:pointer;color:var(--wine)" onclick="openCrmRecord('${linkedType}', ${linkedId})">${esc(linkedTo)}</span>` : '';
     return `
     <div class="list-row">
       <div class="list-row-icon">${esc(p.name).charAt(0).toUpperCase()}</div>
       <div class="list-row-body">
         <div class="list-row-title">${esc(p.name)}</div>
-        <div class="list-row-sub">${esc(p.email) || 'nessuna email'}${linkedTo ? ' · ' + esc(linkedTo) : ''}</div>
+        <div class="list-row-sub">${esc(p.email) || 'nessuna email'}${linkedHtml}</div>
       </div>
       <div class="list-row-meta">
         ${p.roles.map(r => `<span class="pill-stat">${PEOPLE_ROLE_LABELS[r] || r}</span>`).join('')}
@@ -3749,6 +3752,11 @@ async function loadPeople() {
 function togglePersonContactFields() {
   const isContact = document.querySelector('.ppl-role[value="contatto"]').checked;
   document.getElementById('ppl-contact-fields').style.display = isContact ? 'block' : 'none';
+}
+
+async function openPersonById(id) {
+  const p = await api('/api/admin/people/' + id);
+  await openPersonModal(p);
 }
 
 async function openPersonModal(p) {
@@ -4520,12 +4528,13 @@ async function deleteCrmNote(noteId) {
 // ── Contatti ──────────────────────────────────────────────────────────────────
 async function loadCrmContacts() {
   const { type, id } = CRM_CURRENT;
+  const isPeopleBacked = ['customer', 'agent', 'importer'].includes(type);
   const rows = await api(`/api/admin/crm/${type}/${id}/contacts`);
   document.getElementById('crm-contacts-list').innerHTML = rows.length ? rows.map(c => `
     <div class="crm-activity-item">
       <div class="crm-item-top">
         <div>
-          <span class="crm-item-title">${esc(c.name)}</span>
+          <span class="crm-item-title"${isPeopleBacked ? ` style="cursor:pointer;color:var(--wine)" onclick="openPersonById(${c.id})"` : ''}>${esc(c.name)}</span>
           ${c.role ? '<span class="crm-item-meta"> · ' + esc(c.role) + '</span>' : ''}
         </div>
         <div class="crm-item-actions">
