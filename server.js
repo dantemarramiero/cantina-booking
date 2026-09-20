@@ -257,6 +257,9 @@ db.exec(`
 `);
 try { db.exec('ALTER TABLE bookings ADD COLUMN operator_id INTEGER'); } catch {}
 try { db.exec('ALTER TABLE bookings ADD COLUMN b2c_customer_id INTEGER'); } catch {}
+// discount_code_id: collegamento per id a discount_codes, accanto al testo discount_code già esistente
+// (tenuto per compatibilità/visualizzazione — rinominare un codice non deve rompere lo storico).
+try { db.exec('ALTER TABLE bookings ADD COLUMN discount_code_id INTEGER'); } catch {}
 
 // ── Enoturismo: operatori addetti alle visite ─────────────────────────────────
 // Gli operatori selezionabili sono sempre uno specchio degli utenti con accesso al
@@ -1296,7 +1299,10 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) =
       db.prepare("UPDATE bookings SET status = 'confermata', payment_intent_id = ?, stripe_payment_status = 'paid' WHERE id = ?")
         .run(paymentIntentId, bookingId);
       const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
-      if (booking?.discount_code) {
+      if (booking?.discount_code_id) {
+        db.prepare('UPDATE discount_codes SET used_count = used_count + 1 WHERE id = ?').run(booking.discount_code_id);
+      } else if (booking?.discount_code) {
+        // Prenotazioni create prima della migrazione a discount_code_id: fallback per valore.
         db.prepare('UPDATE discount_codes SET used_count = used_count + 1 WHERE code = ?').run(booking.discount_code);
       }
       const full = bookingWithDetails(bookingId);
@@ -1400,11 +1406,13 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
   let amountCents = exp.price_cents * guestCount;
   let discountCents = 0;
+  let discountCodeId = null;
   const codeClean = discount_code?.trim().toUpperCase() || null;
   if (codeClean) {
     const result = validateDiscount(codeClean, amountCents);
     if (!result.valid) return res.status(400).json({ error: result.error || 'Codice sconto non valido.' });
     discountCents = result.discountCents;
+    discountCodeId = result.discount.id;
     amountCents -= discountCents;
   }
 
@@ -1414,9 +1422,9 @@ app.post('/api/create-checkout-session', async (req, res) => {
   const b2cCustomerId = findOrCreateB2CCustomer(customer_name.trim(), emailClean, phone?.trim());
 
   const result = db.prepare(`
-    INSERT INTO bookings (slot_id, experience_id, customer_name, email, phone, guests, language, notes, status, amount_cents, discount_code, discount_cents, b2c_customer_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'in_attesa', ?, ?, ?, ?)
-  `).run(slot.id, exp.id, customer_name.trim(), emailClean, phone?.trim() || null, guestCount, lang, notes?.trim() || null, amountCents, codeClean, discountCents, b2cCustomerId);
+    INSERT INTO bookings (slot_id, experience_id, customer_name, email, phone, guests, language, notes, status, amount_cents, discount_code, discount_code_id, discount_cents, b2c_customer_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'in_attesa', ?, ?, ?, ?, ?)
+  `).run(slot.id, exp.id, customer_name.trim(), emailClean, phone?.trim() || null, guestCount, lang, notes?.trim() || null, amountCents, codeClean, discountCodeId, discountCents, b2cCustomerId);
 
   const bookingId = result.lastInsertRowid;
 
