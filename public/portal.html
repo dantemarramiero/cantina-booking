@@ -2143,11 +2143,6 @@
         <div id="crm-orders-list"></div>
       </div>
 
-      <div class="crm2-list-panel" id="crm2-list-affari" style="display:none">
-        <div class="crm2-list-panel-head"><h2>Affari</h2><button class="btn-generate" style="margin-top:0" onclick="openCrmDealModal()">+ Nuovo affare</button></div>
-        <div id="crm-deals-list"></div>
-      </div>
-
       <div class="crm2-list-panel" id="crm2-list-compiti" style="display:none">
         <div class="crm2-list-panel-head"><h2>Compiti</h2><button class="btn-generate" style="margin-top:0" onclick="openCrmTaskModal()">+ Nuovo compito</button></div>
         <div id="crm-tasks-list"></div>
@@ -2291,35 +2286,6 @@
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('crm-task-modal')">Annulla</button>
       <button class="btn" onclick="saveCrmTask()">Salva</button>
-    </div>
-  </div>
-</div>
-
-<!-- CRM: deal modal -->
-<div class="modal-overlay" id="crm-deal-modal">
-  <div class="modal-box">
-    <h3>Nuovo affare</h3>
-    <div id="crm-deal-modal-msg"></div>
-    <input type="hidden" id="crm-deal-id">
-    <div class="field"><label>Nome affare</label><input id="crm-deal-name"></div>
-    <div class="field-row">
-      <div class="field"><label>Valore stimato (€)</label><input type="number" id="crm-deal-value" step="0.01"></div>
-      <div class="field"><label>Chiusura prevista</label><input type="date" id="crm-deal-close-date"></div>
-    </div>
-    <div class="field"><label>Fase</label>
-      <select id="crm-deal-stage">
-        <option value="nuovo">Nuovo</option>
-        <option value="qualificato">Qualificato</option>
-        <option value="proposta">Proposta inviata</option>
-        <option value="negoziazione">Negoziazione</option>
-        <option value="vinto">Vinto</option>
-        <option value="perso">Perso</option>
-      </select>
-    </div>
-    <div class="field"><label>Note</label><textarea id="crm-deal-notes" rows="2"></textarea></div>
-    <div class="modal-actions">
-      <button class="btn secondary" onclick="closeModal('crm-deal-modal')">Annulla</button>
-      <button class="btn" onclick="saveCrmDeal()">Salva</button>
     </div>
   </div>
 </div>
@@ -4060,7 +4026,6 @@ function jsonAttrP(obj) { return JSON.stringify(obj).replace(/'/g, '&#39;'); }
 
 const CRM_ENDPOINT_MAP = { customer: 'customers', agent: 'agents', importer: 'importers', supplier: 'suppliers', person: 'people' };
 const CRM_SUBPANEL_MAP = { customer: 'crm-clienti', agent: 'crm-agenti', importer: 'crm-importatori', supplier: 'crm-fornitori', person: 'crm-persone' };
-const CRM_DEAL_STAGE_LABELS = { nuovo: 'Nuovo', qualificato: 'Qualificato', proposta: 'Proposta inviata', negoziazione: 'Negoziazione', vinto: 'Vinto', perso: 'Perso' };
 const CRM_EDIT_FN_MAP = { customer: 'openCustomerModal', importer: 'openImporterModal', supplier: 'openSupplierModal', agent: 'openAgentModal', person: 'openPersonModal' };
 const CRM_LIST_LABEL_MAP = { customer: 'Clienti', agent: 'Agenti', importer: 'Importatori', supplier: 'Fornitori', person: 'Contatti' };
 const CRM_SINCE_LABEL = { customer: 'Cliente', agent: 'Agente', importer: 'Importatore', supplier: 'Fornitore', person: 'In anagrafica' };
@@ -4324,7 +4289,6 @@ function renderCrm2Index() {
   }
   if (type === 'customer' || type === 'agent') items.push({ key: 'ordini', label: 'Ordini', count: d.order_count ?? d.orderCount });
   if (type === 'customer' || type === 'agent' || type === 'importer') items.push({ key: 'bottiglie', label: 'Bottiglie' });
-  if (type !== 'agent') items.push({ key: 'affari', label: 'Affari', count: d.deals_count });
   items.push({ key: 'compiti', label: 'Compiti', count: d.open_tasks_count });
   if (type === 'agent') items.push({ key: 'clienti-seguiti', label: 'Clienti seguiti' });
   items.push({ key: 'documenti', label: 'Documenti', count: d.documents_count });
@@ -4339,7 +4303,7 @@ function crmSetActiveSection(section) {
   document.querySelectorAll('#crm2-index button').forEach(b => b.classList.toggle('active', b.dataset.section === section));
   const isAnagrafica = CRM_ANAGRAFICA_SECTIONS.includes(section);
   document.getElementById('crm2-anagrafica').style.display = isAnagrafica ? 'block' : 'none';
-  ['contatti', 'ordini', 'bottiglie', 'affari', 'compiti', 'documenti', 'clienti-seguiti', 'transazioni'].forEach(k => {
+  ['contatti', 'ordini', 'bottiglie', 'compiti', 'documenti', 'clienti-seguiti', 'transazioni'].forEach(k => {
     const el = document.getElementById('crm2-list-' + k);
     if (el) el.style.display = k === section ? 'block' : 'none';
   });
@@ -4349,7 +4313,6 @@ function crmSetActiveSection(section) {
   else if (section === 'contatti') loadCrmContacts();
   else if (section === 'ordini') loadCrmOrders();
   else if (section === 'bottiglie') loadCrmBottiglieInit();
-  else if (section === 'affari') loadCrmDeals();
   else if (section === 'compiti') loadCrmTasks();
   else if (section === 'documenti') loadCrmAttachments();
   else if (section === 'clienti-seguiti') loadCrmTrackedCustomers();
@@ -4821,60 +4784,6 @@ async function toggleCrmTaskStatus(taskId, status) {
 async function deleteCrmTask(taskId) {
   await api('/api/admin/crm/tasks/' + taskId, { method: 'DELETE' });
   loadCrmTasks();
-}
-
-// ── Affari ────────────────────────────────────────────────────────────────────
-async function loadCrmDeals() {
-  const { type, id } = CRM_CURRENT;
-  const rows = await api(`/api/admin/crm/${type}/${id}/deals`);
-  document.getElementById('crm-deals-list').innerHTML = rows.length ? rows.map(dl => `
-    <div class="crm-activity-item">
-      <div class="crm-item-top">
-        <span class="crm-item-title">${esc(dl.name)} — € ${fmtEuro(dl.value_cents)}</span>
-        <div class="crm-item-actions">
-          <select onchange="updateCrmDealStage(${dl.id}, this.value)" style="padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:11.5px">
-            ${Object.entries(CRM_DEAL_STAGE_LABELS).map(([v, l]) => `<option value="${v}" ${dl.stage === v ? 'selected' : ''}>${l}</option>`).join('')}
-          </select>
-          <button class="btn-outline-pill danger" onclick="deleteCrmDeal(${dl.id})">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-          </button>
-        </div>
-      </div>
-      <span class="crm-item-meta">${dl.expected_close_date ? 'chiusura prevista ' + dl.expected_close_date : ''}</span>
-      ${dl.notes ? `<div class="crm-item-body">${esc(dl.notes)}</div>` : ''}
-    </div>
-  `).join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessun affare.</p>';
-}
-function openCrmDealModal() {
-  document.getElementById('crm-deal-modal-msg').innerHTML = '';
-  document.getElementById('crm-deal-id').value = '';
-  document.getElementById('crm-deal-name').value = '';
-  document.getElementById('crm-deal-value').value = '';
-  document.getElementById('crm-deal-close-date').value = '';
-  document.getElementById('crm-deal-stage').value = 'nuovo';
-  document.getElementById('crm-deal-notes').value = '';
-  openModal('crm-deal-modal');
-}
-async function saveCrmDeal() {
-  const { type, id } = CRM_CURRENT;
-  const name = document.getElementById('crm-deal-name').value.trim();
-  if (!name) { document.getElementById('crm-deal-modal-msg').innerHTML = '<div class="msg error">Il nome è obbligatorio.</div>'; return; }
-  const value = document.getElementById('crm-deal-value').value;
-  await api(`/api/admin/crm/${type}/${id}/deals`, { method: 'POST', body: JSON.stringify({
-    name, value_cents: value ? Math.round(parseFloat(value) * 100) : 0,
-    stage: document.getElementById('crm-deal-stage').value,
-    expected_close_date: document.getElementById('crm-deal-close-date').value || null,
-    notes: document.getElementById('crm-deal-notes').value.trim(),
-  }) });
-  closeModal('crm-deal-modal');
-  loadCrmDeals();
-}
-async function updateCrmDealStage(dealId, stage) {
-  await api('/api/admin/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ stage }) });
-}
-async function deleteCrmDeal(dealId) {
-  await api('/api/admin/crm/deals/' + dealId, { method: 'DELETE' });
-  loadCrmDeals();
 }
 
 // ── Email (log manuale) ───────────────────────────────────────────────────────
