@@ -207,6 +207,20 @@
   .exp-avail-row select, .exp-avail-row input { padding: 8px 9px; border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; background: #fff; color: var(--ink); font-family: var(--sans); }
   .exp-avail-row button { width: 28px; height: 28px; border: 1px solid var(--line); background: #fff; border-radius: 7px; color: var(--bad); cursor: pointer; }
   @media (max-width: 640px) { .exp-avail-row { grid-template-columns: 1fr 1fr; } }
+  .cassa-layout { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .cassa-layout { grid-template-columns: 1fr; } }
+  .cassa-products { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; max-height: 560px; overflow-y: auto; padding-right: 4px; }
+  .cassa-product-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #fff; cursor: pointer; transition: border-color .15s; }
+  .cassa-product-card:hover { border-color: var(--wine); }
+  .cassa-product-card.out-of-stock { opacity: .5; }
+  .cassa-product-card .name { font-weight: 600; font-size: 13px; margin-bottom: 3px; }
+  .cassa-product-card .meta { font-size: 11.5px; color: var(--ink-soft); }
+  .cassa-cart-box { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: #fff; position: sticky; top: 0; }
+  .cassa-cart-row { display: grid; grid-template-columns: 1fr 54px 74px 74px 26px; gap: 6px; align-items: center; margin-bottom: 8px; font-size: 12.5px; }
+  .cassa-cart-row input { width: 100%; padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; font-size: 12.5px; font-family: var(--sans); }
+  .cassa-cart-row button { border: none; background: none; color: var(--bad); cursor: pointer; font-size: 16px; line-height: 1; }
+  .cassa-empty-cart { font-size: 12.5px; color: var(--ink-soft); text-align: center; padding: 20px 0; }
+  .cassa-total-row { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; margin-top: 10px; border-top: 1px solid var(--line); font-weight: 700; font-size: 15px; }
   .segmented { display: inline-flex; background: #f2ede3; border-radius: 999px; padding: 3px; gap: 2px; flex-shrink: 0; }
   .segmented button { border: none; background: none; padding: 7px 15px; border-radius: 999px; font-size: 12.5px; font-weight: 500; color: var(--ink-soft); cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
   .segmented button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(56,17,18,0.1); font-weight: 600; }
@@ -491,6 +505,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><path d="M9 10h.01M15 10h.01"/></svg>
         Eventi terzi
       </button>
+      <button data-tab="cassa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+        Cassa
+      </button>
       <button data-tab="calendar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
         Calendario
@@ -607,6 +625,62 @@
       <div class="table-wrap">
         <table><thead><tr><th>Data</th><th>Evento</th><th>Organizzatore</th><th>Ospiti</th><th>Tariffa</th><th>Acconto</th><th>Stato</th><th>Azioni</th></tr></thead>
         <tbody id="venue-events-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- CASSA (negozio fisico) -->
+    <div class="panel" id="panel-cassa">
+      <p style="margin:0 0 16px;font-size:12.5px;color:var(--ink-soft)">Vendita diretta in cantina. Seleziona le bottiglie, imposta quantità e prezzo, registra il pagamento — la vendita confluisce nel CRM Clienti finali.</p>
+      <div class="cassa-layout">
+        <div>
+          <div class="exp-toolbar" style="margin-bottom:14px">
+            <div class="search-input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="cassa-product-search" placeholder="Cerca bottiglia..." oninput="renderCassaProducts()">
+            </div>
+            <div class="list-spacer"></div>
+            <div class="field" style="margin:0;min-width:200px">
+              <select id="cassa-price-list" onchange="renderCassaProducts()"></select>
+            </div>
+          </div>
+          <div class="cassa-products" id="cassa-products"></div>
+        </div>
+        <div class="cassa-cart-box">
+          <h3 style="font-size:15px;margin-bottom:12px">Carrello</h3>
+          <div id="cassa-cart-rows"></div>
+          <div class="cassa-total-row"><span>Totale</span><span id="cassa-total">€ 0,00</span></div>
+          <div id="cassa-modal-msg" style="margin-top:10px"></div>
+          <div class="field" style="margin-top:14px"><label>Nome cliente</label><input id="cassa-customer-name"></div>
+          <div class="field-row">
+            <div class="field"><label>Email</label><input type="email" id="cassa-customer-email"></div>
+            <div class="field"><label>Telefono</label><input id="cassa-customer-phone"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Contesto vendita</label>
+              <select id="cassa-context">
+                <option value="negozio">Negozio</option>
+                <option value="post_visita">Post visita</option>
+                <option value="post_evento">Post evento</option>
+              </select>
+            </div>
+            <div class="field"><label>Pagamento</label>
+              <select id="cassa-payment">
+                <option value="contanti">Contanti</option>
+                <option value="carta">Carta</option>
+                <option value="altro">Altro</option>
+              </select>
+            </div>
+          </div>
+          <div class="field"><label>Sconto (€)</label><input type="number" step="0.01" id="cassa-discount" value="0" oninput="renderCassaCart()"></div>
+          <div class="field"><label>Note</label><input id="cassa-notes"></div>
+          <button class="btn" style="width:100%;margin-top:6px" onclick="registerCassaSale()">Registra vendita</button>
+        </div>
+      </div>
+
+      <h3 style="font-size:15px;margin:26px 0 12px">Vendite recenti</h3>
+      <div class="table-wrap">
+        <table><thead><tr><th>Data</th><th>Cliente</th><th>Contesto</th><th>Pagamento</th><th>Articoli</th><th>Totale</th><th>Azioni</th></tr></thead>
+        <tbody id="cassa-sales-tbody"></tbody></table>
       </div>
     </div>
 
@@ -1232,7 +1306,7 @@ function closeMobileSidebar() {
 }
 
 // ── Tabs (sidebar) ──────────────────────────────────────────────────────────────
-const TAB_TITLES = { dashboard: 'Dashboard', experiences: 'Esperienze', events: 'Eventi proprietari', 'venue-events': 'Eventi terzi', calendar: 'Calendario', bookings: 'Prenotazioni', discounts: 'Codici Sconto', reviews: 'Recensioni', newsletter: 'Newsletter', operators: 'Operatori', crm: 'CRM' };
+const TAB_TITLES = { dashboard: 'Dashboard', experiences: 'Esperienze', events: 'Eventi proprietari', 'venue-events': 'Eventi terzi', cassa: 'Cassa', calendar: 'Calendario', bookings: 'Prenotazioni', discounts: 'Codici Sconto', reviews: 'Recensioni', newsletter: 'Newsletter', operators: 'Operatori', crm: 'CRM' };
 document.querySelectorAll('.sidebar-nav button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.sidebar-nav button').forEach(b => b.classList.remove('active'));
@@ -1264,6 +1338,7 @@ function loadPanel(tab) {
   if (tab === 'experiences') loadExperiences();
   if (tab === 'events') loadEvents();
   if (tab === 'venue-events') loadVenueEvents();
+  if (tab === 'cassa') loadCassa();
   if (tab === 'calendar') { loadExperiencesForSelects(); loadSlots(); renderCalendar(); }
   if (tab === 'bookings') loadBookings();
   if (tab === 'discounts') loadDiscounts();
@@ -2201,6 +2276,142 @@ async function deleteVenueEvent(id) {
   if (!confirm('Eliminare questo evento terzi?')) return;
   await api('/api/admin/venue-events/' + id, { method: 'DELETE' });
   loadVenueEvents();
+}
+
+// ── Cassa (negozio fisico) ──────────────────────────────────────────────────────
+let CASSA_PRODUCTS = [];
+let CASSA_PRICE_LISTS = [];
+let CASSA_CART = [];
+const CASSA_CONTEXT_LABELS = { negozio: 'Negozio', post_visita: 'Post visita', post_evento: 'Post evento' };
+const CASSA_PAYMENT_LABELS = { contanti: 'Contanti', carta: 'Carta', altro: 'Altro' };
+
+async function loadCassa() {
+  document.getElementById('cassa-modal-msg').innerHTML = '';
+  [CASSA_PRODUCTS, CASSA_PRICE_LISTS] = await Promise.all([
+    api('/api/admin/products'),
+    api('/api/admin/price-lists'),
+  ]);
+  const sel = document.getElementById('cassa-price-list');
+  const prevValue = sel.value;
+  sel.innerHTML = CASSA_PRICE_LISTS.map(pl => `<option value="${pl.id}">${esc(pl.name)}</option>`).join('');
+  if (prevValue && CASSA_PRICE_LISTS.some(pl => String(pl.id) === prevValue)) sel.value = prevValue;
+  renderCassaProducts();
+  renderCassaCart();
+  loadCassaSales();
+}
+
+function cassaPriceFor(productId) {
+  const listId = parseInt(document.getElementById('cassa-price-list').value);
+  const list = CASSA_PRICE_LISTS.find(pl => pl.id === listId);
+  const item = list?.items.find(i => i.product_id === productId);
+  return item ? item.price_cents : 0;
+}
+
+function renderCassaProducts() {
+  const q = document.getElementById('cassa-product-search').value.trim().toLowerCase();
+  const rows = CASSA_PRODUCTS.filter(p => p.active && (!q || p.name.toLowerCase().includes(q) || (p.vintage || '').includes(q)));
+  document.getElementById('cassa-products').innerHTML = rows.length ? rows.map(p => {
+    const outOfStock = p.stock_quantity != null && p.stock_quantity <= 0;
+    return `
+    <div class="cassa-product-card ${outOfStock ? 'out-of-stock' : ''}" onclick="addToCassaCart(${p.id})">
+      <div class="name">${esc(p.name)}${p.vintage ? ' ' + esc(p.vintage) : ''}</div>
+      <div class="meta">€ ${fmtEuro(cassaPriceFor(p.id))}${p.stock_quantity != null ? ' · ' + p.stock_quantity + ' disp.' : ''}</div>
+    </div>
+  `;
+  }).join('') : '<p class="cassa-empty-cart">Nessuna bottiglia trovata.</p>';
+}
+
+function addToCassaCart(productId) {
+  const p = CASSA_PRODUCTS.find(x => x.id === productId);
+  if (!p) return;
+  const existing = CASSA_CART.find(r => r.product_id === productId);
+  if (existing) { existing.quantity += 1; }
+  else CASSA_CART.push({ product_id: p.id, product_name: p.name + (p.vintage ? ' ' + p.vintage : ''), quantity: 1, unit_price_cents: cassaPriceFor(productId), stock_quantity: p.stock_quantity });
+  renderCassaCart();
+}
+
+function renderCassaCart() {
+  const box = document.getElementById('cassa-cart-rows');
+  if (!CASSA_CART.length) {
+    box.innerHTML = '<p class="cassa-empty-cart">Carrello vuoto. Seleziona una bottiglia per iniziare.</p>';
+  } else {
+    box.innerHTML = CASSA_CART.map((r, i) => `
+      <div class="cassa-cart-row">
+        <span>${esc(r.product_name)}</span>
+        <input type="number" min="1" value="${r.quantity}" onchange="updateCassaCartField(${i}, 'quantity', this.value)">
+        <input type="number" step="0.01" value="${(r.unit_price_cents / 100).toFixed(2)}" onchange="updateCassaCartField(${i}, 'price', this.value)">
+        <span>€ ${fmtEuro(r.quantity * r.unit_price_cents)}</span>
+        <button type="button" onclick="removeCassaCartRow(${i})">×</button>
+      </div>
+    `).join('');
+  }
+  const itemsTotal = CASSA_CART.reduce((sum, r) => sum + r.quantity * r.unit_price_cents, 0);
+  const discountCents = Math.round((parseFloat(document.getElementById('cassa-discount').value) || 0) * 100);
+  const total = Math.max(0, itemsTotal - discountCents);
+  document.getElementById('cassa-total').textContent = '€ ' + fmtEuro(total);
+}
+
+function updateCassaCartField(index, field, value) {
+  const row = CASSA_CART[index];
+  if (!row) return;
+  if (field === 'quantity') row.quantity = Math.max(1, parseInt(value) || 1);
+  if (field === 'price') row.unit_price_cents = Math.round((parseFloat(value) || 0) * 100);
+  renderCassaCart();
+}
+
+function removeCassaCartRow(index) {
+  CASSA_CART.splice(index, 1);
+  renderCassaCart();
+}
+
+async function registerCassaSale() {
+  const msg = document.getElementById('cassa-modal-msg');
+  msg.innerHTML = '';
+  if (!CASSA_CART.length) { msg.innerHTML = '<div class="msg error">Aggiungi almeno una bottiglia al carrello.</div>'; return; }
+  const body = {
+    customer_name: document.getElementById('cassa-customer-name').value.trim(),
+    customer_email: document.getElementById('cassa-customer-email').value.trim(),
+    customer_phone: document.getElementById('cassa-customer-phone').value.trim(),
+    sale_context: document.getElementById('cassa-context').value,
+    payment_method: document.getElementById('cassa-payment').value,
+    discount_cents: Math.round((parseFloat(document.getElementById('cassa-discount').value) || 0) * 100),
+    notes: document.getElementById('cassa-notes').value.trim(),
+    items: CASSA_CART.map(r => ({ product_id: r.product_id, product_name: r.product_name, quantity: r.quantity, unit_price_cents: r.unit_price_cents })),
+  };
+  try {
+    await api('/api/admin/shop-sales', { method: 'POST', body: JSON.stringify(body) });
+    CASSA_CART = [];
+    document.getElementById('cassa-customer-name').value = '';
+    document.getElementById('cassa-customer-email').value = '';
+    document.getElementById('cassa-customer-phone').value = '';
+    document.getElementById('cassa-discount').value = '0';
+    document.getElementById('cassa-notes').value = '';
+    msg.innerHTML = '<div class="msg success">Vendita registrata.</div>';
+    await loadCassa();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+async function loadCassaSales() {
+  const sales = await api('/api/admin/shop-sales');
+  document.getElementById('cassa-sales-tbody').innerHTML = sales.length ? sales.map(s => `
+    <tr>
+      <td>${s.created_at}</td>
+      <td>${esc(s.customer_name || '—')}</td>
+      <td>${CASSA_CONTEXT_LABELS[s.sale_context] || s.sale_context}</td>
+      <td>${CASSA_PAYMENT_LABELS[s.payment_method] || s.payment_method}</td>
+      <td>${s.items_count}</td>
+      <td>€ ${fmtEuro(s.total_cents)}</td>
+      <td class="actions-cell"><button class="btn small danger" onclick="voidCassaSale(${s.id})">Annulla</button></td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" class="empty">Nessuna vendita registrata.</td></tr>';
+}
+
+async function voidCassaSale(id) {
+  if (!confirm('Annullare questa vendita? Le giacenze scalate verranno ripristinate.')) return;
+  await api('/api/admin/shop-sales/' + id, { method: 'DELETE' });
+  await loadCassa();
 }
 
 // ── Reviews ───────────────────────────────────────────────────────────────────

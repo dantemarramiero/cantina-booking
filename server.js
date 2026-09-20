@@ -276,6 +276,37 @@ db.exec(`
   )
 `);
 
+// ── Enoturismo: negozio fisico (cassa) ─────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS shop_sales (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_name    TEXT,
+    customer_email   TEXT,
+    customer_phone   TEXT,
+    b2c_customer_id  INTEGER,
+    sale_context     TEXT NOT NULL DEFAULT 'negozio',
+    payment_method   TEXT NOT NULL DEFAULT 'contanti',
+    discount_cents   INTEGER NOT NULL DEFAULT 0,
+    total_cents      INTEGER NOT NULL DEFAULT 0,
+    operator_id      INTEGER,
+    notes            TEXT,
+    created_at       TEXT DEFAULT (datetime('now','localtime')),
+    FOREIGN KEY (b2c_customer_id) REFERENCES b2c_customers(id)
+  )
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS shop_sale_items (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    sale_id           INTEGER NOT NULL,
+    product_id        INTEGER,
+    product_name      TEXT NOT NULL,
+    quantity          INTEGER NOT NULL,
+    unit_price_cents  INTEGER NOT NULL,
+    line_total_cents  INTEGER NOT NULL,
+    FOREIGN KEY (sale_id) REFERENCES shop_sales(id)
+  )
+`);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS discount_codes (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -328,6 +359,8 @@ db.exec(`
   )
 `);
 try { db.exec('ALTER TABLE products ADD COLUMN wine_type TEXT'); } catch {}
+// stock_quantity: giacenza per la vendita diretta (cassa negozio fisico). NULL = scorte non tracciate per questa bottiglia.
+try { db.exec('ALTER TABLE products ADD COLUMN stock_quantity INTEGER'); } catch {}
 
 // ── ERP: listini ──────────────────────────────────────────────────────────────
 db.exec(`
@@ -1825,6 +1858,80 @@ app.get('/api/admin/venue-events/conflicts/:date', authAdmin, (req, res) => {
   res.json(rows);
 });
 
+// ── Enoturismo: negozio fisico (cassa) ─────────────────────────────────────────
+const SHOP_SALE_CONTEXTS = ['negozio', 'post_visita', 'post_evento'];
+const SHOP_PAYMENT_METHODS = ['contanti', 'carta', 'altro'];
+
+app.get('/api/admin/shop-sales', authAdmin, (req, res) => {
+  const { from, to, context } = req.query;
+  let sql = `
+    SELECT s.*, (SELECT COUNT(*) FROM shop_sale_items i WHERE i.sale_id = s.id) AS items_count
+    FROM shop_sales s WHERE 1=1
+  `;
+  const params = [];
+  if (from) { sql += ' AND date(s.created_at) >= date(?)'; params.push(from); }
+  if (to) { sql += ' AND date(s.created_at) <= date(?)'; params.push(to); }
+  if (context && SHOP_SALE_CONTEXTS.includes(context)) { sql += ' AND s.sale_context = ?'; params.push(context); }
+  sql += ' ORDER BY s.created_at DESC, s.id DESC';
+  res.json(db.prepare(sql).all(...params));
+});
+
+app.get('/api/admin/shop-sales/:id', authAdmin, (req, res) => {
+  const sale = db.prepare('SELECT * FROM shop_sales WHERE id = ?').get(req.params.id);
+  if (!sale) return res.status(404).json({ error: 'Vendita non trovata.' });
+  sale.items = db.prepare('SELECT * FROM shop_sale_items WHERE sale_id = ? ORDER BY id').all(sale.id);
+  res.json(sale);
+});
+
+app.post('/api/admin/shop-sales', authAdmin, (req, res) => {
+  const { customer_name, customer_email, customer_phone, sale_context, payment_method, discount_cents, notes, operator_id, items } = req.body || {};
+  if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'Aggiungi almeno una bottiglia alla vendita.' });
+  for (const it of items) {
+    if (!it.product_name?.trim() || !it.quantity || it.quantity < 1) return res.status(400).json({ error: 'Riga vendita non valida.' });
+  }
+  const context = SHOP_SALE_CONTEXTS.includes(sale_context) ? sale_context : 'negozio';
+  const method = SHOP_PAYMENT_METHODS.includes(payment_method) ? payment_method : 'contanti';
+  const emailClean = customer_email?.trim().toLowerCase() || null;
+
+  let b2cCustomerId = null;
+  if (emailClean) {
+    b2cCustomerId = findOrCreateB2CCustomer(customer_name?.trim() || emailClean, emailClean, customer_phone?.trim() || null);
+  } else if (customer_name?.trim()) {
+    b2cCustomerId = db.prepare('INSERT INTO b2c_customers (name, phone) VALUES (?, ?)').run(customer_name.trim(), customer_phone?.trim() || null).lastInsertRowid;
+  }
+
+  const itemsTotal = items.reduce((sum, it) => sum + (it.quantity * it.unit_price_cents), 0);
+  const discount = Math.max(0, parseInt(discount_cents) || 0);
+  const total = Math.max(0, itemsTotal - discount);
+
+  const saleResult = db.prepare(`
+    INSERT INTO shop_sales (customer_name, customer_email, customer_phone, b2c_customer_id, sale_context, payment_method, discount_cents, total_cents, operator_id, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    customer_name?.trim() || null, emailClean, customer_phone?.trim() || null, b2cCustomerId || null,
+    context, method, discount, total, operator_id || null, notes?.trim() || null
+  );
+  const saleId = saleResult.lastInsertRowid;
+
+  const insertItem = db.prepare('INSERT INTO shop_sale_items (sale_id, product_id, product_name, quantity, unit_price_cents, line_total_cents) VALUES (?, ?, ?, ?, ?, ?)');
+  const decrementStock = db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ? AND stock_quantity IS NOT NULL');
+  for (const it of items) {
+    insertItem.run(saleId, it.product_id || null, it.product_name.trim(), it.quantity, it.unit_price_cents || 0, it.quantity * (it.unit_price_cents || 0));
+    if (it.product_id) decrementStock.run(it.quantity, it.product_id);
+  }
+
+  res.json({ success: true, id: saleId });
+});
+
+app.delete('/api/admin/shop-sales/:id', authAdmin, (req, res) => {
+  const items = db.prepare('SELECT * FROM shop_sale_items WHERE sale_id = ?').all(req.params.id);
+  const restoreStock = db.prepare('UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ? AND stock_quantity IS NOT NULL');
+  for (const it of items) if (it.product_id) restoreStock.run(it.quantity, it.product_id);
+  db.prepare('DELETE FROM shop_sale_items WHERE sale_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM shop_sales WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
 // ── CRM B2C: clienti (visitatori + negozio + e-commerce) ──────────────────────
 app.get('/api/admin/b2c-customers', authAdmin, (req, res) => {
   const { q } = req.query;
@@ -2036,14 +2143,14 @@ app.get('/api/admin/products', authAdmin, (req, res) => {
 });
 
 app.post('/api/admin/products', authAdmin, upload.single('image'), (req, res) => {
-  const { sku, name, vintage, varietal, description, wine_type } = req.body || {};
+  const { sku, name, vintage, varietal, description, wine_type, stock_quantity } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'Il nome della bottiglia è obbligatorio.' });
   const image_url = req.file ? `/uploads/products/${req.file.filename}` : null;
   try {
     const result = db.prepare(`
-      INSERT INTO products (sku, name, vintage, varietal, description, image_url, wine_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(sku?.trim() || null, name.trim(), vintage?.trim() || null, varietal?.trim() || null, description?.trim() || null, image_url, wine_type || null);
+      INSERT INTO products (sku, name, vintage, varietal, description, image_url, wine_type, stock_quantity)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(sku?.trim() || null, name.trim(), vintage?.trim() || null, varietal?.trim() || null, description?.trim() || null, image_url, wine_type || null, stock_quantity === '' || stock_quantity === undefined ? null : parseInt(stock_quantity));
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (e) {
     res.status(409).json({ error: 'SKU già esistente.' });
@@ -2051,10 +2158,13 @@ app.post('/api/admin/products', authAdmin, upload.single('image'), (req, res) =>
 });
 
 app.patch('/api/admin/products/:id', authAdmin, upload.single('image'), (req, res) => {
-  const fields = ['sku', 'name', 'vintage', 'varietal', 'description', 'active', 'wine_type'];
+  const fields = ['sku', 'name', 'vintage', 'varietal', 'description', 'active', 'wine_type', 'stock_quantity'];
   const updates = [], params = [];
   for (const f of fields) {
-    if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }
+    if (req.body[f] !== undefined) {
+      updates.push(`${f} = ?`);
+      params.push(f === 'stock_quantity' && req.body[f] === '' ? null : req.body[f]);
+    }
   }
   if (req.file) { updates.push('image_url = ?'); params.push(`/uploads/products/${req.file.filename}`); }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
