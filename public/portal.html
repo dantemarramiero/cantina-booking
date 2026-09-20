@@ -723,7 +723,7 @@
       </button>
       <button data-sub="crm-persone">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"/></svg>
-        Persone
+        Contatti
       </button>
       <button data-sub="crm-clienti">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
@@ -1063,7 +1063,7 @@
           <div class="list-toolbar">
             <div class="search-input">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" id="people-search" placeholder="Cerca persona" oninput="loadPeople()">
+              <input type="text" id="people-search" placeholder="Cerca contatto" oninput="loadPeople()">
             </div>
             <select id="people-role-filter" onchange="loadPeople()" style="padding:9px 30px 9px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:13px">
               <option value="">Tutti i ruoli</option>
@@ -1074,7 +1074,7 @@
             <div class="list-spacer"></div>
             <button class="btn-generate" onclick="openPersonModal()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
-              Nuova persona
+              Nuovo contatto
             </button>
           </div>
           <div class="list-rows" id="people-tbody"></div>
@@ -1527,7 +1527,7 @@
 <!-- Person modal -->
 <div class="modal-overlay" id="people-modal">
   <div class="modal-box" style="max-width:560px">
-    <h3 id="people-modal-title">Nuova persona</h3>
+    <h3 id="people-modal-title">Nuovo contatto</h3>
     <div id="people-modal-msg"></div>
     <input type="hidden" id="ppl-id">
     <div class="field-row">
@@ -2251,7 +2251,16 @@
     <input type="hidden" id="crm-contact-id">
     <div class="field-row">
       <div class="field"><label>Nome e cognome</label><input id="crm-contact-name"></div>
-      <div class="field"><label>Ruolo</label><input id="crm-contact-role" placeholder="es. Responsabile acquisti"></div>
+      <div class="field"><label>Ruolo</label>
+        <select id="crm-contact-role">
+          <option value="">— Nessuno —</option>
+          <option value="titolare">Titolare</option>
+          <option value="maitre">Maitre</option>
+          <option value="cameriere">Cameriere</option>
+          <option value="commerciale">Commerciale</option>
+          <option value="referente">Referente</option>
+        </select>
+      </div>
     </div>
     <div class="field-row">
       <div class="field"><label>Email</label><input type="email" id="crm-contact-email"></div>
@@ -3675,7 +3684,7 @@ async function loadPeople() {
       </div>
     </div>
   `;
-  }).join('') : '<div class="list-empty">Nessuna persona trovata.</div>';
+  }).join('') : '<div class="list-empty">Nessun contatto trovato.</div>';
 }
 
 function togglePersonContactFields() {
@@ -3685,7 +3694,7 @@ function togglePersonContactFields() {
 
 async function openPersonModal(p) {
   document.getElementById('people-modal-msg').innerHTML = '';
-  document.getElementById('people-modal-title').textContent = p ? 'Modifica persona' : 'Nuova persona';
+  document.getElementById('people-modal-title').textContent = p ? 'Modifica contatto' : 'Nuovo contatto';
   document.getElementById('ppl-id').value = p ? p.id : '';
   document.getElementById('ppl-name').value = p ? p.name : '';
   document.getElementById('ppl-email').value = p ? (p.email || '') : '';
@@ -3744,7 +3753,7 @@ async function savePerson() {
 }
 
 async function deletePerson(id) {
-  if (!confirm('Eliminare questa persona?')) return;
+  if (!confirm('Eliminare questo contatto?')) return;
   await api('/api/admin/people/' + id, { method: 'DELETE' });
   loadPeople();
 }
@@ -4370,7 +4379,7 @@ async function saveCrmContact() {
     notes: document.getElementById('crm-contact-notes').value.trim(),
   };
   try {
-    if (contactId) await api('/api/admin/crm/contacts/' + contactId, { method: 'PATCH', body: JSON.stringify(body) });
+    if (contactId) await api(`/api/admin/crm/${type}/contacts/${contactId}`, { method: 'PATCH', body: JSON.stringify(body) });
     else await api(`/api/admin/crm/${type}/${id}/contacts`, { method: 'POST', body: JSON.stringify(body) });
     closeModal('crm-contact-modal');
     loadCrmContacts();
@@ -4381,7 +4390,8 @@ async function saveCrmContact() {
 
 async function deleteCrmContact(contactId) {
   if (!confirm('Eliminare questo contatto?')) return;
-  await api('/api/admin/crm/contacts/' + contactId, { method: 'DELETE' });
+  const { type } = CRM_CURRENT;
+  await api(`/api/admin/crm/${type}/contacts/${contactId}`, { method: 'DELETE' });
   loadCrmContacts();
 }
 

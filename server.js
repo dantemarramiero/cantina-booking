@@ -260,6 +260,9 @@ try { db.exec('ALTER TABLE bookings ADD COLUMN b2c_customer_id INTEGER'); } catc
 // discount_code_id: collegamento per id a discount_codes, accanto al testo discount_code già esistente
 // (tenuto per compatibilità/visualizzazione — rinominare un codice non deve rompere lo storico).
 try { db.exec('ALTER TABLE bookings ADD COLUMN discount_code_id INTEGER'); } catch {}
+// person_id: collegamento alla nuova anagrafica unica Persone (CRM). b2c_customer_id resta
+// per lo storico pre-migrazione; da qui in avanti le nuove prenotazioni valorizzano person_id.
+try { db.exec('ALTER TABLE bookings ADD COLUMN person_id INTEGER'); } catch {}
 
 // ── Enoturismo: operatori addetti alle visite ─────────────────────────────────
 // Gli operatori selezionabili sono sempre uno specchio degli utenti con accesso al
@@ -302,6 +305,9 @@ db.exec(`
     created_at        TEXT DEFAULT (datetime('now','localtime'))
   )
 `);
+// person_id: l'organizzatore collegato alla nuova anagrafica Persone (ruolo cliente_evento).
+// crm_customer_id resta l'aggancio riservato originario, ormai non più usato.
+try { db.exec('ALTER TABLE venue_events ADD COLUMN person_id INTEGER'); } catch {}
 
 // ── Enoturismo: CRM B2C (visitatori, clienti negozio/e-commerce) ──────────────
 db.exec(`
@@ -346,6 +352,7 @@ db.exec(`
     FOREIGN KEY (b2c_customer_id) REFERENCES b2c_customers(id)
   )
 `);
+try { db.exec('ALTER TABLE shop_sales ADD COLUMN person_id INTEGER'); } catch {}
 db.exec(`
   CREATE TABLE IF NOT EXISTS shop_sale_items (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -380,6 +387,7 @@ db.exec(`
     FOREIGN KEY (b2c_customer_id) REFERENCES b2c_customers(id)
   )
 `);
+try { db.exec('ALTER TABLE pickup_orders ADD COLUMN person_id INTEGER'); } catch {}
 db.exec(`
   CREATE TABLE IF NOT EXISTS pickup_order_items (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1025,6 +1033,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_people_customer ON people(customer_id);
   CREATE INDEX IF NOT EXISTS idx_people_importer ON people(importer_id);
   CREATE INDEX IF NOT EXISTS idx_people_agent ON people(agent_id);
+  CREATE INDEX IF NOT EXISTS idx_bookings_person ON bookings(person_id);
+  CREATE INDEX IF NOT EXISTS idx_shop_sales_person ON shop_sales(person_id);
+  CREATE INDEX IF NOT EXISTS idx_pickup_orders_person ON pickup_orders(person_id);
+  CREATE INDEX IF NOT EXISTS idx_venue_events_person ON venue_events(person_id);
   CREATE INDEX IF NOT EXISTS idx_importers_agent ON importers(agent_id);
   CREATE INDEX IF NOT EXISTS idx_crm_notes_entity ON crm_notes(entity_type, entity_id);
   CREATE INDEX IF NOT EXISTS idx_crm_attachments_entity ON crm_attachments(entity_type, entity_id);
@@ -1075,6 +1087,29 @@ function findOrCreateB2CCustomer(name, email, phone) {
     return existing.id;
   }
   const result = db.prepare('INSERT INTO b2c_customers (name, email, phone) VALUES (?, ?, ?)').run(name, emailClean, phone || null);
+  return result.lastInsertRowid;
+}
+
+// Trova o crea una Persona (CRM unificato) aggiungendo ruolo/canale a quelli già presenti
+// invece di sovrascriverli — la stessa persona può accumulare più ruoli/canali nel tempo.
+function findOrCreatePerson({ name, email, phone, role, channel }) {
+  const emailClean = email?.toLowerCase().trim() || null;
+  const nameClean = name?.trim() || null;
+  if (!emailClean && !nameClean) return null;
+
+  const person = emailClean ? db.prepare('SELECT * FROM people WHERE email = ?').get(emailClean) : null;
+  if (person) {
+    const roles = new Set(JSON.parse(person.roles || '[]'));
+    const channels = new Set(JSON.parse(person.source_channels || '[]'));
+    if (role) roles.add(role);
+    if (channel) channels.add(channel);
+    db.prepare('UPDATE people SET roles = ?, source_channels = ?, phone = COALESCE(phone, ?) WHERE id = ?')
+      .run(JSON.stringify([...roles]), JSON.stringify([...channels]), phone?.trim() || null, person.id);
+    return person.id;
+  }
+
+  const result = db.prepare('INSERT INTO people (name, email, phone, roles, source_channels) VALUES (?, ?, ?, ?, ?)')
+    .run(nameClean || emailClean, emailClean, phone?.trim() || null, JSON.stringify(role ? [role] : []), JSON.stringify(channel ? [channel] : []));
   return result.lastInsertRowid;
 }
 function validateDiscount(code, amountCents) {
@@ -1218,8 +1253,11 @@ function crmSalesStats(column, id) {
 // Contatori per l'indice laterale della scheda CRM (Contatti/Affari/Compiti/Documenti)
 function crmCounts(entityType, entityId) {
   const c = (sql) => db.prepare(sql).get(entityType, entityId).c;
+  const contactsCount = ['customer', 'agent', 'importer'].includes(entityType)
+    ? db.prepare(`SELECT COUNT(*) c FROM people WHERE ${entityType}_id = ? AND roles LIKE '%"contatto"%'`).get(entityId).c
+    : c('SELECT COUNT(*) c FROM contacts WHERE entity_type = ? AND entity_id = ?');
   return {
-    contacts_count: c('SELECT COUNT(*) c FROM contacts WHERE entity_type = ? AND entity_id = ?'),
+    contacts_count: contactsCount,
     deals_count: c('SELECT COUNT(*) c FROM crm_deals WHERE entity_type = ? AND entity_id = ?'),
     open_tasks_count: c("SELECT COUNT(*) c FROM crm_tasks WHERE entity_type = ? AND entity_id = ? AND status != 'chiuso'"),
     documents_count: c('SELECT COUNT(*) c FROM crm_attachments WHERE entity_type = ? AND entity_id = ?'),
@@ -1462,11 +1500,15 @@ app.post('/api/create-checkout-session', async (req, res) => {
   const emailClean = email.toLowerCase().trim();
 
   const b2cCustomerId = findOrCreateB2CCustomer(customer_name.trim(), emailClean, phone?.trim());
+  const personId = findOrCreatePerson({
+    name: customer_name.trim(), email: emailClean, phone: phone?.trim(),
+    role: 'cliente_finale', channel: exp.type === 'evento' ? 'evento_proprietario' : 'visita',
+  });
 
   const result = db.prepare(`
-    INSERT INTO bookings (slot_id, experience_id, customer_name, email, phone, guests, language, notes, status, amount_cents, discount_code, discount_code_id, discount_cents, b2c_customer_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'in_attesa', ?, ?, ?, ?, ?)
-  `).run(slot.id, exp.id, customer_name.trim(), emailClean, phone?.trim() || null, guestCount, lang, notes?.trim() || null, amountCents, codeClean, discountCodeId, discountCents, b2cCustomerId);
+    INSERT INTO bookings (slot_id, experience_id, customer_name, email, phone, guests, language, notes, status, amount_cents, discount_code, discount_code_id, discount_cents, b2c_customer_id, person_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'in_attesa', ?, ?, ?, ?, ?, ?)
+  `).run(slot.id, exp.id, customer_name.trim(), emailClean, phone?.trim() || null, guestCount, lang, notes?.trim() || null, amountCents, codeClean, discountCodeId, discountCents, b2cCustomerId, personId);
 
   const bookingId = result.lastInsertRowid;
 
@@ -1555,12 +1597,16 @@ app.post('/api/create-pickup-checkout-session', async (req, res) => {
   const lang = language === 'en' ? 'en' : 'it';
   const emailClean = email.toLowerCase().trim();
   const b2cCustomerId = findOrCreateB2CCustomer(customer_name.trim(), emailClean, phone?.trim());
+  const personId = findOrCreatePerson({
+    name: customer_name.trim(), email: emailClean, phone: phone?.trim(),
+    role: 'cliente_finale', channel: 'negozio_fisico',
+  });
   const pickupToken = crypto.randomBytes(16).toString('hex');
 
   const orderResult = db.prepare(`
-    INSERT INTO pickup_orders (customer_name, customer_email, customer_phone, b2c_customer_id, language, status, amount_cents, pickup_token, notes)
-    VALUES (?, ?, ?, ?, ?, 'in_attesa_pagamento', ?, ?, ?)
-  `).run(customer_name.trim(), emailClean, phone?.trim() || null, b2cCustomerId, lang, amountCents, pickupToken, notes?.trim() || null);
+    INSERT INTO pickup_orders (customer_name, customer_email, customer_phone, b2c_customer_id, person_id, language, status, amount_cents, pickup_token, notes)
+    VALUES (?, ?, ?, ?, ?, ?, 'in_attesa_pagamento', ?, ?, ?)
+  `).run(customer_name.trim(), emailClean, phone?.trim() || null, b2cCustomerId, personId, lang, amountCents, pickupToken, notes?.trim() || null);
   const orderId = orderResult.lastInsertRowid;
   const insertItem = db.prepare('INSERT INTO pickup_order_items (order_id, product_id, product_name, quantity, unit_price_cents, line_total_cents) VALUES (?, ?, ?, ?, ?, ?)');
   for (const it of resolvedItems) insertItem.run(orderId, it.product_id, it.product_name, it.quantity, it.unit_price_cents, it.quantity * it.unit_price_cents);
@@ -1914,11 +1960,15 @@ app.post('/api/admin/bookings/manual', authAdmin, async (req, res) => {
   const amountCents = exp.price_cents * guestCount;
   const emailClean = email.toLowerCase().trim();
   const b2cCustomerId = findOrCreateB2CCustomer(customer_name.trim(), emailClean, phone?.trim());
+  const personId = findOrCreatePerson({
+    name: customer_name.trim(), email: emailClean, phone: phone?.trim(),
+    role: 'cliente_finale', channel: exp.type === 'evento' ? 'evento_proprietario' : 'visita',
+  });
 
   const result = db.prepare(`
-    INSERT INTO bookings (slot_id, experience_id, customer_name, email, phone, guests, notes, status, amount_cents, b2c_customer_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(slot.id, exp.id, customer_name.trim(), emailClean, phone?.trim() || null, guestCount, notes?.trim() || null, statusVal, amountCents, b2cCustomerId);
+    INSERT INTO bookings (slot_id, experience_id, customer_name, email, phone, guests, notes, status, amount_cents, b2c_customer_id, person_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(slot.id, exp.id, customer_name.trim(), emailClean, phone?.trim() || null, guestCount, notes?.trim() || null, statusVal, amountCents, b2cCustomerId, personId);
 
   const full = bookingWithDetails(result.lastInsertRowid);
   if (send_email) {
@@ -2146,15 +2196,19 @@ app.post('/api/admin/venue-events', authAdmin, (req, res) => {
   if (!organizer_name?.trim()) return res.status(400).json({ error: 'Il nome dell\'organizzatore è obbligatorio.' });
   if (!event_date) return res.status(400).json({ error: 'La data dell\'evento è obbligatoria.' });
   const finalStatus = VENUE_EVENT_STATUSES.includes(status) ? status : 'richiesta';
+  const personId = findOrCreatePerson({
+    name: organizer_name.trim(), email: organizer_email?.trim(), phone: organizer_phone?.trim(),
+    role: 'cliente_evento', channel: 'evento_terzo',
+  });
   const result = db.prepare(`
     INSERT INTO venue_events (title, organizer_name, organizer_email, organizer_phone, event_date, start_time, end_time,
-      guests_estimate, rental_fee_cents, deposit_cents, deposit_paid, status, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      guests_estimate, rental_fee_cents, deposit_cents, deposit_paid, status, notes, person_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     title.trim(), organizer_name.trim(), organizer_email?.trim() || null, organizer_phone?.trim() || null,
     event_date, start_time || null, end_time || null,
     guests_estimate || null, rental_fee_cents || 0, deposit_cents || 0, deposit_paid ? 1 : 0,
-    finalStatus, notes?.trim() || null
+    finalStatus, notes?.trim() || null, personId
   );
   res.json({ success: true, id: result.lastInsertRowid });
 });
@@ -2229,16 +2283,20 @@ app.post('/api/admin/shop-sales', authAdmin, (req, res) => {
   } else if (customer_name?.trim()) {
     b2cCustomerId = db.prepare('INSERT INTO b2c_customers (name, phone) VALUES (?, ?)').run(customer_name.trim(), customer_phone?.trim() || null).lastInsertRowid;
   }
+  const personId = findOrCreatePerson({
+    name: customer_name?.trim(), email: emailClean, phone: customer_phone?.trim(),
+    role: 'cliente_finale', channel: 'negozio_fisico',
+  });
 
   const itemsTotal = items.reduce((sum, it) => sum + (it.quantity * it.unit_price_cents), 0);
   const discount = Math.max(0, parseInt(discount_cents) || 0);
   const total = Math.max(0, itemsTotal - discount);
 
   const saleResult = db.prepare(`
-    INSERT INTO shop_sales (customer_name, customer_email, customer_phone, b2c_customer_id, sale_context, payment_method, discount_cents, total_cents, operator_id, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO shop_sales (customer_name, customer_email, customer_phone, b2c_customer_id, person_id, sale_context, payment_method, discount_cents, total_cents, operator_id, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    customer_name?.trim() || null, emailClean, customer_phone?.trim() || null, b2cCustomerId || null,
+    customer_name?.trim() || null, emailClean, customer_phone?.trim() || null, b2cCustomerId || null, personId,
     context, method, discount, total, operator_id || null, notes?.trim() || null
   );
   const saleId = saleResult.lastInsertRowid;
@@ -3621,13 +3679,25 @@ app.get('/api/admin/crm/:entityType/:entityId/activity', authAdmin, (req, res) =
   res.json(all);
 });
 
-// Contatti (persone collegate all'anagrafica)
+// Contatti (persone collegate all'anagrafica). Per customer/agent/importer, i "contatti"
+// sono ora Persone (people, ruolo "contatto") collegate tramite la FK dedicata — non la
+// vecchia tabella polimorfica contacts. Supplier resta sulla vecchia tabella: il modello
+// Persone non copre i fornitori per scelta esplicita.
+const PEOPLE_CONTACT_ENTITY_TYPES = ['customer', 'agent', 'importer'];
+function peopleFkColumn(entityType) { return entityType + '_id'; }
+
 app.get('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) => {
-  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
-  res.json(db.prepare('SELECT * FROM contacts WHERE entity_type = ? AND entity_id = ? ORDER BY name').all(req.params.entityType, req.params.entityId));
+  const { entityType, entityId } = req.params;
+  if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
+    const rows = db.prepare(`SELECT id, name, contact_role AS role, email, phone, notes FROM people WHERE ${peopleFkColumn(entityType)} = ? AND roles LIKE '%"contatto"%' ORDER BY name`).all(entityId);
+    return res.json(rows);
+  }
+  res.json(db.prepare('SELECT * FROM contacts WHERE entity_type = ? AND entity_id = ? ORDER BY name').all(entityType, entityId));
 });
 app.post('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) => {
-  if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  const { entityType, entityId } = req.params;
+  if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
   const { name, role, email, phone, mobile, notes, source_fair_id } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'Il nome del contatto è obbligatorio.' });
   let finalNotes = notes?.trim() || null;
@@ -3639,21 +3709,46 @@ app.post('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) 
       finalNotes = finalNotes ? `${autoNote}\n\n${finalNotes}` : autoNote;
     }
   }
+  if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
+    const result = db.prepare(`
+      INSERT INTO people (name, contact_role, email, phone, notes, roles, source_channels, ${peopleFkColumn(entityType)})
+      VALUES (?, ?, ?, ?, ?, '["contatto"]', '[]', ?)
+    `).run(name.trim(), role?.trim() || null, email?.trim() || null, phone?.trim() || null, finalNotes, entityId);
+    return res.json({ success: true, id: result.lastInsertRowid });
+  }
   const result = db.prepare('INSERT INTO contacts (entity_type, entity_id, name, role, email, phone, mobile, notes, source_fair_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(req.params.entityType, req.params.entityId, name.trim(), role?.trim() || null, email?.trim() || null, phone?.trim() || null, mobile?.trim() || null, finalNotes, source_fair_id || null);
+    .run(entityType, entityId, name.trim(), role?.trim() || null, email?.trim() || null, phone?.trim() || null, mobile?.trim() || null, finalNotes, source_fair_id || null);
   res.json({ success: true, id: result.lastInsertRowid });
 });
-app.patch('/api/admin/crm/contacts/:id', authAdmin, (req, res) => {
+app.patch('/api/admin/crm/:entityType/contacts/:id', authAdmin, (req, res) => {
+  const { entityType, id } = req.params;
+  if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
+    const fields = ['name', 'email', 'phone', 'notes'];
+    const updates = [], params = [];
+    for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
+    if (req.body.role !== undefined) { updates.push('contact_role = ?'); params.push(req.body.role || null); }
+    if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+    params.push(id);
+    db.prepare(`UPDATE people SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    return res.json({ success: true });
+  }
   const fields = ['name', 'role', 'email', 'phone', 'mobile', 'notes'];
   const updates = [], params = [];
   for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
-  params.push(req.params.id);
+  params.push(id);
   db.prepare(`UPDATE contacts SET ${updates.join(', ')} WHERE id = ?`).run(...params);
   res.json({ success: true });
 });
-app.delete('/api/admin/crm/contacts/:id', authAdmin, (req, res) => {
-  db.prepare('DELETE FROM contacts WHERE id = ?').run(req.params.id);
+app.delete('/api/admin/crm/:entityType/contacts/:id', authAdmin, (req, res) => {
+  const { entityType, id } = req.params;
+  if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
+    db.prepare('DELETE FROM people WHERE id = ?').run(id);
+    return res.json({ success: true });
+  }
+  db.prepare('DELETE FROM contacts WHERE id = ?').run(id);
   res.json({ success: true });
 });
 
