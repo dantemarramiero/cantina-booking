@@ -1758,6 +1758,22 @@
   </div>
 </div>
 
+<!-- Associa cliente esistente modal -->
+<div class="modal-overlay" id="assoc-customer-modal">
+  <div class="modal-box" style="max-width:480px">
+    <h3>Associa cliente esistente</h3>
+    <div id="assoc-customer-msg"></div>
+    <div class="field">
+      <label>Cerca cliente</label>
+      <input type="text" id="assoc-customer-search" placeholder="Nome, email o P.IVA..." oninput="searchAssocCustomers()">
+    </div>
+    <div id="assoc-customer-results" style="max-height:320px;overflow-y:auto;margin-top:10px"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('assoc-customer-modal')">Chiudi</button>
+    </div>
+  </div>
+</div>
+
 <!-- News modal -->
 <div class="modal-overlay" id="news-modal">
   <div class="modal-box">
@@ -2170,7 +2186,13 @@
       </div>
 
       <div class="crm2-list-panel" id="crm2-list-clienti-seguiti" style="display:none">
-        <div class="crm2-list-panel-head"><h2>Clienti seguiti</h2><button class="btn-generate" style="margin-top:0" onclick="openNewCustomerForAgent()">+ Nuovo cliente</button></div>
+        <div class="crm2-list-panel-head">
+          <h2>Clienti seguiti</h2>
+          <div class="ord-new-dropdown">
+            <button class="btn-generate" style="margin-top:0" onclick="toggleCustLinkMenu(this, 'agent', CRM_CURRENT.id)">+ Nuovo cliente</button>
+            <div class="ord-new-menu"></div>
+          </div>
+        </div>
         <div id="crm-tracked-customers"></div>
       </div>
 
@@ -3112,11 +3134,6 @@ async function toggleOrdNewMenu() {
       : '<div class="ord-new-empty">Nessun agente attivo.</div>');
   menu.classList.add('open');
 }
-document.addEventListener('click', (e) => {
-  const dd = document.getElementById('ord-new-dropdown');
-  const menu = document.getElementById('ord-new-menu');
-  if (dd && menu && !dd.contains(e.target)) menu.classList.remove('open');
-});
 
 async function loadAgents() {
   AGENTS = await api('/api/admin/agents');
@@ -3482,7 +3499,12 @@ async function loadFairDetail(id) {
     </div>
 
     <div class="crm-info-section">
-      <div class="crm-panel-toolbar"><h4 style="margin:0">Clienti incontrati</h4><div class="list-spacer"></div><button class="btn-generate" style="margin-top:0" onclick="openNewCustomerForFair(${f.id})">+ Nuovo cliente</button></div>
+      <div class="crm-panel-toolbar"><h4 style="margin:0">Clienti incontrati</h4><div class="list-spacer"></div>
+        <div class="ord-new-dropdown">
+          <button class="btn-generate" style="margin-top:0" onclick="toggleCustLinkMenu(this, 'fair', ${f.id})">+ Nuovo cliente</button>
+          <div class="ord-new-menu"></div>
+        </div>
+      </div>
       <div style="margin-top:14px">
         ${f.customers.length ? f.customers.map(c => `
           <div class="crm-tc-customer" onclick="openCrmRecord('customer', ${c.id})">
@@ -3674,15 +3696,81 @@ async function openCustomerModal(c) {
   openModal('customer-modal');
 }
 
-async function openNewCustomerForAgent() {
+let CUSTOMER_MODAL_SOURCE_FAIR_ID = null;
+
+// ── Nuovo cliente vs. associa cliente esistente (Agenti → Clienti seguiti, Fiere → Clienti incontrati) ──
+let CUST_LINK_CONTEXT = null; // { type: 'agent' | 'fair', id }
+
+function toggleCustLinkMenu(btn, type, id) {
+  CUST_LINK_CONTEXT = { type, id };
+  const menu = btn.nextElementSibling;
+  const wasOpen = menu.classList.contains('open');
+  document.querySelectorAll('.ord-new-menu.open').forEach(m => m.classList.remove('open'));
+  if (wasOpen) return;
+  menu.innerHTML = `
+    <a href="#" onclick="event.preventDefault();this.closest('.ord-new-menu').classList.remove('open');openNewCustomerFromLinkContext();" style="font-weight:600">+ Nuovo cliente</a>
+    <a href="#" onclick="event.preventDefault();this.closest('.ord-new-menu').classList.remove('open');openAssociateCustomerModal();">Associa cliente esistente</a>
+  `;
+  menu.classList.add('open');
+}
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('.ord-new-dropdown').forEach(dd => {
+    if (!dd.contains(e.target)) dd.querySelector('.ord-new-menu')?.classList.remove('open');
+  });
+});
+
+async function openNewCustomerFromLinkContext() {
   await openCustomerModal();
-  document.getElementById('cust-agent').value = CRM_CURRENT.id;
+  if (CUST_LINK_CONTEXT?.type === 'agent') document.getElementById('cust-agent').value = CUST_LINK_CONTEXT.id;
+  else if (CUST_LINK_CONTEXT?.type === 'fair') CUSTOMER_MODAL_SOURCE_FAIR_ID = CUST_LINK_CONTEXT.id;
 }
 
-let CUSTOMER_MODAL_SOURCE_FAIR_ID = null;
-async function openNewCustomerForFair(fairId) {
-  await openCustomerModal();
-  CUSTOMER_MODAL_SOURCE_FAIR_ID = fairId;
+function openAssociateCustomerModal() {
+  document.getElementById('assoc-customer-msg').innerHTML = '';
+  document.getElementById('assoc-customer-search').value = '';
+  document.getElementById('assoc-customer-results').innerHTML = '<p style="color:var(--ink-soft);font-size:13px">Digita per cercare un cliente.</p>';
+  openModal('assoc-customer-modal');
+  document.getElementById('assoc-customer-search').focus();
+}
+
+let ASSOC_CUSTOMER_DEBOUNCE = null;
+function searchAssocCustomers() {
+  clearTimeout(ASSOC_CUSTOMER_DEBOUNCE);
+  ASSOC_CUSTOMER_DEBOUNCE = setTimeout(async () => {
+    const q = document.getElementById('assoc-customer-search').value.trim();
+    const results = document.getElementById('assoc-customer-results');
+    if (!q) { results.innerHTML = '<p style="color:var(--ink-soft);font-size:13px">Digita per cercare un cliente.</p>'; return; }
+    const rows = await api('/api/admin/customers?q=' + encodeURIComponent(q));
+    results.innerHTML = rows.length ? rows.map(c => `
+      <div class="list-row" style="cursor:pointer" onclick='linkExistingCustomer(${jsonAttrP(c)})'>
+        <div class="list-row-icon">${esc(c.name).charAt(0).toUpperCase()}</div>
+        <div class="list-row-body">
+          <div class="list-row-title">${esc(c.name)}</div>
+          <div class="list-row-sub">${esc(c.city) || 'nessuna località'}${c.agent_name ? ' · segue: ' + esc(c.agent_name) : ''}</div>
+        </div>
+      </div>
+    `).join('') : '<p style="color:var(--ink-soft);font-size:13px">Nessun cliente trovato.</p>';
+  }, 250);
+}
+
+async function linkExistingCustomer(c) {
+  const ctx = CUST_LINK_CONTEXT;
+  if (!ctx) return;
+  const msg = document.getElementById('assoc-customer-msg');
+  try {
+    if (ctx.type === 'agent') {
+      if (c.agent_id && String(c.agent_id) !== String(ctx.id) && !confirm(`${c.name} segue già un altro agente. Spostarlo su questo agente?`)) return;
+      await api('/api/admin/customers/' + c.id, { method: 'PATCH', body: JSON.stringify({ agent_id: ctx.id }) });
+      loadCrmTrackedCustomers();
+    } else if (ctx.type === 'fair') {
+      if (c.source_fair_id && String(c.source_fair_id) !== String(ctx.id) && !confirm(`${c.name} è già associato a un'altra fiera. Spostarlo su questa fiera?`)) return;
+      await api('/api/admin/customers/' + c.id, { method: 'PATCH', body: JSON.stringify({ source_fair_id: ctx.id }) });
+      loadFairDetail(ctx.id);
+    }
+    closeModal('assoc-customer-modal');
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
 }
 
 async function saveCustomer() {
