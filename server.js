@@ -591,6 +591,8 @@ try { db.exec('ALTER TABLE agents ADD COLUMN iban TEXT'); } catch {}
 try { db.exec('ALTER TABLE agents ADD COLUMN fiscal_code TEXT'); } catch {}
 try { db.exec('ALTER TABLE agents ADD COLUMN payment_terms TEXT'); } catch {}
 try { db.exec('ALTER TABLE agents ADD COLUMN commission_percent REAL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN enasarco_number TEXT'); } catch {}
+try { db.exec('ALTER TABLE agents ADD COLUMN contract_type TEXT'); } catch {}
 try { db.exec('ALTER TABLE orders ADD COLUMN billing_customer_id INTEGER'); } catch {}
 try { db.exec('ALTER TABLE orders ADD COLUMN causale TEXT DEFAULT \'ORDCLI\''); } catch {}
 try { db.exec('ALTER TABLE orders ADD COLUMN delivery_date TEXT'); } catch {}
@@ -611,6 +613,8 @@ try { db.exec('ALTER TABLE customers ADD COLUMN business_type TEXT'); } catch {}
 try { db.exec("ALTER TABLE customers ADD COLUMN relationship_type TEXT NOT NULL DEFAULT '[]'"); } catch {}
 try { db.exec('ALTER TABLE customers ADD COLUMN supplied_by_importer_id INTEGER'); } catch {}
 try { db.exec('ALTER TABLE customers ADD COLUMN supplied_by_distributor_id INTEGER'); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN exclusive_territory TEXT'); } catch {}
+try { db.exec('ALTER TABLE customers ADD COLUMN export_market TEXT'); } catch {}
 
 // ── CRM: Persone (anagrafica unica di persona fisica, con tag di ruolo) ────────
 // Una persona può essere Cliente finale, Cliente evento e/o Contatto (di un'azienda
@@ -640,6 +644,9 @@ db.exec(`
 `);
 try { db.exec('ALTER TABLE people ADD COLUMN first_name TEXT'); } catch {}
 try { db.exec('ALTER TABLE people ADD COLUMN last_name TEXT'); } catch {}
+try { db.exec('ALTER TABLE people ADD COLUMN birth_date TEXT'); } catch {}
+try { db.exec('ALTER TABLE people ADD COLUMN preferred_language TEXT'); } catch {}
+try { db.exec('ALTER TABLE people ADD COLUMN profiling_consent INTEGER NOT NULL DEFAULT 0'); } catch {}
 
 // ── CRM: anagrafica estesa (Informazioni di contatto / indirizzo / business) ──
 try { db.exec('ALTER TABLE customers ADD COLUMN contact_person TEXT'); } catch {}
@@ -687,6 +694,9 @@ db.exec(`
     FOREIGN KEY (agent_id) REFERENCES agents(id)
   )
 `);
+try { db.exec('ALTER TABLE importers ADD COLUMN territory TEXT'); } catch {}
+try { db.exec('ALTER TABLE importers ADD COLUMN exclusivity_type TEXT'); } catch {}
+try { db.exec('ALTER TABLE importers ADD COLUMN incoterms TEXT'); } catch {}
 
 // ── CRM: Fornitori ────────────────────────────────────────────────────────────
 db.exec(`
@@ -3174,6 +3184,7 @@ app.get('/api/admin/agents/:id', authAdmin, (req, res) => {
 const AGENT_EXTENDED_FIELDS = [
   'mobile', 'address', 'city', 'business_province', 'postal_code', 'country',
   'vat_number', 'sdi_code', 'pec', 'iban', 'fiscal_code', 'payment_terms', 'commission_percent',
+  'enasarco_number', 'contract_type',
 ];
 
 app.post('/api/admin/agents', authAdmin, (req, res) => {
@@ -3264,6 +3275,7 @@ const CUSTOMER_FIELDS = [
   'shipping_address', 'shipping_city', 'shipping_province', 'shipping_postal_code', 'shipping_country',
   'estimated_volume_cents', 'source_fair_id',
   'business_type', 'relationship_type', 'supplied_by_importer_id', 'supplied_by_distributor_id',
+  'exclusive_territory', 'export_market',
 ];
 
 app.get('/api/admin/customers', authAdmin, (req, res) => {
@@ -3328,7 +3340,7 @@ app.get('/api/admin/customers/:id', authAdmin, (req, res) => {
 });
 
 // ── CRM: Persone (anagrafica unica, tag di ruolo) ──────────────────────────────
-const PEOPLE_FIELDS = ['name', 'first_name', 'last_name', 'email', 'phone', 'notes', 'contact_role', 'customer_id', 'importer_id', 'agent_id'];
+const PEOPLE_FIELDS = ['name', 'first_name', 'last_name', 'email', 'phone', 'notes', 'contact_role', 'customer_id', 'importer_id', 'agent_id', 'birth_date', 'preferred_language'];
 
 app.get('/api/admin/people', authAdmin, (req, res) => {
   const { q, role } = req.query;
@@ -3381,12 +3393,13 @@ app.get('/api/admin/people/:id', authAdmin, (req, res) => {
 app.post('/api/admin/people', authAdmin, (req, res) => {
   const body = req.body || {};
   if (!body.name?.trim()) return res.status(400).json({ error: 'Il nome è obbligatorio.' });
-  const cols = ['roles', 'source_channels', 'newsletter_opt_in', 'wine_club'];
+  const cols = ['roles', 'source_channels', 'newsletter_opt_in', 'wine_club', 'profiling_consent'];
   const values = [
     JSON.stringify(Array.isArray(body.roles) ? body.roles : []),
     JSON.stringify(Array.isArray(body.source_channels) ? body.source_channels : []),
     body.newsletter_opt_in ? 1 : 0,
     body.wine_club ? 1 : 0,
+    body.profiling_consent ? 1 : 0,
   ];
   for (const f of PEOPLE_FIELDS) {
     if (body[f] !== undefined && body[f] !== '') { cols.push(f); values.push(typeof body[f] === 'string' ? body[f].trim() : body[f]); }
@@ -3403,6 +3416,7 @@ app.patch('/api/admin/people/:id', authAdmin, (req, res) => {
   if (body.source_channels !== undefined) { updates.push('source_channels = ?'); params.push(JSON.stringify(Array.isArray(body.source_channels) ? body.source_channels : [])); }
   if (body.newsletter_opt_in !== undefined) { updates.push('newsletter_opt_in = ?'); params.push(body.newsletter_opt_in ? 1 : 0); }
   if (body.wine_club !== undefined) { updates.push('wine_club = ?'); params.push(body.wine_club ? 1 : 0); }
+  if (body.profiling_consent !== undefined) { updates.push('profiling_consent = ?'); params.push(body.profiling_consent ? 1 : 0); }
   for (const f of PEOPLE_FIELDS) {
     if (body[f] !== undefined) { updates.push(`${f} = ?`); params.push(body[f] === '' ? null : body[f]); }
   }
@@ -3518,6 +3532,7 @@ const IMPORTER_FIELDS = [
   'shipping_address', 'shipping_city', 'shipping_province', 'shipping_postal_code', 'shipping_country',
   'discount_code', 'discount_percent', 'payment_terms', 'sdi_code', 'vat_number', 'estimated_volume_cents',
   'agent_id', 'notes', 'iban', 'pec', 'fiscal_code',
+  'territory', 'exclusivity_type', 'incoterms',
 ];
 
 app.get('/api/admin/importers', authAdmin, (req, res) => {
