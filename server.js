@@ -261,7 +261,7 @@ try { db.exec('ALTER TABLE bookings ADD COLUMN b2c_customer_id INTEGER'); } catc
 // (tenuto per compatibilità/visualizzazione — rinominare un codice non deve rompere lo storico).
 try { db.exec('ALTER TABLE bookings ADD COLUMN discount_code_id INTEGER'); } catch {}
 // person_id: collegamento alla nuova anagrafica unica Persone (CRM). b2c_customer_id resta
-// per lo storico pre-migrazione; da qui in avanti le nuove prenotazioni valorizzano person_id.
+// solo per lo storico pre-migrazione: non viene più scritto, le nuove prenotazioni usano person_id.
 try { db.exec('ALTER TABLE bookings ADD COLUMN person_id INTEGER'); } catch {}
 
 // ── Enoturismo: operatori addetti alle visite ─────────────────────────────────
@@ -309,7 +309,8 @@ db.exec(`
 // crm_customer_id resta l'aggancio riservato originario, ormai non più usato.
 try { db.exec('ALTER TABLE venue_events ADD COLUMN person_id INTEGER'); } catch {}
 
-// ── Enoturismo: CRM B2C (visitatori, clienti negozio/e-commerce) ──────────────
+// ── Enoturismo: CRM B2C legacy (sostituito da Persone) ────────────────────────
+// Tabelle tenute solo per lo storico: nessuna scrittura né endpoint, tutto passa da people.
 db.exec(`
   CREATE TABLE IF NOT EXISTS b2c_customers (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1163,17 +1164,6 @@ function bookingWithDetails(id) {
     WHERE b.id = ?
   `).get(id);
 }
-function findOrCreateB2CCustomer(name, email, phone) {
-  const emailClean = email?.toLowerCase().trim() || null;
-  if (!emailClean) return null;
-  const existing = db.prepare('SELECT * FROM b2c_customers WHERE email = ?').get(emailClean);
-  if (existing) {
-    if (phone && !existing.phone) db.prepare('UPDATE b2c_customers SET phone = ? WHERE id = ?').run(phone, existing.id);
-    return existing.id;
-  }
-  const result = db.prepare('INSERT INTO b2c_customers (name, email, phone) VALUES (?, ?, ?)').run(name, emailClean, phone || null);
-  return result.lastInsertRowid;
-}
 
 // Trova o crea una Persona (CRM unificato) aggiungendo ruolo/canale a quelli già presenti
 // invece di sovrascriverli — la stessa persona può accumulare più ruoli/canali nel tempo.
@@ -1653,16 +1643,15 @@ app.post('/api/create-checkout-session', async (req, res) => {
   const lang = language === 'en' ? 'en' : 'it';
   const emailClean = email.toLowerCase().trim();
 
-  const b2cCustomerId = findOrCreateB2CCustomer(customer_name.trim(), emailClean, phone?.trim());
   const personId = findOrCreatePerson({
     name: customer_name.trim(), firstName: first_name, lastName: last_name, email: emailClean, phone: phone?.trim(),
     role: 'cliente_finale', channel: exp.type === 'evento' ? 'evento_proprietario' : 'visita',
   });
 
   const result = db.prepare(`
-    INSERT INTO bookings (slot_id, experience_id, customer_name, email, phone, guests, language, notes, status, amount_cents, discount_code, discount_code_id, discount_cents, b2c_customer_id, person_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'in_attesa', ?, ?, ?, ?, ?, ?)
-  `).run(slot.id, exp.id, customer_name.trim(), emailClean, phone?.trim() || null, guestCount, lang, notes?.trim() || null, amountCents, codeClean, discountCodeId, discountCents, b2cCustomerId, personId);
+    INSERT INTO bookings (slot_id, experience_id, customer_name, email, phone, guests, language, notes, status, amount_cents, discount_code, discount_code_id, discount_cents, person_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'in_attesa', ?, ?, ?, ?, ?)
+  `).run(slot.id, exp.id, customer_name.trim(), emailClean, phone?.trim() || null, guestCount, lang, notes?.trim() || null, amountCents, codeClean, discountCodeId, discountCents, personId);
 
   const bookingId = result.lastInsertRowid;
 
@@ -1751,7 +1740,6 @@ app.post('/api/create-pickup-checkout-session', async (req, res) => {
   const amountCents = resolvedItems.reduce((sum, it) => sum + it.quantity * it.unit_price_cents, 0);
   const lang = language === 'en' ? 'en' : 'it';
   const emailClean = email.toLowerCase().trim();
-  const b2cCustomerId = findOrCreateB2CCustomer(customer_name.trim(), emailClean, phone?.trim());
   const personId = findOrCreatePerson({
     name: customer_name.trim(), firstName: first_name, lastName: last_name, email: emailClean, phone: phone?.trim(),
     role: 'cliente_finale', channel: 'negozio_fisico',
@@ -1759,9 +1747,9 @@ app.post('/api/create-pickup-checkout-session', async (req, res) => {
   const pickupToken = crypto.randomBytes(16).toString('hex');
 
   const orderResult = db.prepare(`
-    INSERT INTO pickup_orders (customer_name, customer_email, customer_phone, b2c_customer_id, person_id, language, status, amount_cents, pickup_token, notes)
-    VALUES (?, ?, ?, ?, ?, ?, 'in_attesa_pagamento', ?, ?, ?)
-  `).run(customer_name.trim(), emailClean, phone?.trim() || null, b2cCustomerId, personId, lang, amountCents, pickupToken, notes?.trim() || null);
+    INSERT INTO pickup_orders (customer_name, customer_email, customer_phone, person_id, language, status, amount_cents, pickup_token, notes)
+    VALUES (?, ?, ?, ?, ?, 'in_attesa_pagamento', ?, ?, ?)
+  `).run(customer_name.trim(), emailClean, phone?.trim() || null, personId, lang, amountCents, pickupToken, notes?.trim() || null);
   const orderId = orderResult.lastInsertRowid;
   const insertItem = db.prepare('INSERT INTO pickup_order_items (order_id, product_id, product_name, quantity, unit_price_cents, line_total_cents) VALUES (?, ?, ?, ?, ?, ?)');
   for (const it of resolvedItems) insertItem.run(orderId, it.product_id, it.product_name, it.quantity, it.unit_price_cents, it.quantity * it.unit_price_cents);
@@ -2114,16 +2102,15 @@ app.post('/api/admin/bookings/manual', authAdmin, async (req, res) => {
   const statusVal = ['confermata', 'in_attesa'].includes(status) ? status : 'confermata';
   const amountCents = exp.price_cents * guestCount;
   const emailClean = email.toLowerCase().trim();
-  const b2cCustomerId = findOrCreateB2CCustomer(customer_name.trim(), emailClean, phone?.trim());
   const personId = findOrCreatePerson({
     name: customer_name.trim(), email: emailClean, phone: phone?.trim(),
     role: 'cliente_finale', channel: exp.type === 'evento' ? 'evento_proprietario' : 'visita',
   });
 
   const result = db.prepare(`
-    INSERT INTO bookings (slot_id, experience_id, customer_name, email, phone, guests, notes, status, amount_cents, b2c_customer_id, person_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(slot.id, exp.id, customer_name.trim(), emailClean, phone?.trim() || null, guestCount, notes?.trim() || null, statusVal, amountCents, b2cCustomerId, personId);
+    INSERT INTO bookings (slot_id, experience_id, customer_name, email, phone, guests, notes, status, amount_cents, person_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(slot.id, exp.id, customer_name.trim(), emailClean, phone?.trim() || null, guestCount, notes?.trim() || null, statusVal, amountCents, personId);
 
   const full = bookingWithDetails(result.lastInsertRowid);
   if (send_email) {
@@ -2432,12 +2419,6 @@ app.post('/api/admin/shop-sales', authAdmin, (req, res) => {
   const method = SHOP_PAYMENT_METHODS.includes(payment_method) ? payment_method : 'contanti';
   const emailClean = customer_email?.trim().toLowerCase() || null;
 
-  let b2cCustomerId = null;
-  if (emailClean) {
-    b2cCustomerId = findOrCreateB2CCustomer(customer_name?.trim() || emailClean, emailClean, customer_phone?.trim() || null);
-  } else if (customer_name?.trim()) {
-    b2cCustomerId = db.prepare('INSERT INTO b2c_customers (name, phone) VALUES (?, ?)').run(customer_name.trim(), customer_phone?.trim() || null).lastInsertRowid;
-  }
   const personId = findOrCreatePerson({
     name: customer_name?.trim(), email: emailClean, phone: customer_phone?.trim(),
     role: 'cliente_finale', channel: 'negozio_fisico',
@@ -2448,10 +2429,10 @@ app.post('/api/admin/shop-sales', authAdmin, (req, res) => {
   const total = Math.max(0, itemsTotal - discount);
 
   const saleResult = db.prepare(`
-    INSERT INTO shop_sales (customer_name, customer_email, customer_phone, b2c_customer_id, person_id, sale_context, payment_method, discount_cents, total_cents, operator_id, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO shop_sales (customer_name, customer_email, customer_phone, person_id, sale_context, payment_method, discount_cents, total_cents, operator_id, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    customer_name?.trim() || null, emailClean, customer_phone?.trim() || null, b2cCustomerId || null, personId,
+    customer_name?.trim() || null, emailClean, customer_phone?.trim() || null, personId,
     context, method, discount, total, operator_id || null, notes?.trim() || null
   );
   const saleId = saleResult.lastInsertRowid;
@@ -2506,124 +2487,6 @@ app.delete('/api/admin/pickup-orders/:id', authAdmin, (req, res) => {
   }
   db.prepare('DELETE FROM pickup_order_items WHERE order_id = ?').run(order.id);
   db.prepare('DELETE FROM pickup_orders WHERE id = ?').run(order.id);
-  res.json({ success: true });
-});
-
-// ── CRM B2C: clienti (visitatori + negozio + e-commerce) ──────────────────────
-app.get('/api/admin/b2c-customers', authAdmin, (req, res) => {
-  const { q } = req.query;
-  let sql = 'SELECT * FROM b2c_customers WHERE 1=1';
-  const params = [];
-  if (q) { sql += ' AND (name LIKE ? OR email LIKE ?)'; const like = `%${q}%`; params.push(like, like); }
-  sql += ' ORDER BY name';
-  const customers = db.prepare(sql).all(...params);
-
-  // Aggregati calcolati in blocco (4 query totali) invece che per singolo cliente,
-  // per evitare N query ripetute man mano che la lista clienti cresce.
-  const visitRows = db.prepare("SELECT b2c_customer_id AS id, COUNT(*) AS c FROM bookings WHERE status != 'annullata' AND b2c_customer_id IS NOT NULL GROUP BY b2c_customer_id").all();
-  const orderRows = db.prepare("SELECT customer_id AS id, channel, COUNT(*) AS c, COALESCE(SUM(amount_cents),0) AS total FROM b2c_orders GROUP BY customer_id, channel").all();
-  const cassaRows = db.prepare("SELECT b2c_customer_id AS id, COUNT(*) AS c, COALESCE(SUM(total_cents),0) AS total FROM shop_sales WHERE b2c_customer_id IS NOT NULL GROUP BY b2c_customer_id").all();
-
-  const visitById = new Map(visitRows.map(r => [r.id, r.c]));
-  const cassaById = new Map(cassaRows.map(r => [r.id, r]));
-  const ordersById = new Map();
-  for (const r of orderRows) {
-    if (!ordersById.has(r.id)) ordersById.set(r.id, []);
-    ordersById.get(r.id).push(r);
-  }
-
-  res.json(customers.map(c => {
-    const orders = ordersById.get(c.id) || [];
-    const ecommerce = orders.find(o => o.channel === 'ecommerce') || { c: 0, total: 0 };
-    const negozio = orders.find(o => o.channel === 'negozio') || { c: 0, total: 0 };
-    const cassa = cassaById.get(c.id) || { c: 0, total: 0 };
-    return {
-      ...c,
-      visitCount: visitById.get(c.id) || 0,
-      ecommerceCount: ecommerce.c, ecommerceTotalCents: ecommerce.total,
-      negozioCount: negozio.c + cassa.c, negozioTotalCents: negozio.total + cassa.total,
-    };
-  }));
-});
-
-app.get('/api/admin/b2c-customers/:id', authAdmin, (req, res) => {
-  const customer = db.prepare('SELECT * FROM b2c_customers WHERE id = ?').get(req.params.id);
-  if (!customer) return res.status(404).json({ error: 'Cliente non trovato.' });
-  const visits = db.prepare(`
-    SELECT b.id, b.status, b.guests, b.amount_cents, s.date, s.time, e.name_it AS experience_name, o.name AS operator_name
-    FROM bookings b JOIN slots s ON s.id = b.slot_id JOIN experiences e ON e.id = b.experience_id
-    LEFT JOIN operators o ON o.id = b.operator_id
-    WHERE b.b2c_customer_id = ? ORDER BY s.date DESC
-  `).all(customer.id);
-  const orders = db.prepare('SELECT * FROM b2c_orders WHERE customer_id = ? ORDER BY order_date DESC').all(customer.id);
-  const shopSales = db.prepare('SELECT * FROM shop_sales WHERE b2c_customer_id = ? ORDER BY created_at DESC').all(customer.id);
-  const itemsBySale = db.prepare('SELECT * FROM shop_sale_items WHERE sale_id = ? ORDER BY id');
-  for (const s of shopSales) s.items = itemsBySale.all(s.id);
-  const pickupOrders = db.prepare('SELECT * FROM pickup_orders WHERE b2c_customer_id = ? ORDER BY created_at DESC').all(customer.id);
-  const itemsByOrder = db.prepare('SELECT * FROM pickup_order_items WHERE order_id = ? ORDER BY id');
-  for (const o of pickupOrders) o.items = itemsByOrder.all(o.id);
-  res.json({ ...customer, visits, orders, shopSales, pickupOrders });
-});
-
-app.post('/api/admin/b2c-customers', authAdmin, (req, res) => {
-  const { name, email, phone, notes } = req.body || {};
-  if (!name?.trim()) return res.status(400).json({ error: 'Il nome del cliente è obbligatorio.' });
-  try {
-    const result = db.prepare('INSERT INTO b2c_customers (name, email, phone, notes) VALUES (?, ?, ?, ?)')
-      .run(name.trim(), email?.trim().toLowerCase() || null, phone?.trim() || null, notes?.trim() || null);
-    res.json({ success: true, id: result.lastInsertRowid });
-  } catch (e) {
-    res.status(409).json({ error: 'Esiste già un cliente con questa email.' });
-  }
-});
-
-app.patch('/api/admin/b2c-customers/:id', authAdmin, (req, res) => {
-  const fields = ['name', 'email', 'phone', 'notes'];
-  const updates = [], params = [];
-  for (const f of fields) {
-    if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] || null); }
-  }
-  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
-  params.push(req.params.id);
-  db.prepare(`UPDATE b2c_customers SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-  res.json({ success: true });
-});
-
-app.delete('/api/admin/b2c-customers/:id', authAdmin, (req, res) => {
-  db.prepare('UPDATE bookings SET b2c_customer_id = NULL WHERE b2c_customer_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM b2c_orders WHERE customer_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM b2c_customers WHERE id = ?').run(req.params.id);
-  res.json({ success: true });
-});
-
-// ── CRM B2C: ordini (e-commerce / negozio fisico) ─────────────────────────────
-app.post('/api/admin/b2c-orders', authAdmin, (req, res) => {
-  const { customer_id, channel, order_number, amount_cents, order_date, notes } = req.body || {};
-  if (!customer_id || !['ecommerce', 'negozio'].includes(channel)) {
-    return res.status(400).json({ error: 'Cliente e canale (ecommerce/negozio) sono obbligatori.' });
-  }
-  const result = db.prepare(`
-    INSERT INTO b2c_orders (customer_id, channel, order_number, amount_cents, order_date, notes)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(customer_id, channel, order_number?.trim() || null, parseInt(amount_cents) || 0,
-         order_date || new Date().toISOString().slice(0, 10), notes?.trim() || null);
-  res.json({ success: true, id: result.lastInsertRowid });
-});
-
-app.patch('/api/admin/b2c-orders/:id', authAdmin, (req, res) => {
-  const fields = ['channel', 'order_number', 'amount_cents', 'order_date', 'notes'];
-  const updates = [], params = [];
-  for (const f of fields) {
-    if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }
-  }
-  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
-  params.push(req.params.id);
-  db.prepare(`UPDATE b2c_orders SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-  res.json({ success: true });
-});
-
-app.delete('/api/admin/b2c-orders/:id', authAdmin, (req, res) => {
-  db.prepare('DELETE FROM b2c_orders WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
