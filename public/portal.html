@@ -2948,6 +2948,7 @@ async function loadOrders() {
           ${o.order_date} ${o.delivery_date ? '→ consegna ' + o.delivery_date : ''} · ${esc(o.causale || 'ORDCLI')}
           ${o.billing_customer_name && o.billing_customer_name !== o.customer_name ? ' · fatt. a ' + esc(o.billing_customer_name) : ''}
           ${o.agent_name ? ' · agente ' + esc(o.agent_name) : ''}
+          ${o.notes ? ' · nota: ' + esc(o.notes) : ''}
         </div>
       </div>
       <div class="list-row-meta">
@@ -4816,8 +4817,12 @@ async function saveCrmContact() {
 }
 
 async function deleteCrmContact(contactId) {
-  if (!confirm('Eliminare questo contatto?')) return;
   const { type } = CRM_CURRENT;
+  const isPeopleBacked = ['customer', 'agent', 'importer'].includes(type);
+  const confirmMsg = isPeopleBacked
+    ? 'Rimuovere questo contatto da qui? La persona resterà comunque nell\'anagrafica Contatti.'
+    : 'Eliminare questo contatto?';
+  if (!confirm(confirmMsg)) return;
   await api(`/api/admin/crm/${type}/contacts/${contactId}`, { method: 'DELETE' });
   loadCrmContacts();
 }

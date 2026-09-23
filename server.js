@@ -889,6 +889,7 @@ db.exec(`
   )
 `);
 try { db.exec('ALTER TABLE orders ADD COLUMN warehouse_note TEXT'); } catch {}
+try { db.exec('ALTER TABLE orders ADD COLUMN notes TEXT'); } catch {}
 
 // ── Ruoli e permessi (matrice di accesso per workspace) ──────────────────────
 db.exec(`
@@ -1109,21 +1110,32 @@ function findOrCreatePerson({ name, firstName, lastName, email, phone, role, cha
   const nameClean = name?.trim() || null;
   const firstNameClean = firstName?.trim() || null;
   const lastNameClean = lastName?.trim() || null;
+  const phoneClean = phone?.trim() || null;
   if (!emailClean && !nameClean) return null;
 
-  const person = emailClean ? db.prepare('SELECT * FROM people WHERE email = ?').get(emailClean) : null;
+  // Match by email when we have one; otherwise (or if no one has that email yet) fall back to an
+  // exact phone match against an email-less Persona — this both covers repeat interactions with no
+  // email at all (e.g. an Eventi terzi organizer) and lets someone "graduate" a phone-only record
+  // by supplying an email later, instead of creating a fresh duplicate either way.
+  let person = emailClean ? db.prepare('SELECT * FROM people WHERE email = ?').get(emailClean) : null;
+  if (!person && phoneClean) person = db.prepare('SELECT * FROM people WHERE phone = ? AND email IS NULL').get(phoneClean);
   if (person) {
     const roles = new Set(JSON.parse(person.roles || '[]'));
     const channels = new Set(JSON.parse(person.source_channels || '[]'));
     if (role) roles.add(role);
     if (channel) channels.add(channel);
-    db.prepare('UPDATE people SET roles = ?, source_channels = ?, phone = COALESCE(phone, ?), first_name = COALESCE(first_name, ?), last_name = COALESCE(last_name, ?) WHERE id = ?')
-      .run(JSON.stringify([...roles]), JSON.stringify([...channels]), phone?.trim() || null, firstNameClean, lastNameClean, person.id);
+    // The display name only gets replaced if it currently looks like a placeholder (missing, or
+    // fell back to the email/phone) — a later, possibly lower-quality entry shouldn't clobber a
+    // name that was already filled in properly.
+    const nameNeedsUpdate = nameClean && (!person.name || person.name === person.email || person.name === person.phone);
+    const newName = nameNeedsUpdate ? nameClean : person.name;
+    db.prepare('UPDATE people SET roles = ?, source_channels = ?, phone = COALESCE(phone, ?), email = COALESCE(email, ?), first_name = COALESCE(first_name, ?), last_name = COALESCE(last_name, ?), name = ? WHERE id = ?')
+      .run(JSON.stringify([...roles]), JSON.stringify([...channels]), phoneClean, emailClean, firstNameClean, lastNameClean, newName, person.id);
     return person.id;
   }
 
   const result = db.prepare('INSERT INTO people (name, first_name, last_name, email, phone, roles, source_channels) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(nameClean || emailClean, firstNameClean, lastNameClean, emailClean, phone?.trim() || null, JSON.stringify(role ? [role] : []), JSON.stringify(channel ? [channel] : []));
+    .run(nameClean || emailClean || phoneClean, firstNameClean, lastNameClean, emailClean, phoneClean, JSON.stringify(role ? [role] : []), JSON.stringify(channel ? [channel] : []));
   return result.lastInsertRowid;
 }
 function validateDiscount(code, amountCents) {
@@ -3754,10 +3766,25 @@ app.post('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) 
     }
   }
   if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
+    const fkCol = peopleFkColumn(entityType);
+    const emailClean = email?.trim().toLowerCase() || null;
+    // Dedupe by email against the unified Persone identity instead of always inserting a new
+    // row — otherwise the same real person ends up duplicated across the Contatti list.
+    const existing = emailClean ? db.prepare('SELECT * FROM people WHERE email = ?').get(emailClean) : null;
+    if (existing) {
+      if (existing[fkCol] && String(existing[fkCol]) !== String(entityId)) {
+        return res.status(409).json({ error: 'Esiste già una persona con questa email, collegata a un\'altra anagrafica. Cercala in Contatti per gestirla da lì.' });
+      }
+      const roles = new Set(JSON.parse(existing.roles || '[]'));
+      roles.add('contatto');
+      db.prepare(`UPDATE people SET roles = ?, contact_role = ?, phone = COALESCE(phone, ?), notes = COALESCE(notes, ?), ${fkCol} = ? WHERE id = ?`)
+        .run(JSON.stringify([...roles]), role?.trim() || existing.contact_role || null, phone?.trim() || null, finalNotes, entityId, existing.id);
+      return res.json({ success: true, id: existing.id });
+    }
     const result = db.prepare(`
-      INSERT INTO people (name, first_name, last_name, contact_role, email, phone, notes, roles, source_channels, ${peopleFkColumn(entityType)})
+      INSERT INTO people (name, first_name, last_name, contact_role, email, phone, notes, roles, source_channels, ${fkCol})
       VALUES (?, ?, ?, ?, ?, ?, ?, '["contatto"]', '[]', ?)
-    `).run(name, first_name?.trim() || null, last_name?.trim() || null, role?.trim() || null, email?.trim() || null, phone?.trim() || null, finalNotes, entityId);
+    `).run(name, first_name?.trim() || null, last_name?.trim() || null, role?.trim() || null, emailClean, phone?.trim() || null, finalNotes, entityId);
     return res.json({ success: true, id: result.lastInsertRowid });
   }
   const result = db.prepare('INSERT INTO contacts (entity_type, entity_id, name, role, email, phone, mobile, notes, source_fair_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -3796,7 +3823,14 @@ app.delete('/api/admin/crm/:entityType/contacts/:id', authAdmin, (req, res) => {
   const { entityType, id } = req.params;
   if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
   if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
-    db.prepare('DELETE FROM people WHERE id = ?').run(id);
+    // This removes the person as a contact of THIS entity — it must not delete the shared Persona
+    // record, which may carry its own roles (cliente_finale, wine club, ...) and transaction history.
+    // Deleting the person outright is a separate, deliberate action from the main Contatti list.
+    const person = db.prepare('SELECT roles FROM people WHERE id = ?').get(id);
+    if (!person) return res.json({ success: true });
+    const roles = JSON.parse(person.roles || '[]').filter(r => r !== 'contatto');
+    db.prepare(`UPDATE people SET roles = ?, contact_role = NULL, ${peopleFkColumn(entityType)} = NULL WHERE id = ?`)
+      .run(JSON.stringify(roles), id);
     return res.json({ success: true });
   }
   db.prepare('DELETE FROM contacts WHERE id = ?').run(id);
@@ -4032,11 +4066,11 @@ app.post('/api/agent/:token/orders', authAgent, (req, res) => {
   }
 
   const result = db.prepare(`
-    INSERT INTO orders (order_number, customer_name, customer_country, channel, price_list_name, order_date, delivery_date, causale, total_cents, discount_percent, discount_cents, payment_due_date, source, customer_id, billing_customer_id, agent_id)
-    VALUES (?, ?, ?, 'Agente', ?, ?, ?, ?, ?, ?, ?, ?, 'agent', ?, ?, ?)
+    INSERT INTO orders (order_number, customer_name, customer_country, channel, price_list_name, order_date, delivery_date, causale, total_cents, discount_percent, discount_cents, payment_due_date, source, customer_id, billing_customer_id, agent_id, notes)
+    VALUES (?, ?, ?, 'Agente', ?, ?, ?, ?, ?, ?, ?, ?, 'agent', ?, ?, ?, ?)
   `).run(orderNumber, customer.name, customer.country, price_list_name || null,
          orderDate, delivery_date || null, causale || 'ORDCLI',
-         total, discountPercent, discountCents, paymentDueDate, customer.id, billingCustomerId, req.agent.id);
+         total, discountPercent, discountCents, paymentDueDate, customer.id, billingCustomerId, req.agent.id, notes?.trim() || null);
 
   const insertItem = db.prepare(`
     INSERT INTO order_items (order_id, product_id, product_name_raw, label_variant, quantity, unit_price_cents)
@@ -4098,11 +4132,11 @@ app.post('/api/admin/orders/manual', authAdmin, (req, res) => {
   }
 
   const result = db.prepare(`
-    INSERT INTO orders (order_number, customer_name, customer_country, channel, price_list_name, order_date, delivery_date, causale, total_cents, discount_percent, discount_cents, payment_due_date, source, customer_id, billing_customer_id, agent_id)
-    VALUES (?, ?, ?, 'Diretto', ?, ?, ?, ?, ?, ?, ?, ?, 'admin', ?, ?, ?)
+    INSERT INTO orders (order_number, customer_name, customer_country, channel, price_list_name, order_date, delivery_date, causale, total_cents, discount_percent, discount_cents, payment_due_date, source, customer_id, billing_customer_id, agent_id, notes)
+    VALUES (?, ?, ?, 'Diretto', ?, ?, ?, ?, ?, ?, ?, ?, 'admin', ?, ?, ?, ?)
   `).run(orderNumber, customer.name, customer.country, price_list_name || null,
          orderDate, delivery_date || null, causale || 'ORDCLI',
-         total, discountPercent, discountCents, paymentDueDate, customer.id, billingCustomerId, effectiveAgentId);
+         total, discountPercent, discountCents, paymentDueDate, customer.id, billingCustomerId, effectiveAgentId, notes?.trim() || null);
 
   const insertItem = db.prepare(`
     INSERT INTO order_items (order_id, product_id, product_name_raw, label_variant, quantity, unit_price_cents)
