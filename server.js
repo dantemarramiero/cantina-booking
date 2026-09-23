@@ -1066,6 +1066,78 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_venue_events_date ON venue_events(event_date);
 `);
 
+// ── CRM: collegamenti persona ↔ anagrafica ─────────────────────────────────────
+// Una persona può essere referente di più aziende (clienti, importatori, agenti, fornitori),
+// con un ruolo diverso per ciascuna. Sostituisce le vecchie colonne people.customer_id /
+// importer_id / agent_id (un solo collegamento per tipo) e la tabella contacts, che restano
+// nello schema solo per lo storico.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS person_links (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    person_id      INTEGER NOT NULL,
+    entity_type    TEXT NOT NULL,
+    entity_id      INTEGER NOT NULL,
+    contact_role   TEXT,
+    source_fair_id INTEGER,
+    created_at     TEXT DEFAULT (datetime('now','localtime')),
+    UNIQUE(person_id, entity_type, entity_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_person_links_entity ON person_links(entity_type, entity_id);
+  CREATE INDEX IF NOT EXISTS idx_person_links_person ON person_links(person_id);
+  CREATE INDEX IF NOT EXISTS idx_person_links_fair ON person_links(source_fair_id);
+`);
+try { db.exec('ALTER TABLE people ADD COLUMN mobile TEXT'); } catch {}
+const LINK_ENTITY_TABLES = { customer: 'customers', importer: 'importers', agent: 'agents', supplier: 'suppliers' };
+function linkEntityExists(type, id) {
+  const table = LINK_ENTITY_TABLES[type];
+  return !!table && !!db.prepare(`SELECT 1 FROM ${table} WHERE id = ?`).get(id);
+}
+try { db.exec('ALTER TABLE contacts ADD COLUMN migrated_person_id INTEGER'); } catch {}
+
+(function migratePersonLinks() {
+  const fkRows = db.prepare('SELECT id, customer_id, importer_id, agent_id, contact_role FROM people WHERE customer_id IS NOT NULL OR importer_id IS NOT NULL OR agent_id IS NOT NULL').all();
+  const legacyContacts = db.prepare('SELECT * FROM contacts WHERE migrated_person_id IS NULL').all();
+  if (!fkRows.length && !legacyContacts.length) return;
+  const insertLink = db.prepare('INSERT OR IGNORE INTO person_links (person_id, entity_type, entity_id, contact_role, source_fair_id) VALUES (?, ?, ?, ?, ?)');
+  db.exec('BEGIN');
+  try {
+    for (const p of fkRows) {
+      if (p.customer_id) insertLink.run(p.id, 'customer', p.customer_id, p.contact_role, null);
+      if (p.importer_id) insertLink.run(p.id, 'importer', p.importer_id, p.contact_role, null);
+      if (p.agent_id) insertLink.run(p.id, 'agent', p.agent_id, p.contact_role, null);
+    }
+    // Nothing writes these columns any more; clearing them also releases their foreign keys,
+    // which were blocking deletes of any customer/importer/agent that had a contact.
+    db.exec('UPDATE people SET customer_id = NULL, importer_id = NULL, agent_id = NULL');
+
+    for (const ct of legacyContacts) {
+      if (!linkEntityExists(ct.entity_type, ct.entity_id)) {
+        db.prepare('UPDATE contacts SET migrated_person_id = 0 WHERE id = ?').run(ct.id);
+        continue;
+      }
+      const email = ct.email?.trim().toLowerCase() || null;
+      let personId = email ? db.prepare('SELECT id FROM people WHERE lower(email) = ?').get(email)?.id : null;
+      if (personId) {
+        const p = db.prepare('SELECT roles FROM people WHERE id = ?').get(personId);
+        const roles = new Set(JSON.parse(p.roles || '[]')); roles.add('contatto');
+        db.prepare('UPDATE people SET roles = ?, phone = COALESCE(phone, ?), mobile = COALESCE(mobile, ?), notes = COALESCE(notes, ?) WHERE id = ?')
+          .run(JSON.stringify([...roles]), ct.phone, ct.mobile, ct.notes, personId);
+      } else {
+        const [first, ...rest] = (ct.name || '').trim().split(/\s+/);
+        personId = db.prepare(`INSERT INTO people (name, first_name, last_name, email, phone, mobile, notes, roles, source_channels) VALUES (?, ?, ?, ?, ?, ?, ?, '["contatto"]', '[]')`)
+          .run(ct.name, first || null, rest.join(' ') || null, email, ct.phone, ct.mobile, ct.notes).lastInsertRowid;
+      }
+      insertLink.run(personId, ct.entity_type, ct.entity_id, ct.role, ct.source_fair_id);
+      db.prepare('UPDATE contacts SET migrated_person_id = ? WHERE id = ?').run(personId, ct.id);
+    }
+    db.exec('COMMIT');
+    console.log(`Collegamenti persona migrati: ${fkRows.length} da people, ${legacyContacts.length} da contacts.`);
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+})();
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getExperience(id) {
   return db.prepare('SELECT * FROM experiences WHERE id = ?').get(id);
@@ -1117,7 +1189,7 @@ function findOrCreatePerson({ name, firstName, lastName, email, phone, role, cha
   // exact phone match against an email-less Persona — this both covers repeat interactions with no
   // email at all (e.g. an Eventi terzi organizer) and lets someone "graduate" a phone-only record
   // by supplying an email later, instead of creating a fresh duplicate either way.
-  let person = emailClean ? db.prepare('SELECT * FROM people WHERE email = ?').get(emailClean) : null;
+  let person = emailClean ? db.prepare('SELECT * FROM people WHERE lower(email) = ?').get(emailClean) : null;
   if (!person && phoneClean) person = db.prepare('SELECT * FROM people WHERE phone = ? AND email IS NULL').get(phoneClean);
   if (person) {
     const roles = new Set(JSON.parse(person.roles || '[]'));
@@ -1279,15 +1351,70 @@ function crmSalesStats(column, id) {
 // Contatori per l'indice laterale della scheda CRM (Contatti/Affari/Compiti/Documenti)
 function crmCounts(entityType, entityId) {
   const c = (sql) => db.prepare(sql).get(entityType, entityId).c;
-  const contactsCount = ['customer', 'agent', 'importer'].includes(entityType)
-    ? db.prepare(`SELECT COUNT(*) c FROM people WHERE ${entityType}_id = ? AND roles LIKE '%"contatto"%'`).get(entityId).c
-    : c('SELECT COUNT(*) c FROM contacts WHERE entity_type = ? AND entity_id = ?');
   return {
-    contacts_count: contactsCount,
+    contacts_count: c('SELECT COUNT(*) c FROM person_links WHERE entity_type = ? AND entity_id = ?'),
     deals_count: c('SELECT COUNT(*) c FROM crm_deals WHERE entity_type = ? AND entity_id = ?'),
     open_tasks_count: c("SELECT COUNT(*) c FROM crm_tasks WHERE entity_type = ? AND entity_id = ? AND status != 'chiuso'"),
     documents_count: c('SELECT COUNT(*) c FROM crm_attachments WHERE entity_type = ? AND entity_id = ?'),
   };
+}
+
+const PERSON_LINKS_SELECT = `
+  SELECT l.id, l.person_id, l.entity_type, l.entity_id, l.contact_role, l.source_fair_id,
+    COALESCE(c.name, i.name, a.name, s.name) AS entity_name
+  FROM person_links l
+  LEFT JOIN customers c ON l.entity_type = 'customer' AND c.id = l.entity_id
+  LEFT JOIN importers i ON l.entity_type = 'importer' AND i.id = l.entity_id
+  LEFT JOIN agents a ON l.entity_type = 'agent' AND a.id = l.entity_id
+  LEFT JOIN suppliers s ON l.entity_type = 'supplier' AND s.id = l.entity_id`;
+
+function personLinks(personId) {
+  return db.prepare(PERSON_LINKS_SELECT + ' WHERE l.person_id = ? ORDER BY l.id').all(personId);
+}
+
+function allPersonLinksByPerson() {
+  const map = new Map();
+  for (const l of db.prepare(PERSON_LINKS_SELECT + ' ORDER BY l.id').all()) {
+    if (!map.has(l.person_id)) map.set(l.person_id, []);
+    map.get(l.person_id).push(l);
+  }
+  return map;
+}
+
+// "contatto" means "referente of at least one anagrafica": keep the role in step with the links.
+function syncContattoRole(personId) {
+  const p = db.prepare('SELECT roles FROM people WHERE id = ?').get(personId);
+  if (!p) return;
+  const roles = new Set(JSON.parse(p.roles || '[]'));
+  if (db.prepare('SELECT 1 FROM person_links WHERE person_id = ?').get(personId)) roles.add('contatto');
+  else roles.delete('contatto');
+  db.prepare('UPDATE people SET roles = ? WHERE id = ?').run(JSON.stringify([...roles]), personId);
+}
+
+// Replaces a person's links with the given set, keeping source_fair_id on links that stay.
+function setPersonLinks(personId, links) {
+  const clean = new Map();
+  for (const l of Array.isArray(links) ? links : []) {
+    const entityId = parseInt(l.entity_id);
+    if (!entityId || !linkEntityExists(l.entity_type, entityId)) continue;
+    clean.set(`${l.entity_type}:${entityId}`, { entity_type: l.entity_type, entity_id: entityId, contact_role: l.contact_role?.trim() || null });
+  }
+  for (const e of db.prepare('SELECT id, entity_type, entity_id FROM person_links WHERE person_id = ?').all(personId)) {
+    if (!clean.has(`${e.entity_type}:${e.entity_id}`)) db.prepare('DELETE FROM person_links WHERE id = ?').run(e.id);
+  }
+  const upsert = db.prepare(`
+    INSERT INTO person_links (person_id, entity_type, entity_id, contact_role) VALUES (?, ?, ?, ?)
+    ON CONFLICT(person_id, entity_type, entity_id) DO UPDATE SET contact_role = excluded.contact_role
+  `);
+  for (const l of clean.values()) upsert.run(personId, l.entity_type, l.entity_id, l.contact_role);
+  return clean.size;
+}
+
+// Removes every link pointing at an anagrafica that is being deleted.
+function deleteEntityLinks(entityType, entityId) {
+  const personIds = db.prepare('SELECT person_id FROM person_links WHERE entity_type = ? AND entity_id = ?').all(entityType, entityId).map(r => r.person_id);
+  db.prepare('DELETE FROM person_links WHERE entity_type = ? AND entity_id = ?').run(entityType, entityId);
+  personIds.forEach(syncContattoRole);
 }
 
 function customerActivityStatus(lastOrderDate) {
@@ -3261,6 +3388,7 @@ app.delete('/api/admin/agents/:id', authAdmin, (req, res) => {
   db.prepare('UPDATE customers SET agent_id = NULL WHERE agent_id = ?').run(req.params.id);
   db.prepare('UPDATE importers SET agent_id = NULL WHERE agent_id = ?').run(req.params.id);
   db.prepare('DELETE FROM agent_provinces WHERE agent_id = ?').run(req.params.id);
+  deleteEntityLinks('agent', req.params.id);
   db.prepare('DELETE FROM agents WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
@@ -3337,6 +3465,7 @@ app.patch('/api/admin/customers/:id', authAdmin, (req, res) => {
 app.delete('/api/admin/customers/:id', authAdmin, (req, res) => {
   db.prepare('UPDATE orders SET customer_id = NULL WHERE customer_id = ?').run(req.params.id);
   db.prepare('UPDATE customers SET supplied_by_distributor_id = NULL WHERE supplied_by_distributor_id = ?').run(req.params.id);
+  deleteEntityLinks('customer', req.params.id);
   db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
@@ -3362,38 +3491,42 @@ app.get('/api/admin/customers/:id', authAdmin, (req, res) => {
 });
 
 // ── CRM: Persone (anagrafica unica, tag di ruolo) ──────────────────────────────
-const PEOPLE_FIELDS = ['name', 'first_name', 'last_name', 'email', 'phone', 'notes', 'contact_role', 'customer_id', 'importer_id', 'agent_id', 'birth_date', 'preferred_language'];
+const PEOPLE_FIELDS = ['name', 'first_name', 'last_name', 'email', 'phone', 'mobile', 'notes', 'birth_date', 'preferred_language'];
+
+function personEmailTaken(email, exceptId) {
+  const e = email?.trim().toLowerCase();
+  return !!e && !!db.prepare('SELECT 1 FROM people WHERE lower(email) = ? AND id != ?').get(e, exceptId || 0);
+}
+const PERSON_EMAIL_TAKEN_ERROR = 'Esiste già una persona con questa email: cercala in Contatti.';
+
+function normalizePersonField(f, v) {
+  if (typeof v !== 'string') return v;
+  return f === 'email' ? v.trim().toLowerCase() : v.trim();
+}
 
 app.get('/api/admin/people', authAdmin, (req, res) => {
   const { q, role } = req.query;
-  let sql = `
-    SELECT p.*, c.name AS customer_name, i.name AS importer_name, a.name AS agent_name
-    FROM people p
-    LEFT JOIN customers c ON c.id = p.customer_id
-    LEFT JOIN importers i ON i.id = p.importer_id
-    LEFT JOIN agents a ON a.id = p.agent_id
-    WHERE 1=1`;
+  let sql = 'SELECT p.* FROM people p WHERE 1=1';
   const params = [];
   if (q) { sql += ' AND (p.name LIKE ? OR p.email LIKE ?)'; const like = `%${q}%`; params.push(like, like); }
   if (role) { sql += ' AND p.roles LIKE ?'; params.push(`%"${role}"%`); }
   sql += ' ORDER BY p.name';
   const rows = db.prepare(sql).all(...params);
-  rows.forEach(r => { r.roles = JSON.parse(r.roles || '[]'); r.source_channels = JSON.parse(r.source_channels || '[]'); });
+  const links = allPersonLinksByPerson();
+  rows.forEach(r => {
+    r.roles = JSON.parse(r.roles || '[]');
+    r.source_channels = JSON.parse(r.source_channels || '[]');
+    r.links = links.get(r.id) || [];
+  });
   res.json(rows);
 });
 
 app.get('/api/admin/people/:id', authAdmin, (req, res) => {
-  const p = db.prepare(`
-    SELECT p.*, c.name AS customer_name, i.name AS importer_name, a.name AS agent_name
-    FROM people p
-    LEFT JOIN customers c ON c.id = p.customer_id
-    LEFT JOIN importers i ON i.id = p.importer_id
-    LEFT JOIN agents a ON a.id = p.agent_id
-    WHERE p.id = ?
-  `).get(req.params.id);
+  const p = db.prepare('SELECT * FROM people WHERE id = ?').get(req.params.id);
   if (!p) return res.status(404).json({ error: 'Persona non trovata.' });
   p.roles = JSON.parse(p.roles || '[]');
   p.source_channels = JSON.parse(p.source_channels || '[]');
+  p.links = personLinks(p.id);
   Object.assign(p, crmCounts('person', p.id));
 
   p.visits = db.prepare(`
@@ -3415,6 +3548,7 @@ app.get('/api/admin/people/:id', authAdmin, (req, res) => {
 app.post('/api/admin/people', authAdmin, (req, res) => {
   const body = req.body || {};
   if (!body.name?.trim()) return res.status(400).json({ error: 'Il nome è obbligatorio.' });
+  if (personEmailTaken(body.email)) return res.status(409).json({ error: PERSON_EMAIL_TAKEN_ERROR });
   const cols = ['roles', 'source_channels', 'newsletter_opt_in', 'wine_club', 'profiling_consent'];
   const values = [
     JSON.stringify(Array.isArray(body.roles) ? body.roles : []),
@@ -3424,15 +3558,18 @@ app.post('/api/admin/people', authAdmin, (req, res) => {
     body.profiling_consent ? 1 : 0,
   ];
   for (const f of PEOPLE_FIELDS) {
-    if (body[f] !== undefined && body[f] !== '') { cols.push(f); values.push(typeof body[f] === 'string' ? body[f].trim() : body[f]); }
+    if (body[f] !== undefined && body[f] !== '') { cols.push(f); values.push(normalizePersonField(f, body[f])); }
   }
   const placeholders = cols.map(() => '?').join(', ');
-  const result = db.prepare(`INSERT INTO people (${cols.join(', ')}) VALUES (${placeholders})`).run(...values);
-  res.json({ success: true, id: result.lastInsertRowid });
+  const id = db.prepare(`INSERT INTO people (${cols.join(', ')}) VALUES (${placeholders})`).run(...values).lastInsertRowid;
+  if (body.links !== undefined && setPersonLinks(id, body.links) > 0) syncContattoRole(id);
+  res.json({ success: true, id });
 });
 
 app.patch('/api/admin/people/:id', authAdmin, (req, res) => {
   const body = req.body || {};
+  const id = req.params.id;
+  if (body.email !== undefined && personEmailTaken(body.email, id)) return res.status(409).json({ error: PERSON_EMAIL_TAKEN_ERROR });
   const updates = [], params = [];
   if (body.roles !== undefined) { updates.push('roles = ?'); params.push(JSON.stringify(Array.isArray(body.roles) ? body.roles : [])); }
   if (body.source_channels !== undefined) { updates.push('source_channels = ?'); params.push(JSON.stringify(Array.isArray(body.source_channels) ? body.source_channels : [])); }
@@ -3440,15 +3577,16 @@ app.patch('/api/admin/people/:id', authAdmin, (req, res) => {
   if (body.wine_club !== undefined) { updates.push('wine_club = ?'); params.push(body.wine_club ? 1 : 0); }
   if (body.profiling_consent !== undefined) { updates.push('profiling_consent = ?'); params.push(body.profiling_consent ? 1 : 0); }
   for (const f of PEOPLE_FIELDS) {
-    if (body[f] !== undefined) { updates.push(`${f} = ?`); params.push(body[f] === '' ? null : body[f]); }
+    if (body[f] !== undefined) { updates.push(`${f} = ?`); params.push(body[f] === '' ? null : normalizePersonField(f, body[f])); }
   }
-  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
-  params.push(req.params.id);
-  db.prepare(`UPDATE people SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  if (!updates.length && body.links === undefined) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  if (updates.length) db.prepare(`UPDATE people SET ${updates.join(', ')} WHERE id = ?`).run(...params, id);
+  if (body.links !== undefined && setPersonLinks(id, body.links) > 0) syncContattoRole(id);
   res.json({ success: true });
 });
 
 app.delete('/api/admin/people/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM person_links WHERE person_id = ?').run(req.params.id);
   db.prepare('DELETE FROM people WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
@@ -3470,7 +3608,7 @@ app.get('/api/admin/fairs', authAdmin, (req, res) => {
   res.json(db.prepare(`
     SELECT f.*,
       (SELECT COUNT(*) FROM customers c WHERE c.source_fair_id = f.id) AS customers_count,
-      (SELECT COUNT(*) FROM contacts ct WHERE ct.source_fair_id = f.id) AS contacts_count,
+      (SELECT COUNT(*) FROM person_links pl WHERE pl.source_fair_id = f.id) AS contacts_count,
       (SELECT COUNT(*) FROM fair_attachments fa WHERE fa.fair_id = f.id) AS attachments_count
     FROM fairs f ORDER BY f.start_date DESC, f.id DESC
   `).all());
@@ -3481,14 +3619,14 @@ app.get('/api/admin/fairs/:id', authAdmin, (req, res) => {
   if (!fair) return res.status(404).json({ error: 'Fiera non trovata.' });
   fair.customers = db.prepare('SELECT id, name, city, province FROM customers WHERE source_fair_id = ? ORDER BY name').all(fair.id);
   fair.contacts = db.prepare(`
-    SELECT ct.*,
-      CASE ct.entity_type
-        WHEN 'customer' THEN (SELECT name FROM customers WHERE id = ct.entity_id)
-        WHEN 'agent' THEN (SELECT name FROM agents WHERE id = ct.entity_id)
-        WHEN 'importer' THEN (SELECT name FROM importers WHERE id = ct.entity_id)
-        WHEN 'supplier' THEN (SELECT name FROM suppliers WHERE id = ct.entity_id)
-      END AS entity_name
-    FROM contacts ct WHERE ct.source_fair_id = ? ORDER BY ct.name
+    SELECT p.id, p.name, p.email, p.phone, l.contact_role AS role, l.entity_type, l.entity_id,
+      COALESCE(c.name, i.name, a.name, s.name) AS entity_name
+    FROM person_links l JOIN people p ON p.id = l.person_id
+    LEFT JOIN customers c ON l.entity_type = 'customer' AND c.id = l.entity_id
+    LEFT JOIN importers i ON l.entity_type = 'importer' AND i.id = l.entity_id
+    LEFT JOIN agents a ON l.entity_type = 'agent' AND a.id = l.entity_id
+    LEFT JOIN suppliers s ON l.entity_type = 'supplier' AND s.id = l.entity_id
+    WHERE l.source_fair_id = ? ORDER BY p.name
   `).all(fair.id);
   fair.attachments = db.prepare('SELECT * FROM fair_attachments WHERE fair_id = ? ORDER BY uploaded_at DESC').all(fair.id);
   res.json(fair);
@@ -3517,7 +3655,7 @@ app.delete('/api/admin/fairs/:id', authAdmin, (req, res) => {
   for (const a of attachments) { try { fs.unlinkSync(path.join(fairAttachmentsDir, a.filename)); } catch {} }
   db.prepare('DELETE FROM fair_attachments WHERE fair_id = ?').run(req.params.id);
   db.prepare('UPDATE customers SET source_fair_id = NULL WHERE source_fair_id = ?').run(req.params.id);
-  db.prepare('UPDATE contacts SET source_fair_id = NULL WHERE source_fair_id = ?').run(req.params.id);
+  db.prepare('UPDATE person_links SET source_fair_id = NULL WHERE source_fair_id = ?').run(req.params.id);
   db.prepare('DELETE FROM fairs WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
@@ -3597,6 +3735,7 @@ app.patch('/api/admin/importers/:id', authAdmin, (req, res) => {
 });
 app.delete('/api/admin/importers/:id', authAdmin, (req, res) => {
   db.prepare('UPDATE customers SET supplied_by_importer_id = NULL WHERE supplied_by_importer_id = ?').run(req.params.id);
+  deleteEntityLinks('importer', req.params.id);
   db.prepare('DELETE FROM importers WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
@@ -3647,6 +3786,7 @@ app.patch('/api/admin/suppliers/:id', authAdmin, (req, res) => {
   res.json({ success: true });
 });
 app.delete('/api/admin/suppliers/:id', authAdmin, (req, res) => {
+  deleteEntityLinks('supplier', req.params.id);
   db.prepare('DELETE FROM suppliers WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
@@ -3753,21 +3893,21 @@ app.get('/api/admin/crm/:entityType/:entityId/activity', authAdmin, (req, res) =
 // sono ora Persone (people, ruolo "contatto") collegate tramite la FK dedicata — non la
 // vecchia tabella polimorfica contacts. Supplier resta sulla vecchia tabella: il modello
 // Persone non copre i fornitori per scelta esplicita.
-const PEOPLE_CONTACT_ENTITY_TYPES = ['customer', 'agent', 'importer'];
-function peopleFkColumn(entityType) { return entityType + '_id'; }
-
+// Contatti di un'anagrafica = persone collegate tramite person_links. La stessa persona può essere
+// referente di più anagrafiche, con un ruolo diverso per ciascuna.
 app.get('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) => {
   const { entityType, entityId } = req.params;
-  if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
-  if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
-    const rows = db.prepare(`SELECT id, name, first_name, last_name, contact_role AS role, email, phone, notes FROM people WHERE ${peopleFkColumn(entityType)} = ? AND roles LIKE '%"contatto"%' ORDER BY name`).all(entityId);
-    return res.json(rows);
-  }
-  res.json(db.prepare('SELECT * FROM contacts WHERE entity_type = ? AND entity_id = ? ORDER BY name').all(entityType, entityId));
+  if (!LINK_ENTITY_TABLES[entityType]) return res.status(400).json({ error: 'Tipo non valido.' });
+  res.json(db.prepare(`
+    SELECT p.id, p.name, p.first_name, p.last_name, p.email, p.phone, p.mobile, p.notes, l.contact_role AS role
+    FROM person_links l JOIN people p ON p.id = l.person_id
+    WHERE l.entity_type = ? AND l.entity_id = ? ORDER BY p.name
+  `).all(entityType, entityId));
 });
 app.post('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) => {
   const { entityType, entityId } = req.params;
-  if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
+  if (!LINK_ENTITY_TABLES[entityType]) return res.status(400).json({ error: 'Tipo non valido.' });
+  if (!linkEntityExists(entityType, entityId)) return res.status(404).json({ error: 'Anagrafica non trovata.' });
   const { first_name, last_name, role, email, phone, mobile, notes, source_fair_id } = req.body || {};
   const name = `${first_name?.trim() || ''} ${last_name?.trim() || ''}`.trim();
   if (!name) return res.status(400).json({ error: 'Il nome del contatto è obbligatorio.' });
@@ -3780,75 +3920,53 @@ app.post('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) 
       finalNotes = finalNotes ? `${autoNote}\n\n${finalNotes}` : autoNote;
     }
   }
-  if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
-    const fkCol = peopleFkColumn(entityType);
-    const emailClean = email?.trim().toLowerCase() || null;
-    // Dedupe by email against the unified Persone identity instead of always inserting a new
-    // row — otherwise the same real person ends up duplicated across the Contatti list.
-    const existing = emailClean ? db.prepare('SELECT * FROM people WHERE email = ?').get(emailClean) : null;
-    if (existing) {
-      if (existing[fkCol] && String(existing[fkCol]) !== String(entityId)) {
-        return res.status(409).json({ error: 'Esiste già una persona con questa email, collegata a un\'altra anagrafica. Cercala in Contatti per gestirla da lì.' });
-      }
-      const roles = new Set(JSON.parse(existing.roles || '[]'));
-      roles.add('contatto');
-      db.prepare(`UPDATE people SET roles = ?, contact_role = ?, phone = COALESCE(phone, ?), notes = COALESCE(notes, ?), ${fkCol} = ? WHERE id = ?`)
-        .run(JSON.stringify([...roles]), role?.trim() || existing.contact_role || null, phone?.trim() || null, finalNotes, entityId, existing.id);
-      return res.json({ success: true, id: existing.id });
-    }
-    const result = db.prepare(`
-      INSERT INTO people (name, first_name, last_name, contact_role, email, phone, notes, roles, source_channels, ${fkCol})
-      VALUES (?, ?, ?, ?, ?, ?, ?, '["contatto"]', '[]', ?)
-    `).run(name, first_name?.trim() || null, last_name?.trim() || null, role?.trim() || null, emailClean, phone?.trim() || null, finalNotes, entityId);
-    return res.json({ success: true, id: result.lastInsertRowid });
+  // Dedupe by email only: colleagues often share an office phone, so phone is not an identity here.
+  const emailClean = email?.trim().toLowerCase() || null;
+  let personId = emailClean ? db.prepare('SELECT id FROM people WHERE lower(email) = ?').get(emailClean)?.id : null;
+  if (personId) {
+    db.prepare('UPDATE people SET phone = COALESCE(phone, ?), mobile = COALESCE(mobile, ?), notes = COALESCE(notes, ?) WHERE id = ?')
+      .run(phone?.trim() || null, mobile?.trim() || null, finalNotes, personId);
+  } else {
+    personId = db.prepare(`INSERT INTO people (name, first_name, last_name, email, phone, mobile, notes, roles, source_channels) VALUES (?, ?, ?, ?, ?, ?, ?, '["contatto"]', '[]')`)
+      .run(name, first_name?.trim() || null, last_name?.trim() || null, emailClean, phone?.trim() || null, mobile?.trim() || null, finalNotes).lastInsertRowid;
   }
-  const result = db.prepare('INSERT INTO contacts (entity_type, entity_id, name, role, email, phone, mobile, notes, source_fair_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(entityType, entityId, name, role?.trim() || null, email?.trim() || null, phone?.trim() || null, mobile?.trim() || null, finalNotes, source_fair_id || null);
-  res.json({ success: true, id: result.lastInsertRowid });
+  db.prepare(`
+    INSERT INTO person_links (person_id, entity_type, entity_id, contact_role, source_fair_id) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(person_id, entity_type, entity_id) DO UPDATE SET
+      contact_role = COALESCE(excluded.contact_role, contact_role),
+      source_fair_id = COALESCE(source_fair_id, excluded.source_fair_id)
+  `).run(personId, entityType, entityId, role?.trim() || null, source_fair_id || null);
+  syncContattoRole(personId);
+  res.json({ success: true, id: personId });
 });
-app.patch('/api/admin/crm/:entityType/contacts/:id', authAdmin, (req, res) => {
-  const { entityType, id } = req.params;
-  if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
-  if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
-    const body = { ...req.body };
-    if (body.first_name !== undefined || body.last_name !== undefined) {
-      const current = db.prepare('SELECT first_name, last_name FROM people WHERE id = ?').get(id) || {};
-      const fn = body.first_name !== undefined ? body.first_name : current.first_name;
-      const ln = body.last_name !== undefined ? body.last_name : current.last_name;
-      body.name = `${fn?.trim() || ''} ${ln?.trim() || ''}`.trim();
-    }
-    const fields = ['name', 'first_name', 'last_name', 'email', 'phone', 'notes'];
-    const updates = [], params = [];
-    for (const f of fields) if (body[f] !== undefined) { updates.push(`${f} = ?`); params.push(body[f] === '' ? null : body[f]); }
-    if (body.role !== undefined) { updates.push('contact_role = ?'); params.push(body.role || null); }
-    if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
-    params.push(id);
-    db.prepare(`UPDATE people SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-    return res.json({ success: true });
+app.patch('/api/admin/crm/:entityType/:entityId/contacts/:personId', authAdmin, (req, res) => {
+  const { entityType, entityId, personId } = req.params;
+  if (!LINK_ENTITY_TABLES[entityType]) return res.status(400).json({ error: 'Tipo non valido.' });
+  const link = db.prepare('SELECT id FROM person_links WHERE person_id = ? AND entity_type = ? AND entity_id = ?').get(personId, entityType, entityId);
+  if (!link) return res.status(404).json({ error: 'Contatto non trovato.' });
+  const body = { ...req.body };
+  if (body.email !== undefined && personEmailTaken(body.email, personId)) return res.status(409).json({ error: PERSON_EMAIL_TAKEN_ERROR });
+  if (body.first_name !== undefined || body.last_name !== undefined) {
+    const current = db.prepare('SELECT first_name, last_name FROM people WHERE id = ?').get(personId) || {};
+    const fn = body.first_name !== undefined ? body.first_name : current.first_name;
+    const ln = body.last_name !== undefined ? body.last_name : current.last_name;
+    body.name = `${fn?.trim() || ''} ${ln?.trim() || ''}`.trim();
   }
-  const fields = ['name', 'role', 'email', 'phone', 'mobile', 'notes'];
   const updates = [], params = [];
-  for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
-  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
-  params.push(id);
-  db.prepare(`UPDATE contacts SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  for (const f of ['name', 'first_name', 'last_name', 'email', 'phone', 'mobile', 'notes']) {
+    if (body[f] !== undefined) { updates.push(`${f} = ?`); params.push(body[f] === '' ? null : normalizePersonField(f, body[f])); }
+  }
+  if (updates.length) db.prepare(`UPDATE people SET ${updates.join(', ')} WHERE id = ?`).run(...params, personId);
+  if (body.role !== undefined) db.prepare('UPDATE person_links SET contact_role = ? WHERE id = ?').run(body.role?.trim() || null, link.id);
   res.json({ success: true });
 });
-app.delete('/api/admin/crm/:entityType/contacts/:id', authAdmin, (req, res) => {
-  const { entityType, id } = req.params;
-  if (!validEntityType(entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
-  if (PEOPLE_CONTACT_ENTITY_TYPES.includes(entityType)) {
-    // This removes the person as a contact of THIS entity — it must not delete the shared Persona
-    // record, which may carry its own roles (cliente_finale, wine club, ...) and transaction history.
-    // Deleting the person outright is a separate, deliberate action from the main Contatti list.
-    const person = db.prepare('SELECT roles FROM people WHERE id = ?').get(id);
-    if (!person) return res.json({ success: true });
-    const roles = JSON.parse(person.roles || '[]').filter(r => r !== 'contatto');
-    db.prepare(`UPDATE people SET roles = ?, contact_role = NULL, ${peopleFkColumn(entityType)} = NULL WHERE id = ?`)
-      .run(JSON.stringify(roles), id);
-    return res.json({ success: true });
-  }
-  db.prepare('DELETE FROM contacts WHERE id = ?').run(id);
+app.delete('/api/admin/crm/:entityType/:entityId/contacts/:personId', authAdmin, (req, res) => {
+  const { entityType, entityId, personId } = req.params;
+  if (!LINK_ENTITY_TABLES[entityType]) return res.status(400).json({ error: 'Tipo non valido.' });
+  // Removes the person as a contact of this anagrafica only: the Persona itself, its links to
+  // other anagrafiche and its transaction history all stay.
+  db.prepare('DELETE FROM person_links WHERE person_id = ? AND entity_type = ? AND entity_id = ?').run(personId, entityType, entityId);
+  syncContattoRole(personId);
   res.json({ success: true });
 });
 

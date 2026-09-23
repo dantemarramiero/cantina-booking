@@ -1561,6 +1561,7 @@
       <div class="field"><label>Email</label><input type="email" id="ppl-email"></div>
       <div class="field"><label>Telefono</label><input id="ppl-phone"></div>
     </div>
+    <div class="field"><label>Cellulare</label><input id="ppl-mobile"></div>
     <div class="field-row">
       <div class="field"><label>Data di nascita</label><input type="date" id="ppl-birth-date"></div>
       <div class="field"><label>Lingua preferita</label>
@@ -1582,23 +1583,11 @@
     </div>
 
     <div id="ppl-contact-fields" style="display:none">
-      <div class="field-row">
-        <div class="field"><label>Ruolo del contatto</label>
-          <select id="ppl-contact-role">
-            <option value="">— Nessuno —</option>
-            <option value="titolare">Titolare</option>
-            <option value="maitre">Maitre</option>
-            <option value="cameriere">Cameriere</option>
-            <option value="commerciale">Commerciale</option>
-            <option value="referente">Referente</option>
-          </select>
-        </div>
+      <div class="field">
+        <label>Referente di</label>
+        <div id="ppl-links"></div>
+        <button type="button" class="btn secondary small" style="margin-top:6px" onclick="addPersonLinkRow()">+ Aggiungi anagrafica</button>
       </div>
-      <div class="field-row">
-        <div class="field"><label>Azienda cliente</label><select id="ppl-customer"><option value="">— Nessuna —</option></select></div>
-        <div class="field"><label>Importatore</label><select id="ppl-importer"><option value="">— Nessuno —</option></select></div>
-      </div>
-      <div class="field"><label>Agente</label><select id="ppl-agent"><option value="">— Nessuno —</option></select></div>
     </div>
 
     <div class="field">
@@ -3593,8 +3582,11 @@ async function loadFairDetail(id) {
       <div style="margin-top:14px">
         ${f.contacts.length ? f.contacts.map(c => `
           <div class="crm-activity-item">
-            <div class="crm-item-top"><span class="crm-item-title">${esc(c.name)}${c.role ? ' · ' + esc(c.role) : ''}</span></div>
-            <span class="crm-item-meta">${[c.entity_name, c.email, c.phone].filter(Boolean).map(esc).join(' · ')}</span>
+            <div class="crm-item-top"><span class="crm-item-title"><span style="cursor:pointer;color:var(--wine)" onclick="openPersonById(${c.id})">${esc(c.name)}</span>${c.role ? ' · ' + esc(PPL_CONTACT_ROLE_LABELS[c.role] || c.role) : ''}</span></div>
+            <span class="crm-item-meta">${[
+              c.entity_name ? `<span style="cursor:pointer;color:var(--wine)" onclick="openCrmRecord('${c.entity_type}', ${c.entity_id})">${esc(c.entity_name)}</span>` : '',
+              esc(c.email), esc(c.phone),
+            ].filter(Boolean).join(' · ')}</span>
           </div>
         `).join('') : '<p class="crm-tc-empty">Nessun contatto raccolto ancora.</p>'}
       </div>
@@ -3926,10 +3918,11 @@ async function loadPeople() {
   if (role) params.set('role', role);
   const rows = await api('/api/admin/people' + (params.toString() ? '?' + params.toString() : ''));
   document.getElementById('people-tbody').innerHTML = rows.length ? rows.map(p => {
-    const linkedTo = p.customer_name || p.importer_name || p.agent_name;
-    const linkedType = p.customer_name ? 'customer' : (p.importer_name ? 'importer' : (p.agent_name ? 'agent' : null));
-    const linkedId = p.customer_id || p.importer_id || p.agent_id;
-    const linkedHtml = linkedTo ? ` · <span style="cursor:pointer;color:var(--wine)" onclick="event.stopPropagation();openCrmRecord('${linkedType}', ${linkedId})">${esc(linkedTo)}</span>` : '';
+    const links = p.links || [];
+    const linkedHtml = links.length
+      ? ' · ' + links.slice(0, 2).map(l => `<span style="cursor:pointer;color:var(--wine)" onclick="event.stopPropagation();openCrmRecord('${l.entity_type}', ${l.entity_id})">${esc(l.entity_name)}</span>`).join(', ')
+        + (links.length > 2 ? ` +${links.length - 2}` : '')
+      : '';
     return `
     <div class="list-row">
       <div class="list-row-icon" style="cursor:pointer" onclick="openCrmRecord('person', ${p.id})">${esc(p.name).charAt(0).toUpperCase()}</div>
@@ -3952,6 +3945,39 @@ async function loadPeople() {
 function togglePersonContactFields() {
   const isContact = document.querySelector('.ppl-role[value="contatto"]').checked;
   document.getElementById('ppl-contact-fields').style.display = isContact ? 'block' : 'none';
+  if (isContact && !document.querySelector('#ppl-links .ppl-link-row')) addPersonLinkRow();
+}
+
+const PPL_LINK_TYPE_LABELS = { customer: 'Cliente', importer: 'Importatore', agent: 'Agente', supplier: 'Fornitore' };
+let PPL_LINK_OPTIONS = { customer: [], importer: [], agent: [], supplier: [] };
+
+// Option list for a contact's role; keeps a free-text role (e.g. from old supplier contacts) selectable.
+function contactRoleOptionsHtml(selected) {
+  const opts = [['', '— Nessun ruolo —'], ...Object.entries(PPL_CONTACT_ROLE_LABELS)];
+  if (selected && !PPL_CONTACT_ROLE_LABELS[selected]) opts.push([selected, selected]);
+  return opts.map(([v, l]) => `<option value="${esc(v)}" ${v === (selected || '') ? 'selected' : ''}>${esc(l)}</option>`).join('');
+}
+
+function personLinkEntityOptions(type, selectedId) {
+  return '<option value="">— Seleziona —</option>' + (PPL_LINK_OPTIONS[type] || []).map(o =>
+    `<option value="${o.id}" ${String(o.id) === String(selectedId) ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
+}
+
+function personLinkRowHtml(l = {}) {
+  const type = l.entity_type || 'customer';
+  return `
+    <div class="ppl-link-row" style="display:grid;grid-template-columns:120px minmax(0,1fr) 130px auto;gap:6px;margin-bottom:6px;align-items:center">
+      <select class="ppl-link-type" onchange="this.parentElement.querySelector('.ppl-link-entity').innerHTML = personLinkEntityOptions(this.value)">
+        ${Object.entries(PPL_LINK_TYPE_LABELS).map(([v, lab]) => `<option value="${v}" ${v === type ? 'selected' : ''}>${lab}</option>`).join('')}
+      </select>
+      <select class="ppl-link-entity">${personLinkEntityOptions(type, l.entity_id)}</select>
+      <select class="ppl-link-role">${contactRoleOptionsHtml(l.contact_role)}</select>
+      <button type="button" class="btn-outline-pill danger" title="Rimuovi" onclick="this.parentElement.remove()">×</button>
+    </div>`;
+}
+
+function addPersonLinkRow() {
+  document.getElementById('ppl-links').insertAdjacentHTML('beforeend', personLinkRowHtml());
 }
 
 async function openPersonById(id) {
@@ -3966,13 +3992,13 @@ async function openPersonModal(p) {
   document.getElementById('ppl-last-name').value = p ? (p.last_name || splitName(p.name).last) : '';
   document.getElementById('ppl-email').value = p ? (p.email || '') : '';
   document.getElementById('ppl-phone').value = p ? (p.phone || '') : '';
+  document.getElementById('ppl-mobile').value = p ? (p.mobile || '') : '';
   document.getElementById('ppl-notes').value = p ? (p.notes || '') : '';
   document.getElementById('ppl-newsletter').checked = !!(p && p.newsletter_opt_in);
   document.getElementById('ppl-wine-club').checked = !!(p && p.wine_club);
   document.getElementById('ppl-profiling-consent').checked = !!(p && p.profiling_consent);
   document.getElementById('ppl-birth-date').value = p ? (p.birth_date || '') : '';
   document.getElementById('ppl-language').value = p ? (p.preferred_language || '') : '';
-  document.getElementById('ppl-contact-role').value = p ? (p.contact_role || '') : '';
 
   const roles = p ? (p.roles || []) : [];
   document.querySelectorAll('.ppl-role').forEach(cb => { cb.checked = roles.includes(cb.value); });
@@ -3981,14 +4007,9 @@ async function openPersonModal(p) {
   togglePersonContactFields();
 
   if (!AGENTS.length) AGENTS = await api('/api/admin/agents');
-  document.getElementById('ppl-agent').innerHTML = '<option value="">— Nessuno —</option>' +
-    AGENTS.map(a => `<option value="${a.id}" ${p && p.agent_id === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('');
-  const customers = await api('/api/admin/customers');
-  document.getElementById('ppl-customer').innerHTML = '<option value="">— Nessuna —</option>' +
-    customers.map(c => `<option value="${c.id}" ${p && p.customer_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
-  const importers = await api('/api/admin/importers');
-  document.getElementById('ppl-importer').innerHTML = '<option value="">— Nessuno —</option>' +
-    importers.map(i => `<option value="${i.id}" ${p && p.importer_id === i.id ? 'selected' : ''}>${esc(i.name)}</option>`).join('');
+  const [customers, importers, suppliers] = await Promise.all([api('/api/admin/customers'), api('/api/admin/importers'), api('/api/admin/suppliers')]);
+  PPL_LINK_OPTIONS = { customer: customers, importer: importers, agent: AGENTS, supplier: suppliers };
+  document.getElementById('ppl-links').innerHTML = (p?.links || []).map(personLinkRowHtml).join('');
 
   openModal('people-modal');
 }
@@ -4052,10 +4073,14 @@ async function savePerson() {
     email: document.getElementById('ppl-email').value.trim(),
     phone: document.getElementById('ppl-phone').value.trim(),
     notes: document.getElementById('ppl-notes').value.trim(),
-    contact_role: document.getElementById('ppl-contact-role').value,
-    customer_id: document.getElementById('ppl-customer').value || '',
-    importer_id: document.getElementById('ppl-importer').value || '',
-    agent_id: document.getElementById('ppl-agent').value || '',
+    mobile: document.getElementById('ppl-mobile').value.trim(),
+    links: document.querySelector('.ppl-role[value="contatto"]').checked
+      ? [...document.querySelectorAll('#ppl-links .ppl-link-row')].map(row => ({
+          entity_type: row.querySelector('.ppl-link-type').value,
+          entity_id: row.querySelector('.ppl-link-entity').value,
+          contact_role: row.querySelector('.ppl-link-role').value,
+        })).filter(l => l.entity_id)
+      : [],
     birth_date: document.getElementById('ppl-birth-date').value || '',
     preferred_language: document.getElementById('ppl-language').value || '',
     roles: [...document.querySelectorAll('.ppl-role:checked')].map(cb => cb.value),
@@ -4285,7 +4310,7 @@ function renderCrm2Meta() {
   }
   if (d.created_at) parts.push(`${CRM_SINCE_LABEL[type]} dal ${d.created_at.slice(0, 4)}`);
   if ((type === 'customer' || type === 'importer') && d.agent_name) parts.push(d.agent_name);
-  if (type === 'person') { const linkedTo = d.customer_name || d.importer_name || d.agent_name; if (linkedTo) parts.push(linkedTo); }
+  if (type === 'person' && (d.links || []).length) parts.push(d.links.map(l => l.entity_name).join(', '));
   document.getElementById('crm2-meta').innerHTML = parts.filter(Boolean).map((p, i) =>
     (i ? '<span class="sep">·</span>' : '') + `<span>${esc(p)}</span>`).join('');
 }
@@ -4355,24 +4380,21 @@ function renderCrm2Sections() {
   if (type === 'person') {
     const rolesLabel = (d.roles || []).map(r => PEOPLE_ROLE_LABELS[r] || r).join(', ') || null;
     const channelsLabel = (d.source_channels || []).map(c => PEOPLE_CHANNEL_LABELS[c] || c).join(', ') || null;
-    const linkedType = d.customer_id ? 'customer' : (d.importer_id ? 'importer' : (d.agent_id ? 'agent' : null));
-    const linkedName = d.customer_name || d.importer_name || d.agent_name;
-    const linkedLabel = { customer: 'Azienda cliente', importer: 'Importatore', agent: 'Agente' }[linkedType] || 'Azienda collegata';
     const rows = [
       crm2Row('Nome', d.first_name || splitName(d.name).first),
       crm2Row('Cognome', d.last_name || splitName(d.name).last),
       crm2Row('Email', d.email),
       crm2Row('Telefono', d.phone),
+      crm2Row('Cellulare', d.mobile),
       crm2Row('Data di nascita', d.birth_date),
       crm2Row('Lingua preferita', PPL_LANGUAGE_LABELS[d.preferred_language] || d.preferred_language),
       crm2Row('Ruoli', rolesLabel),
     ];
-    if ((d.roles || []).includes('contatto')) {
-      rows.push(crm2Row('Ruolo contatto', d.contact_role ? (PPL_CONTACT_ROLE_LABELS[d.contact_role] || d.contact_role) : null));
-      rows.push(linkedName
-        ? `<div class="crm2-field-row"><span class="crm2-field-label">${esc(linkedLabel)}</span><span class="crm2-field-value"><span style="cursor:pointer;color:var(--wine)" onclick="openCrmRecord('${linkedType}', ${d[linkedType + '_id']})">${esc(linkedName)}</span></span></div>`
-        : crm2Row(linkedLabel, null));
+    for (const l of d.links || []) {
+      const role = l.contact_role ? ` (${PPL_CONTACT_ROLE_LABELS[l.contact_role] || l.contact_role})` : '';
+      rows.push(crm2LinkRow(`Referente di · ${PPL_LINK_TYPE_LABELS[l.entity_type]}${role}`, l.entity_name, l.entity_type, l.entity_id));
     }
+    if ((d.roles || []).includes('contatto') && !(d.links || []).length) rows.push(crm2Row('Referente di', null));
     rows.push(crm2Row('Canale di origine', channelsLabel));
     rows.push(crm2Row('Newsletter', d.newsletter_opt_in ? 'Sì' : 'No'));
     rows.push(crm2Row('Consenso profilazione', d.profiling_consent ? 'Sì' : 'No'));
@@ -4820,14 +4842,13 @@ async function deleteCrmNote(noteId) {
 // ── Contatti ──────────────────────────────────────────────────────────────────
 async function loadCrmContacts() {
   const { type, id } = CRM_CURRENT;
-  const isPeopleBacked = ['customer', 'agent', 'importer'].includes(type);
   const rows = await api(`/api/admin/crm/${type}/${id}/contacts`);
   document.getElementById('crm-contacts-list').innerHTML = rows.length ? rows.map(c => `
     <div class="crm-activity-item">
       <div class="crm-item-top">
         <div>
-          <span class="crm-item-title"${isPeopleBacked ? ` style="cursor:pointer;color:var(--wine)" onclick="openPersonById(${c.id})"` : ''}>${esc(c.name)}</span>
-          ${c.role ? '<span class="crm-item-meta"> · ' + esc(c.role) + '</span>' : ''}
+          <span class="crm-item-title" style="cursor:pointer;color:var(--wine)" onclick="openPersonById(${c.id})">${esc(c.name)}</span>
+          ${c.role ? '<span class="crm-item-meta"> · ' + esc(PPL_CONTACT_ROLE_LABELS[c.role] || c.role) + '</span>' : ''}
         </div>
         <div class="crm-item-actions">
           <button class="btn-outline-pill" onclick='openCrmContactModal(${jsonAttrP(c)})'>Modifica</button>
@@ -4848,7 +4869,7 @@ function openCrmContactModal(c) {
   document.getElementById('crm-contact-id').value = c ? c.id : '';
   document.getElementById('crm-contact-first-name').value = c ? (c.first_name || splitName(c.name).first) : '';
   document.getElementById('crm-contact-last-name').value = c ? (c.last_name || splitName(c.name).last) : '';
-  document.getElementById('crm-contact-role').value = c ? (c.role || '') : '';
+  document.getElementById('crm-contact-role').innerHTML = contactRoleOptionsHtml(c ? c.role : '');
   document.getElementById('crm-contact-email').value = c ? (c.email || '') : '';
   document.getElementById('crm-contact-phone').value = c ? (c.phone || '') : '';
   document.getElementById('crm-contact-mobile').value = c ? (c.mobile || '') : '';
@@ -4874,7 +4895,7 @@ async function saveCrmContact() {
     notes: document.getElementById('crm-contact-notes').value.trim(),
   };
   try {
-    if (contactId) await api(`/api/admin/crm/${type}/contacts/${contactId}`, { method: 'PATCH', body: JSON.stringify(body) });
+    if (contactId) await api(`/api/admin/crm/${type}/${id}/contacts/${contactId}`, { method: 'PATCH', body: JSON.stringify(body) });
     else await api(`/api/admin/crm/${type}/${id}/contacts`, { method: 'POST', body: JSON.stringify(body) });
     closeModal('crm-contact-modal');
     loadCrmContacts();
@@ -4884,13 +4905,9 @@ async function saveCrmContact() {
 }
 
 async function deleteCrmContact(contactId) {
-  const { type } = CRM_CURRENT;
-  const isPeopleBacked = ['customer', 'agent', 'importer'].includes(type);
-  const confirmMsg = isPeopleBacked
-    ? 'Rimuovere questo contatto da qui? La persona resterà comunque nell\'anagrafica Contatti.'
-    : 'Eliminare questo contatto?';
-  if (!confirm(confirmMsg)) return;
-  await api(`/api/admin/crm/${type}/contacts/${contactId}`, { method: 'DELETE' });
+  const { type, id } = CRM_CURRENT;
+  if (!confirm("Rimuovere questo contatto da qui? La persona resterà comunque nell'anagrafica Contatti.")) return;
+  await api(`/api/admin/crm/${type}/${id}/contacts/${contactId}`, { method: 'DELETE' });
   loadCrmContacts();
 }
 
