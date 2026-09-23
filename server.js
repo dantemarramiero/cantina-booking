@@ -3259,6 +3259,7 @@ app.post('/api/admin/agents/:id/regenerate-token', authAdmin, (req, res) => {
 
 app.delete('/api/admin/agents/:id', authAdmin, (req, res) => {
   db.prepare('UPDATE customers SET agent_id = NULL WHERE agent_id = ?').run(req.params.id);
+  db.prepare('UPDATE importers SET agent_id = NULL WHERE agent_id = ?').run(req.params.id);
   db.prepare('DELETE FROM agent_provinces WHERE agent_id = ?').run(req.params.id);
   db.prepare('DELETE FROM agents WHERE id = ?').run(req.params.id);
   res.json({ success: true });
@@ -3291,7 +3292,7 @@ const CUSTOMER_FIELDS = [
 ];
 
 app.get('/api/admin/customers', authAdmin, (req, res) => {
-  const { q, agent_id } = req.query;
+  const { q, agent_id, supplied_by_importer_id, supplied_by_distributor_id } = req.query;
   let sql = `
     SELECT c.*, a.name AS agent_name, pl.name AS price_list_name,
       (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) AS order_count,
@@ -3300,6 +3301,8 @@ app.get('/api/admin/customers', authAdmin, (req, res) => {
     WHERE 1=1`;
   const params = [];
   if (agent_id) { sql += ' AND c.agent_id = ?'; params.push(agent_id); }
+  if (supplied_by_importer_id) { sql += ' AND c.supplied_by_importer_id = ?'; params.push(supplied_by_importer_id); }
+  if (supplied_by_distributor_id) { sql += ' AND c.supplied_by_distributor_id = ?'; params.push(supplied_by_distributor_id); }
   if (q) { sql += ' AND (c.name LIKE ? OR c.email LIKE ? OR c.vat_number LIKE ?)'; const like = `%${q}%`; params.push(like, like, like); }
   sql += ' ORDER BY c.name';
   res.json(db.prepare(sql).all(...params));
@@ -3333,6 +3336,7 @@ app.patch('/api/admin/customers/:id', authAdmin, (req, res) => {
 
 app.delete('/api/admin/customers/:id', authAdmin, (req, res) => {
   db.prepare('UPDATE orders SET customer_id = NULL WHERE customer_id = ?').run(req.params.id);
+  db.prepare('UPDATE customers SET supplied_by_distributor_id = NULL WHERE supplied_by_distributor_id = ?').run(req.params.id);
   db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
@@ -3340,10 +3344,16 @@ app.delete('/api/admin/customers/:id', authAdmin, (req, res) => {
 app.get('/api/admin/customers/:id', authAdmin, (req, res) => {
   const c = db.prepare(`
     SELECT c.*, a.name AS agent_name,
+      si.name AS supplied_by_importer_name, sd.name AS supplied_by_distributor_name,
+      (SELECT COUNT(*) FROM customers x WHERE x.supplied_by_distributor_id = c.id) AS supplied_customers_count,
       (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) AS order_count,
       (SELECT COALESCE(SUM(o.total_cents),0) FROM orders o WHERE o.customer_id = c.id) AS revenue_cents,
       (SELECT MAX(o.order_date) FROM orders o WHERE o.customer_id = c.id) AS last_order_date
-    FROM customers c LEFT JOIN agents a ON a.id = c.agent_id WHERE c.id = ?
+    FROM customers c
+    LEFT JOIN agents a ON a.id = c.agent_id
+    LEFT JOIN importers si ON si.id = c.supplied_by_importer_id
+    LEFT JOIN customers sd ON sd.id = c.supplied_by_distributor_id
+    WHERE c.id = ?
   `).get(req.params.id);
   if (!c) return res.status(404).json({ error: 'Cliente non trovato.' });
   c.activity_status = customerActivityStatus(c.last_order_date);
@@ -3556,7 +3566,11 @@ app.get('/api/admin/importers', authAdmin, (req, res) => {
   res.json(db.prepare(sql).all(...params));
 });
 app.get('/api/admin/importers/:id', authAdmin, (req, res) => {
-  const row = db.prepare('SELECT i.*, a.name AS agent_name FROM importers i LEFT JOIN agents a ON a.id = i.agent_id WHERE i.id = ?').get(req.params.id);
+  const row = db.prepare(`
+    SELECT i.*, a.name AS agent_name,
+      (SELECT COUNT(*) FROM customers c WHERE c.supplied_by_importer_id = i.id) AS supplied_customers_count
+    FROM importers i LEFT JOIN agents a ON a.id = i.agent_id WHERE i.id = ?
+  `).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Importatore non trovato.' });
   Object.assign(row, crmCounts('importer', row.id));
   res.json(row);
@@ -3582,6 +3596,7 @@ app.patch('/api/admin/importers/:id', authAdmin, (req, res) => {
   res.json({ success: true });
 });
 app.delete('/api/admin/importers/:id', authAdmin, (req, res) => {
+  db.prepare('UPDATE customers SET supplied_by_importer_id = NULL WHERE supplied_by_importer_id = ?').run(req.params.id);
   db.prepare('DELETE FROM importers WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });

@@ -2254,6 +2254,17 @@
         <div id="crm-tracked-customers"></div>
       </div>
 
+      <div class="crm2-list-panel" id="crm2-list-clienti-riforniti" style="display:none">
+        <div class="crm2-list-panel-head">
+          <h2>Clienti riforniti</h2>
+          <div class="ord-new-dropdown">
+            <button class="btn-generate" style="margin-top:0" onclick="toggleCustLinkMenu(this, CRM_CURRENT.type === 'importer' ? 'importer' : 'distributor', CRM_CURRENT.id)">+ Nuovo cliente</button>
+            <div class="ord-new-menu"></div>
+          </div>
+        </div>
+        <div id="crm-supplied-customers"></div>
+      </div>
+
       <div class="crm2-list-panel" id="crm2-list-transazioni" style="display:none">
         <div class="crm2-list-panel-head"><h2>Transazioni</h2></div>
         <h3 style="font-size:15px;margin-bottom:10px">Visite ed eventi propri</h3>
@@ -3729,6 +3740,7 @@ const CUSTOMER_FIELD_MAP = {
 };
 
 async function openCustomerModal(c) {
+  CUSTOMER_MODAL_SOURCE_FAIR_ID = null;
   document.getElementById('customer-modal-msg').innerHTML = '';
   document.getElementById('customer-modal-title').textContent = c ? 'Modifica cliente' : 'Nuovo cliente';
   document.getElementById('cust-id').value = c ? c.id : '';
@@ -3759,8 +3771,8 @@ async function openCustomerModal(c) {
 
 let CUSTOMER_MODAL_SOURCE_FAIR_ID = null;
 
-// ── Nuovo cliente vs. associa cliente esistente (Agenti → Clienti seguiti, Fiere → Clienti incontrati) ──
-let CUST_LINK_CONTEXT = null; // { type: 'agent' | 'fair', id }
+// ── Nuovo cliente vs. associa cliente esistente (Clienti seguiti, Clienti incontrati, Clienti riforniti) ──
+let CUST_LINK_CONTEXT = null; // { type: 'agent' | 'fair' | 'importer' | 'distributor', id }
 
 function toggleCustLinkMenu(btn, type, id) {
   CUST_LINK_CONTEXT = { type, id };
@@ -3782,8 +3794,22 @@ document.addEventListener('click', (e) => {
 
 async function openNewCustomerFromLinkContext() {
   await openCustomerModal();
-  if (CUST_LINK_CONTEXT?.type === 'agent') document.getElementById('cust-agent').value = CUST_LINK_CONTEXT.id;
-  else if (CUST_LINK_CONTEXT?.type === 'fair') CUSTOMER_MODAL_SOURCE_FAIR_ID = CUST_LINK_CONTEXT.id;
+  const ctx = CUST_LINK_CONTEXT;
+  if (ctx?.type === 'agent') document.getElementById('cust-agent').value = ctx.id;
+  else if (ctx?.type === 'fair') CUSTOMER_MODAL_SOURCE_FAIR_ID = ctx.id;
+  else if (ctx?.type === 'importer') {
+    document.getElementById('cust-supplied-by-importer').value = ctx.id;
+    document.querySelector('.cust-relationship[value="tramite_importatore"]').checked = true;
+  } else if (ctx?.type === 'distributor') {
+    document.getElementById('cust-supplied-by-distributor').value = ctx.id;
+    document.querySelector('.cust-relationship[value="tramite_distributore"]').checked = true;
+  }
+}
+
+function customerRelationshipWith(c, value) {
+  const rel = new Set(JSON.parse(c.relationship_type || '[]'));
+  rel.add(value);
+  return JSON.stringify([...rel]);
 }
 
 function openAssociateCustomerModal() {
@@ -3827,6 +3853,19 @@ async function linkExistingCustomer(c) {
       if (c.source_fair_id && String(c.source_fair_id) !== String(ctx.id) && !confirm(`${c.name} è già associato a un'altra fiera. Spostarlo su questa fiera?`)) return;
       await api('/api/admin/customers/' + c.id, { method: 'PATCH', body: JSON.stringify({ source_fair_id: ctx.id }) });
       loadFairDetail(ctx.id);
+    } else if (ctx.type === 'importer') {
+      if (c.supplied_by_importer_id && String(c.supplied_by_importer_id) !== String(ctx.id) && !confirm(`${c.name} è già rifornito da un altro importatore. Spostarlo su questo importatore?`)) return;
+      await api('/api/admin/customers/' + c.id, { method: 'PATCH', body: JSON.stringify({
+        supplied_by_importer_id: ctx.id, relationship_type: customerRelationshipWith(c, 'tramite_importatore'),
+      }) });
+      loadCrmRecordData();
+    } else if (ctx.type === 'distributor') {
+      if (String(c.id) === String(ctx.id)) { msg.innerHTML = '<div class="msg error">Un distributore non può rifornire sé stesso.</div>'; return; }
+      if (c.supplied_by_distributor_id && String(c.supplied_by_distributor_id) !== String(ctx.id) && !confirm(`${c.name} è già rifornito da un altro distributore. Spostarlo su questo distributore?`)) return;
+      await api('/api/admin/customers/' + c.id, { method: 'PATCH', body: JSON.stringify({
+        supplied_by_distributor_id: ctx.id, relationship_type: customerRelationshipWith(c, 'tramite_distributore'),
+      }) });
+      loadCrmRecordData();
     }
     closeModal('assoc-customer-modal');
   } catch (e) {
@@ -3856,7 +3895,8 @@ async function saveCustomer() {
     closeModal('customer-modal');
     loadCustomers();
     if (CRM_CURRENT.type === 'agent') loadCrmTrackedCustomers();
-    if (CRM_CURRENT.type === 'customer' && String(CRM_CURRENT.id) === id) loadCrmRecordData();
+    const recordOpen = document.getElementById('crm-record-view').style.display === 'block';
+    if (recordOpen && ((CRM_CURRENT.type === 'customer' && String(CRM_CURRENT.id) === id) || CRM_ACTIVE_SECTION === 'clienti-riforniti')) loadCrmRecordData();
     if (CUSTOMER_MODAL_SOURCE_FAIR_ID) { loadFairDetail(CUSTOMER_MODAL_SOURCE_FAIR_ID); CUSTOMER_MODAL_SOURCE_FAIR_ID = null; }
   } catch (e) {
     msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
@@ -3873,6 +3913,7 @@ const PEOPLE_ROLE_LABELS = { cliente_finale: 'Cliente finale', cliente_evento: '
 const PEOPLE_CHANNEL_LABELS = { negozio_fisico: 'Negozio fisico', ecommerce: 'E-commerce', visita: 'Visita', evento_proprietario: 'Evento proprietario', evento_terzo: 'Evento terzo' };
 const PPL_CONTACT_ROLE_LABELS = { titolare: 'Titolare', maitre: 'Maitre', cameriere: 'Cameriere', commerciale: 'Commerciale', referente: 'Referente' };
 const PPL_LANGUAGE_LABELS = { it: 'Italiano', en: 'English' };
+const CUST_RELATIONSHIP_LABELS = { diretta: 'Diretta', tramite_importatore: 'Tramite importatore', tramite_distributore: 'Tramite distributore' };
 const CUST_BUSINESS_TYPE_LABELS = { ristoratore: 'Ristoratore', enoteca: 'Enoteca', wine_bar: 'Wine bar', hotel: 'Hotel', catering: 'Catering', gdo: 'GDO', ecommerce_b2b: 'E-commerce B2B', distributore: 'Distributore' };
 const IMPORTER_EXCLUSIVITY_LABELS = { esclusivo: 'Esclusivo', non_esclusivo: 'Non esclusivo' };
 const AGENT_CONTRACT_TYPE_LABELS = { monomandatario: 'Monomandatario', plurimandatario: 'Plurimandatario', dipendente: 'Dipendente' };
@@ -4299,6 +4340,11 @@ function crm2Row(label, value, addFn) {
   return `<div class="crm2-field-row"><span class="crm2-field-label">${esc(label)}</span><span class="crm2-field-value">${valueHtml}</span></div>`;
 }
 
+function crm2LinkRow(label, name, type, id) {
+  if (!name || !id) return crm2Row(label, null);
+  return `<div class="crm2-field-row"><span class="crm2-field-label">${esc(label)}</span><span class="crm2-field-value"><span style="cursor:pointer;color:var(--wine)" onclick="openCrmRecord('${type}', ${Number(id)})">${esc(name)}</span></span></div>`;
+}
+
 function renderCrm2Sections() {
   const { type, data: d } = CRM_CURRENT;
   document.getElementById('crm2-section-sedi').style.display = type === 'person' ? 'none' : '';
@@ -4398,6 +4444,9 @@ function renderCrm2Sections() {
   } else {
     commercialiHtml = [
       type === 'customer' ? crm2Row('Tipo', CUST_BUSINESS_TYPE_LABELS[d.business_type] || d.business_type) : '',
+      type === 'customer' ? crm2Row('Relazione con noi', JSON.parse(d.relationship_type || '[]').map(r => CUST_RELATIONSHIP_LABELS[r] || r).join(', ') || null) : '',
+      type === 'customer' ? crm2LinkRow('Fornito da importatore', d.supplied_by_importer_name, 'importer', d.supplied_by_importer_id) : '',
+      type === 'customer' ? crm2LinkRow('Fornito da distributore', d.supplied_by_distributor_name, 'customer', d.supplied_by_distributor_id) : '',
       crm2Row('Sconto standard (%)', d.discount_percent != null && d.discount_percent !== '' ? d.discount_percent + '%' : null),
       type === 'customer' ? crm2Row('Listino', d.price_list_name) : '',
       crm2Row('Agente collegato', d.agent_name),
@@ -4462,6 +4511,7 @@ function renderCrm2Index() {
   if (type === 'customer' || type === 'agent' || type === 'importer') items.push({ key: 'bottiglie', label: 'Bottiglie' });
   items.push({ key: 'compiti', label: 'Compiti', count: d.open_tasks_count });
   if (type === 'agent') items.push({ key: 'clienti-seguiti', label: 'Clienti seguiti' });
+  if (type === 'importer' || (type === 'customer' && d.business_type === 'distributore')) items.push({ key: 'clienti-riforniti', label: 'Clienti riforniti', count: d.supplied_customers_count });
   items.push({ key: 'documenti', label: 'Documenti', count: d.documents_count });
 
   document.getElementById('crm2-index').innerHTML = items.map(it => `
@@ -4474,7 +4524,7 @@ function crmSetActiveSection(section) {
   document.querySelectorAll('#crm2-index button').forEach(b => b.classList.toggle('active', b.dataset.section === section));
   const isAnagrafica = CRM_ANAGRAFICA_SECTIONS.includes(section);
   document.getElementById('crm2-anagrafica').style.display = isAnagrafica ? 'block' : 'none';
-  ['contatti', 'ordini', 'bottiglie', 'compiti', 'documenti', 'clienti-seguiti', 'transazioni'].forEach(k => {
+  ['contatti', 'ordini', 'bottiglie', 'compiti', 'documenti', 'clienti-seguiti', 'clienti-riforniti', 'transazioni'].forEach(k => {
     const el = document.getElementById('crm2-list-' + k);
     if (el) el.style.display = k === section ? 'block' : 'none';
   });
@@ -4487,6 +4537,7 @@ function crmSetActiveSection(section) {
   else if (section === 'compiti') loadCrmTasks();
   else if (section === 'documenti') loadCrmAttachments();
   else if (section === 'clienti-seguiti') loadCrmTrackedCustomers();
+  else if (section === 'clienti-riforniti') loadCrmSuppliedCustomers();
 }
 
 function renderCrm2Alert() {
@@ -4685,6 +4736,22 @@ function crmStatusTip(status) {
   if (status === 'attivo') return `Ha effettuato almeno un ordine negli ultimi ${a} mesi.`;
   if (status === 'semi_attivo') return `Ultimo ordine tra ${a} e ${s} mesi fa.`;
   return `Nessun ordine da più di ${s} mesi (o mai ordinato).`;
+}
+
+async function loadCrmSuppliedCustomers() {
+  const box = document.getElementById('crm-supplied-customers');
+  box.innerHTML = '<p class="crm-tc-empty">Caricamento...</p>';
+  const param = CRM_CURRENT.type === 'importer' ? 'supplied_by_importer_id' : 'supplied_by_distributor_id';
+  const rows = await api(`/api/admin/customers?${param}=${CRM_CURRENT.id}`);
+  box.innerHTML = rows.length ? rows.map(c => `
+    <div class="crm-tc-customer" onclick="openCrmRecord('customer', ${c.id})">
+      <div>
+        <div class="crm-item-title">${esc(c.name)}</div>
+        <div class="crm-item-meta">${esc(CUST_BUSINESS_TYPE_LABELS[c.business_type] || 'tipo non specificato')} · ${esc(c.city || 'nessuna località')}${c.province ? ' (' + esc(c.province) + ')' : ''}</div>
+      </div>
+      <div class="crm-tc-customer-right">${c.order_count} ordini · € ${fmtEuro(c.revenue_cents)}</div>
+    </div>
+  `).join('') : '<p class="crm-tc-empty">Nessun cliente rifornito.</p>';
 }
 
 async function loadCrmTrackedCustomers() {
