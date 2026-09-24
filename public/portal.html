@@ -6,6 +6,7 @@
 <title>Portale interno — Gestionale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="/css/portal-modules.css">
 <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,700;1,6..96,400&family=Sorts+Mill+Goudy:ital@0;1&family=Nunito+Sans:ital,opsz,wght@0,6..12,300;0,6..12,400;0,6..12,600;0,6..12,700;1,6..12,400&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -847,6 +848,14 @@
           <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg></span>
           CRM
         </button>
+        <button data-ws="people" onclick="switchWorkspace('people')">
+          <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 16.5c.6-1.6 1.9-2.5 3.5-2.5s2.9.9 3.5 2.5"/><line x1="15" y1="10" x2="19" y2="10"/><line x1="15" y1="14" x2="18" y2="14"/></svg></span>
+          People
+        </button>
+        <button data-ws="finance" onclick="switchWorkspace('finance')">
+          <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5a4.5 4.5 0 1 0 0 7"/><line x1="7" y1="10.5" x2="13" y2="10.5"/><line x1="7" y1="13.5" x2="13" y2="13.5"/></svg></span>
+          Finance
+        </button>
       </div>
     </div>
 
@@ -952,6 +961,48 @@
       <button data-sub="crm-fornitori">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
         Fornitori
+      </button>
+    </nav>
+
+    <nav class="sidebar-nav" data-workspace-nav="people" style="display:none">
+      <button data-sub="people-dipendenti" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"/></svg>
+        Dipendenti
+      </button>
+      <button data-sub="people-squadre">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
+        Squadre
+      </button>
+      <button data-sub="people-sedi">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+        Sedi e festività
+      </button>
+    </nav>
+
+    <nav class="sidebar-nav" data-workspace-nav="finance" style="display:none">
+      <button data-sub="fin-centri" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-2h12v2"/></svg>
+        Centri di costo
+      </button>
+      <button data-sub="fin-regole">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10"/><path d="M4 12h7"/><path d="M4 18h4"/><path d="M15 3l4 3-4 3"/><path d="M14 13l3 3-3 3"/></svg>
+        Ribaltamenti
+      </button>
+      <button data-sub="fin-driver">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>
+        Driver
+      </button>
+      <button data-sub="fin-costi">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2Z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
+        Costi diretti
+      </button>
+      <button data-sub="fin-cascata">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="4" rx="1"/><rect x="8.5" y="10" width="7" height="4" rx="1"/><rect x="14" y="17" width="7" height="4" rx="1"/><path d="M6.5 7v5h2M12 14v5h2"/></svg>
+        Cascata
+      </button>
+      <button data-sub="fin-oggetti">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
+        Oggetti di costo
       </button>
     </nav>
 
@@ -1331,6 +1382,23 @@
     </div>
 
     <!-- ═══ IMPOSTAZIONI ═══ -->
+    <!-- ═══ PEOPLE ═══ -->
+    <div class="module" id="module-people">
+      <div class="subpanel active" id="sub-people-dipendenti"><div id="people-dipendenti-root"></div></div>
+      <div class="subpanel" id="sub-people-squadre"><div id="people-squadre-root"></div></div>
+      <div class="subpanel" id="sub-people-sedi"><div id="people-sedi-root"></div></div>
+    </div>
+
+    <!-- ═══ FINANCE ═══ -->
+    <div class="module" id="module-finance">
+      <div class="subpanel active" id="sub-fin-centri"><div id="fin-centri-root"></div></div>
+      <div class="subpanel" id="sub-fin-regole"><div id="fin-regole-root"></div></div>
+      <div class="subpanel" id="sub-fin-driver"><div id="fin-driver-root"></div></div>
+      <div class="subpanel" id="sub-fin-costi"><div id="fin-costi-root"></div></div>
+      <div class="subpanel" id="sub-fin-cascata"><div id="fin-cascata-root"></div></div>
+      <div class="subpanel" id="sub-fin-oggetti"><div id="fin-oggetti-root"></div></div>
+    </div>
+
     <div class="module" id="module-impostazioni">
 
       <div id="settings-grid-view">
@@ -1748,6 +1816,14 @@
   <button type="button" data-ws="crm" onclick="switchWorkspace('crm')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
     <span>CRM</span>
+  </button>
+  <button type="button" data-ws="people" onclick="switchWorkspace('people')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 16.5c.6-1.6 1.9-2.5 3.5-2.5s2.9.9 3.5 2.5"/><line x1="15" y1="10" x2="19" y2="10"/><line x1="15" y1="14" x2="18" y2="14"/></svg>
+    <span>People</span>
+  </button>
+  <button type="button" data-ws="finance" onclick="switchWorkspace('finance')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5a4.5 4.5 0 1 0 0 7"/><line x1="7" y1="10.5" x2="13" y2="10.5"/><line x1="7" y1="13.5" x2="13" y2="13.5"/></svg>
+    <span>Finance</span>
   </button>
 </nav>
 </div>
@@ -2854,6 +2930,9 @@
   </div>
 </div>
 
+<script src="/js/portal-ui.js"></script>
+<script src="/js/portal-finance.js"></script>
+<script src="/js/portal-people.js"></script>
 <script>
 let ADMIN_KEY = null;
 let PRODUCTS = [];
@@ -2977,16 +3056,18 @@ function stockBadge(qty, threshold) {
 }
 
 // ── Workspace switcher (top-level area selector) ───────────────────────────────
-const WORKSPACE_LABELS = { enoturismo: 'Enoturismo', commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino', crm: 'CRM', impostazioni: 'Impostazioni' };
+const WORKSPACE_LABELS = { enoturismo: 'Enoturismo', commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino', crm: 'CRM', people: 'People', finance: 'Finance', impostazioni: 'Impostazioni' };
 const ALL_WORKSPACES = Object.keys(WORKSPACE_LABELS);
 const WORKSPACE_ICONS = {
   enoturismo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg>',
   commerciale: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>',
   produzione: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg>',
   magazzino: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/></svg>',
-  crm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>'
+  crm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>',
+  people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 16.5c.6-1.6 1.9-2.5 3.5-2.5s2.9.9 3.5 2.5"/><line x1="15" y1="10" x2="19" y2="10"/><line x1="15" y1="14" x2="18" y2="14"/></svg>',
+  finance: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5a4.5 4.5 0 1 0 0 7"/><line x1="7" y1="10.5" x2="13" y2="10.5"/><line x1="7" y1="13.5" x2="13" y2="13.5"/></svg>'
 };
-const MODULE_TITLES = { commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino', crm: 'CRM', impostazioni: 'Impostazioni' };
+const MODULE_TITLES = { commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino', crm: 'CRM', people: 'People', finance: 'Finance', impostazioni: 'Impostazioni' };
 
 function toggleWorkspaceMenu() { document.getElementById('workspace-menu').classList.toggle('open'); }
 document.addEventListener('click', (e) => {
@@ -3106,6 +3187,15 @@ function loadSubpanel(sub) {
   if (sub === 'prod-righe') loadProductionItems();
   if (sub === 'mag-dashboard') loadMagazzinoDashboard();
   if (sub === 'crm-dashboard') loadCrmDashboard();
+  if (sub === 'people-dipendenti') loadHrEmployees();
+  if (sub === 'people-squadre') loadHrTeams();
+  if (sub === 'people-sedi') loadHrSites();
+  if (sub === 'fin-centri') loadFinCenters();
+  if (sub === 'fin-regole') loadFinRules();
+  if (sub === 'fin-driver') loadFinDrivers();
+  if (sub === 'fin-costi') loadFinCosts();
+  if (sub === 'fin-cascata') loadFinCascade();
+  if (sub === 'fin-oggetti') loadFinObjects();
   if (sub === 'crm-persone') loadPeople();
   if (sub === 'crm-clienti') loadCustomers();
   if (sub === 'crm-agenti') loadAgents();
@@ -6524,12 +6614,13 @@ async function loadRolesMatrix() {
   if (!roles.length) { box.innerHTML = '<div class="list-empty">Nessun ruolo. Senza un ruolo assegnato, un utente ha accesso completo.</div>'; return; }
   box.innerHTML = `
     <table class="roles-matrix-table">
-      <thead><tr><th>Ruolo</th>${ALL_WORKSPACES.map(w => `<th>${esc(WORKSPACE_LABELS[w])}</th>`).join('')}<th></th></tr></thead>
+      <thead><tr><th>Ruolo</th>${ALL_WORKSPACES.map(w => `<th>${esc(WORKSPACE_LABELS[w])}</th>`).join('')}<th title="Oltre ai dati di base, quali dati HR riservati vede">Dati HR riservati</th><th></th></tr></thead>
       <tbody>
         ${roles.map(r => `
           <tr>
             <td class="roles-matrix-name">${esc(r.name)}</td>
             ${ALL_WORKSPACES.map(w => `<td style="text-align:center"><input type="checkbox" ${r.workspaces.includes(w) ? 'checked' : ''} onchange="toggleRolePermission(${r.id}, '${w}', this.checked)"></td>`).join('')}
+            <td style="white-space:nowrap">${HR_ACCESS_LEVELS.map(([l, label]) => `<label style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;font-size:11.5px;text-transform:none;letter-spacing:0;font-weight:400"><input type="checkbox" ${(r.access_levels || []).includes(l) ? 'checked' : ''} onchange="toggleRoleAccessLevel(${r.id}, '${l}', this.checked)">${label}</label>`).join('')}</td>
             <td><button class="btn-outline-pill danger" onclick="deleteRole(${r.id})">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
             </button></td>
@@ -6564,6 +6655,16 @@ async function toggleRolePermission(roleId, workspace, checked) {
   const workspaces = new Set(role.workspaces);
   if (checked) workspaces.add(workspace); else workspaces.delete(workspace);
   await api('/api/admin/roles/' + roleId, { method: 'PATCH', body: JSON.stringify({ workspaces: [...workspaces] }) });
+}
+
+// Livelli di riservatezza dei dati HR (People). "Base" ce l'hanno tutti.
+const HR_ACCESS_LEVELS = [['personale', 'Personali'], ['retributivo', 'Retributivi'], ['sanitario', 'Sanitari'], ['disciplinare', 'Disciplinari']];
+async function toggleRoleAccessLevel(roleId, level, checked) {
+  const roles = await api('/api/admin/roles');
+  const role = roles.find(r => r.id === roleId);
+  const levels = new Set(role.access_levels || []);
+  if (checked) levels.add(level); else levels.delete(level);
+  await api('/api/admin/roles/' + roleId, { method: 'PATCH', body: JSON.stringify({ access_levels: [...levels] }) });
 }
 
 async function deleteRole(id) {

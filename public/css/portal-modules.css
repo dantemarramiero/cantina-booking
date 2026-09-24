@@ -1,0 +1,64 @@
+/* Moduli People e Finance del portale. Usa le variabili e i componenti di portal.html. */
+.mod-intro { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-soft); }
+.mod-body { padding: 18px 22px; }
+.mod-empty { padding: 36px 20px; text-align: center; color: var(--ink-soft); font-size: 13.5px; }
+.mod-row { display: flex; align-items: center; gap: 12px; padding: 12px 22px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.mod-row:last-child { border-bottom: none; }
+.mod-row:hover { background: var(--cream); }
+.mod-row-main { flex: 1; min-width: 200px; }
+.mod-row-title { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.mod-row-sub { margin-top: 2px; font-size: 12px; color: var(--ink-soft); }
+.mod-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.mod-clickable { cursor: pointer; }
+.mod-code { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); margin-right: 8px; }
+.mod-toolbar-fields { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.mod-toolbar-fields input, .mod-toolbar-fields select { height: 36px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 4px; background: #fff; font: 400 13px var(--sans); color: var(--ink); }
+.mod-section-title { margin: 22px 0 10px; font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+.mod-section-title:first-child { margin-top: 0; }
+.mod-note { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-faint); }
+.mod-warn { margin: 0 0 14px; padding: 10px 12px; border-radius: 4px; background: var(--warn-bg); color: var(--warn); font-size: 13px; }
+.mod-ok { margin: 0 0 14px; padding: 10px 12px; border-radius: 4px; background: var(--ok-bg); color: var(--ok); font-size: 13px; }
+
+/* Albero dei centri di costo */
+.cc-level { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.cc-level::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.cc-level.l1 { background: #eeeae2; color: #6b6157; }
+.cc-level.l2 { background: #f8ecd6; color: #b0741c; }
+.cc-level.l3 { background: #e4ecdc; color: #4a6b3c; }
+.cc-level.l4 { background: #f7eee5; color: #a5623a; }
+.cc-legend { display: flex; gap: 10px; flex-wrap: wrap; padding: 12px 22px; border-bottom: 1px solid var(--line); background: var(--cream); font-size: 12px; color: var(--ink-soft); align-items: center; }
+.cc-aggregate .mod-row-title { color: var(--ink-soft); text-transform: uppercase; letter-spacing: .06em; font-size: 12px; }
+.cc-inactive { opacity: .55; }
+
+/* Tabelle di report */
+.mod-table-wrap { overflow-x: auto; }
+.mod-table { width: 100%; min-width: 720px; border-collapse: collapse; background: transparent; }
+.mod-table th { padding: 10px 12px; background: var(--cream-2); font-size: 10px; white-space: nowrap; }
+.mod-table td { padding: 9px 12px; font-size: 13px; color: #2e2925; }
+.mod-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mod-table tr.agg td { font-weight: 600; background: var(--cream); }
+.mod-table tr.total td { font-weight: 700; border-top: 2px solid var(--line-strong); }
+.mod-table tbody tr:hover td { background: transparent; }
+.mod-table tr.agg:hover td { background: var(--cream); }
+.mod-anomaly { margin: 0 0 8px; padding: 9px 12px; border-radius: 4px; background: var(--bad-bg); color: var(--bad); font-size: 13px; line-height: 1.45; }
+
+/* Righe modificabili dentro le finestre (destinazioni, valori driver, membri) */
+.mod-edit-rows { display: flex; flex-direction: column; gap: 6px; }
+.mod-edit-row { display: grid; gap: 6px; align-items: center; }
+.mod-edit-row select, .mod-edit-row input { width: 100%; padding: 8px 9px; border: 1px solid var(--line); border-radius: 6px; font: 400 13px var(--sans); background: #fff; color: var(--ink); min-width: 0; }
+.mod-sum { margin-top: 8px; font-size: 12.5px; color: var(--ink-soft); }
+.mod-sum.bad { color: var(--bad); font-weight: 600; }
+.mod-checklist { max-height: 220px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.mod-checklist label { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--ink); }
+.mod-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.mod-week label { font-size: 10.5px; }
+.mod-week input { text-align: right; }
+.mod-kv { display: grid; grid-template-columns: 170px 1fr; gap: 6px 12px; font-size: 13px; }
+.mod-kv dt { color: var(--ink-faint); }
+.mod-kv dd { margin: 0; color: var(--ink); }
+@media (max-width: 640px) {
+  .mod-row { padding: 12px 14px; }
+  .mod-body { padding: 14px; }
+  .mod-week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .mod-kv { grid-template-columns: 1fr; }
+}

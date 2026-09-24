@@ -70,8 +70,10 @@ test('prima di migrare fa una copia del database', () => {
 test('le migrazioni vere del progetto si applicano su un database vuoto e si annullano', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cantina-mig-real-'));
   const db = new DatabaseSync(path.join(dir, 'real.db'));
-  // 0002 fa riferimento a portal_users (creata dal bootstrap storico): qui basta una tabella minima.
-  db.exec('CREATE TABLE portal_users (id INTEGER PRIMARY KEY)');
+  // Le migrazioni fanno riferimento a tabelle del bootstrap storico: qui bastano versioni minime.
+  db.exec(`CREATE TABLE portal_users (id INTEGER PRIMARY KEY);
+    CREATE TABLE roles (id INTEGER PRIMARY KEY, workspaces TEXT NOT NULL DEFAULT '[]');
+    CREATE TABLE fairs (id INTEGER PRIMARY KEY); CREATE TABLE experiences (id INTEGER PRIMARY KEY); CREATE TABLE products (id INTEGER PRIMARY KEY);`);
   process.env.MIGRATION_BACKUPS = 'off';
   const migDir = path.join(__dirname, '..', 'migrations');
   const applied = runMigrations(db, { dir: migDir, log: silent });

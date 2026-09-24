@@ -84,6 +84,16 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - Registro attività; infrastruttura per eventi di dominio, notifiche e job periodici.
 - Fix: le foto di prodotti ed esperienze ora stanno sul volume persistente (prima si perdevano a ogni deploy).
 
+**People e Finance — Fase 1** (vedi `docs/people-finance/02-fase-1.md`)
+- Workspace **Finance**:
+  - centri di costo ad albero con livelli di cascata;
+  - oggetti di costo, ribaltamenti con validità mensile, driver con valori del mese, costi diretti;
+  - cascata per mese (simula, conferma, annulla, riesegui) con report del costo pieno, quadratura al centesimo e dettaglio delle quote.
+- Workspace **People**:
+  - dipendenti con responsabile e delegato, orario contrattuale, costo orario riservato, squadre;
+  - sedi con santo patrono e calendario delle festività.
+- Matrice ruoli: nuovi workspace e livelli di riservatezza per i dati HR.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

@@ -10,7 +10,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { runMigrations } = require('./lib/migrations');
 const { createEventBus } = require('./lib/events');
 const { createScheduler } = require('./lib/scheduler');
-const { createSessions, createSigner, createLoginThrottle, canAccess, safeEqual } = require('./lib/security');
+const { createSessions, createSigner, createLoginThrottle, canAccess, safeEqual, ACCESS_LEVELS } = require('./lib/security');
 const { createAudit } = require('./lib/audit');
 const { createNotifications } = require('./lib/notifications');
 
@@ -915,7 +915,7 @@ db.exec(`
   )
 `);
 try { db.exec('ALTER TABLE portal_users ADD COLUMN role_id INTEGER REFERENCES roles(id)'); } catch {}
-const ALL_WORKSPACES = ['enoturismo', 'commerciale', 'produzione', 'magazzino', 'crm', 'impostazioni'];
+const ALL_WORKSPACES = ['enoturismo', 'commerciale', 'produzione', 'magazzino', 'crm', 'people', 'finance', 'impostazioni'];
 
 // Mantiene "operators" (selezionabile nelle visite enoturismo) sincronizzato con gli
 // utenti del portale: ogni "utente che ha accesso al software" è automaticamente un
@@ -1326,6 +1326,21 @@ function permittedWorkspacesFor(req) {
   const role = db.prepare('SELECT * FROM roles WHERE id = ?').get(req.portalUser.role_id);
   if (!role) return null;
   try { return JSON.parse(role.workspaces); } catch { return null; }
+}
+
+// Livelli di riservatezza dei dati HR (base, personale, retributivo, sanitario, disciplinare).
+// Come per i workspace: chiave master e utenti senza ruolo vedono tutto (null).
+function accessLevelsFor(req) {
+  if (req.isMasterKey || !req.portalUser?.role_id) return null;
+  const role = db.prepare('SELECT access_levels FROM roles WHERE id = ?').get(req.portalUser.role_id);
+  if (!role) return null;
+  let levels = [];
+  try { levels = JSON.parse(role.access_levels || '[]'); } catch {}
+  return ['base', ...levels.filter(l => l !== 'base')];
+}
+function hasAccessLevel(req, level) {
+  const levels = accessLevelsFor(req);
+  return levels === null || levels.includes(level);
 }
 
 // ── ERP helpers ───────────────────────────────────────────────────────────────
@@ -4739,30 +4754,36 @@ function portalUserPublic(id) {
   return db.prepare('SELECT id, name, email, username, active, role_id FROM portal_users WHERE id = ?').get(id) || null;
 }
 function roleSnapshot(id) {
-  const r = db.prepare('SELECT id, name, workspaces FROM roles WHERE id = ?').get(id);
-  return r ? { ...r, workspaces: JSON.parse(r.workspaces) } : null;
+  const r = db.prepare('SELECT id, name, workspaces, access_levels FROM roles WHERE id = ?').get(id);
+  return r ? { ...r, workspaces: JSON.parse(r.workspaces), access_levels: JSON.parse(r.access_levels || '[]') } : null;
+}
+// "base" non si salva: ce l'hanno tutti.
+function cleanAccessLevels(levels) {
+  return Array.isArray(levels) ? [...new Set(levels.filter(l => ACCESS_LEVELS.includes(l) && l !== 'base'))] : [];
 }
 
 // ── Ruoli e permessi ──────────────────────────────────────────────────────────
 app.get('/api/admin/roles', authAdmin, (req, res) => {
-  res.json(db.prepare('SELECT * FROM roles ORDER BY name').all().map(r => ({ ...r, workspaces: JSON.parse(r.workspaces) })));
+  res.json(db.prepare('SELECT * FROM roles ORDER BY name').all().map(r => ({ ...r, workspaces: JSON.parse(r.workspaces), access_levels: JSON.parse(r.access_levels || '[]') })));
 });
 app.post('/api/admin/roles', authAdmin, (req, res) => {
-  const { name, workspaces } = req.body || {};
+  const { name, workspaces, access_levels } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'Il nome del ruolo è obbligatorio.' });
   const ws = Array.isArray(workspaces) ? workspaces.filter(w => ALL_WORKSPACES.includes(w)) : [];
-  const result = db.prepare('INSERT INTO roles (name, workspaces) VALUES (?, ?)').run(name.trim(), JSON.stringify(ws));
+  const levels = cleanAccessLevels(access_levels);
+  const result = db.prepare('INSERT INTO roles (name, workspaces, access_levels) VALUES (?, ?, ?)').run(name.trim(), JSON.stringify(ws), JSON.stringify(levels));
   audit(req, 'role.created', { entity: 'role', entityId: result.lastInsertRowid, after: roleSnapshot(result.lastInsertRowid) });
   res.json({ success: true, id: result.lastInsertRowid });
 });
 app.patch('/api/admin/roles/:id', authAdmin, (req, res) => {
-  const { name, workspaces } = req.body || {};
+  const { name, workspaces, access_levels } = req.body || {};
   const updates = [], params = [];
   if (name !== undefined) { updates.push('name = ?'); params.push(name.trim()); }
   if (workspaces !== undefined) {
     const ws = Array.isArray(workspaces) ? workspaces.filter(w => ALL_WORKSPACES.includes(w)) : [];
     updates.push('workspaces = ?'); params.push(JSON.stringify(ws));
   }
+  if (access_levels !== undefined) { updates.push('access_levels = ?'); params.push(JSON.stringify(cleanAccessLevels(access_levels))); }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
   params.push(req.params.id);
   const before = roleSnapshot(req.params.id);
@@ -4785,6 +4806,7 @@ app.get('/api/admin/me', authAdmin, (req, res) => {
     name: req.portalUser?.name || (req.isMasterKey ? 'Amministratore' : null),
     roleName: req.portalUser?.role_id ? db.prepare('SELECT name FROM roles WHERE id = ?').get(req.portalUser.role_id)?.name : null,
     permittedWorkspaces, // null = accesso completo a tutti i workspace
+    accessLevels: accessLevelsFor(req), // null = tutti i livelli di riservatezza
   });
 });
 
@@ -5066,6 +5088,10 @@ app.delete('/api/admin/warehouse/raw/:id', authAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// ── Moduli People e Finance (Fase 1) ──────────────────────────────────────────
+const finance = require('./modules/finance')(app, { db, authAdmin, audit, events });
+const hr = require('./modules/hr')(app, { db, authAdmin, audit, hasAccessLevel, finance });
+
 // Avvio: solo quando il file è eseguito direttamente (node server.js). I test lo importano e
 // avviano l'app su una porta a caso, senza scheduler.
 if (require.main === module) {
@@ -5079,4 +5105,4 @@ if (require.main === module) {
   scheduler.start();
 }
 
-module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit };
+module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr };
