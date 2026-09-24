@@ -977,6 +977,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
         Presenze
       </button>
+      <button data-sub="people-richieste">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3Z"/><path d="M8 9h8M8 12h5"/></svg>
+        Richieste
+      </button>
       <button data-sub="people-scadenze">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/></svg>
         Scadenze
@@ -1031,6 +1035,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
         Comprimi
       </button>
+      <button onclick="openMySpace()" id="my-space-nav-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"/></svg>
+        Il mio spazio
+      </button>
       <button onclick="openSettings()" id="settings-nav-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3h-6l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4L4.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1L9 21h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4Z"/></svg>
         Impostazioni
@@ -1061,6 +1069,9 @@
     <nav class="mobile-section-tabs" id="mobile-section-tabs"></nav>
 
   <main>
+    <!-- ═══ IL MIO SPAZIO (self-service del dipendente) ═══ -->
+    <div class="module" id="module-me"><div id="me-root"></div></div>
+
     <!-- ═══ COMMERCIALE ═══ -->
     <div class="module active" id="module-commerciale">
       <div class="subpanel active" id="sub-com-dashboard">
@@ -1410,6 +1421,7 @@
       <div class="subpanel active" id="sub-people-dipendenti"><div id="people-dipendenti-root"></div></div>
       <div class="subpanel" id="sub-people-assenze"><div id="people-assenze-root"></div></div>
       <div class="subpanel" id="sub-people-presenze"><div id="people-presenze-root"></div></div>
+      <div class="subpanel" id="sub-people-richieste"><div id="people-richieste-root"></div></div>
       <div class="subpanel" id="sub-people-scadenze"><div id="people-scadenze-root"></div></div>
       <div class="subpanel" id="sub-people-sicurezza"><div id="people-sicurezza-root"></div></div>
       <div class="subpanel" id="sub-people-squadre"><div id="people-squadre-root"></div></div>
@@ -2964,6 +2976,7 @@
 <script src="/js/portal-people-safety.js"></script>
 <script src="/js/portal-people-absences.js"></script>
 <script src="/js/portal-people-timesheet.js"></script>
+<script src="/js/portal-people-services.js"></script>
 <script>
 let ADMIN_KEY = null;
 let PRODUCTS = [];
@@ -3223,6 +3236,7 @@ function loadSubpanel(sub) {
   if (sub === 'people-scadenze') loadHrDeadlines();
   if (sub === 'people-assenze') loadHrAbsences();
   if (sub === 'people-presenze') loadHrTimesheet();
+  if (sub === 'people-richieste') loadHrChangeRequests();
   if (sub === 'people-sicurezza') loadHrSafety();
   if (sub === 'people-sedi') loadHrConfig();
   if (sub === 'fin-centri') loadFinCenters();
@@ -6915,6 +6929,7 @@ async function boot() {
     document.getElementById('sidebar-user-name').textContent = me.name;
   }
   const params = new URLSearchParams(window.location.search);
+  if (params.get('me')) { openMySpace(); return; } // link delle notifiche del self-service
   let ws = params.get('workspace');
   if (PERMITTED_WORKSPACES && !PERMITTED_WORKSPACES.includes(ws || 'commerciale')) {
     ws = PERMITTED_WORKSPACES[0];

@@ -3,7 +3,8 @@
 const TS_STATUS = { aperto: ['grey', 'Aperto'], inviato: ['yellow', 'Inviato'], approvato: ['green', 'Approvato'] };
 const TS_ORIGIN = { manuale: '', squadra: 'squadra', proposta: 'proposta', assenza: 'assenza', rettifica: 'rettifica' };
 const TS_WEEKDAYS = ['', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
-const TS = { period: UI.thisMonth(), employeeId: null, sheet: null, options: null };
+// root: dove si disegna il foglio (la pagina Presenze, oppure «Il mio spazio»).
+const TS = { period: UI.thisMonth(), employeeId: null, sheet: null, options: null, root: null };
 
 const tsHours = m => `${(m / 60).toLocaleString('it-IT', { maximumFractionDigits: 2 })} h`;
 async function tsOptions(force = false) {
@@ -16,6 +17,7 @@ const tsWarn = res => { if (res?.warnings?.length) alert(res.warnings.join('\n')
 
 // ── Pagina Presenze: riepilogo del mese ────────────────────────────────────────
 async function loadHrTimesheet() {
+  if (TS.root) { TS.root = null; TS.employeeId = null; } // si arriva da «Il mio spazio»: si riparte dal riepilogo
   const root = document.getElementById('people-presenze-root');
   await tsOptions(true);
   if (TS.employeeId) return loadTsSheet();
@@ -41,7 +43,7 @@ async function loadHrTimesheet() {
 
 // ── Foglio presenze di un dipendente ───────────────────────────────────────────
 async function loadTsSheet() {
-  const root = document.getElementById('people-presenze-root');
+  const root = document.getElementById(TS.root || 'people-presenze-root');
   if (!TS.options) await tsOptions();
   const s = TS.sheet = await api(`/api/admin/hr/timesheet/month?employee_id=${TS.employeeId}&period=${TS.period}`);
   const [cls, label] = TS_STATUS[s.status];
@@ -52,7 +54,7 @@ async function loadTsSheet() {
   const t = s.totals;
   root.innerHTML = `<div class="list-card">
     <div class="rec-head">
-      <button class="btn secondary small" onclick="TS.employeeId = null; loadHrTimesheet()">← Presenze</button>
+      ${TS.root ? '' : '<button class="btn secondary small" onclick="TS.employeeId = null; loadHrTimesheet()">← Presenze</button>'}
       <div style="flex:1;min-width:200px"><div class="rec-name">${esc(s.employee.name)}</div><div class="rec-sub">${esc(UI.monthLabel(s.period))}</div></div>
       <input type="month" value="${s.period}" onchange="TS.period = this.value || UI.thisMonth(); loadTsSheet()" style="height:34px;border:1px solid var(--line-strong);border-radius:4px;padding:0 8px">
       <span class="badge ${cls}">${label}</span>

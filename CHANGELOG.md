@@ -164,6 +164,22 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - Le assenze valide generano le righe nella stessa transazione, con conflitti segnalati se c'erano già ore.
 - Export CSV per il consulente del lavoro. Le ore approvate alimentano il driver «Ore lavorate» di Finance.
 
+**Pubblicazione del 24/09/2026:** Fase 1 e blocchi 2A–2D in produzione.
+- Migrazioni da 0003 a 0012, precedute da una copia automatica del database.
+- Chiave `HR_FILES_KEY` impostata su Railway.
+
+**People — Fase 2, blocco 2E: self-service e servizi**
+- «Il mio spazio» per ogni dipendente con accesso al portale, anche senza il workspace People:
+  - i propri dati, documenti (cedolini, CU, attestati), ferie e permessi, presenze, dotazioni;
+  - richieste di modifica dei dati, che si applicano solo dopo l'approvazione di HR (pagina People → Richieste).
+- Scheda → Ingresso e uscita:
+  - checklist di onboarding e offboarding configurabili per tipo di contratto, con verifiche automatiche;
+  - offboarding concluso: dipendente, accesso al portale e operatore disattivati (non cancellati);
+  - dotazioni consegnate e restituite.
+- Caricamento in blocco di cedolini e CU, abbinati per codice fiscale nel nome del file o nel testo del PDF.
+- Elenco degli stagionali con le campagne lavorate e chi richiamare.
+- Recruiting (solo modello dati): candidati con consenso privacy e cancellazione automatica, conversione in dipendente.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

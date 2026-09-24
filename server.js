@@ -5107,6 +5107,17 @@ const hrFile = require('./modules/hr-file')(app, { db, authAdmin, audit, events,
 const hrSafety = require('./modules/hr-safety')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile });
 const hrAbsences = require('./modules/hr-absences')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety });
 const hrTimesheet = require('./modules/hr-timesheet')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile, hrSafety, hrAbsences, finance });
+const hrServices = require('./modules/hr-services')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety, hrTimesheet, secureStore });
+// People → accesso: l'offboarding concluso disattiva l'utente del portale e il suo operatore dell'Enoturismo
+// (come la disattivazione da Impostazioni → Utenti: sessioni revocate, niente cancellazioni).
+events.on('employee.offboarded', 'portal.deactivate-access', ev => {
+  const userId = ev.payload.portal_user_id;
+  if (!userId) return;
+  db.prepare('UPDATE portal_users SET active = 0 WHERE id = ?').run(userId);
+  sessions.revokeUser(userId);
+  deactivateOperatorForPortalUser(userId);
+  audit(null, 'portal_user.deactivated', { entity: 'portal_user', entityId: userId, actor: 'Offboarding', after: { employee_id: ev.payload.employee_id } });
+});
 
 // Avvio: solo quando il file è eseguito direttamente (node server.js). I test lo importano e
 // avviano l'app su una porta a caso, senza scheduler.
@@ -5123,4 +5134,4 @@ if (require.main === module) {
   scheduler.start();
 }
 
-module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, hrTimesheet, secureStore };
+module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, hrTimesheet, hrServices, secureStore };

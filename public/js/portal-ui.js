@@ -139,6 +139,7 @@ function openPortalLink(link) {
   const url = new URL(link, location.origin);
   if (url.pathname !== '/portal.html') { location.href = url.pathname + url.search; return; } // es. l'admin dell'Enoturismo
   const q = url.searchParams;
+  if (q.get('me') && typeof openMySpace === 'function') return openMySpace();
   const ws = q.get('workspace');
   if (ws && typeof switchWorkspace === 'function') switchWorkspace(ws);
   if (q.get('sub') && typeof clickSidebarSub === 'function') clickSidebarSub(q.get('sub'));

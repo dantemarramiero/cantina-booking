@@ -1,5 +1,5 @@
 // Portale → People: scheda del dipendente (fascicolo), scadenzario, configurazione (mansioni, soglie, oneri).
-const HR_TABS = [['organizzazione', 'Organizzazione'], ['personali', 'Dati personali'], ['lavoro', 'Rapporto di lavoro'], ['competenze', 'Competenze'], ['sicurezza', 'Sicurezza'], ['assenze', 'Assenze'], ['presenze', 'Presenze'], ['documenti', 'Documenti'], ['scadenze', 'Scadenze']];
+const HR_TABS = [['organizzazione', 'Organizzazione'], ['personali', 'Dati personali'], ['lavoro', 'Rapporto di lavoro'], ['competenze', 'Competenze'], ['sicurezza', 'Sicurezza'], ['assenze', 'Assenze'], ['presenze', 'Presenze'], ['percorso', 'Ingresso e uscita'], ['documenti', 'Documenti'], ['scadenze', 'Scadenze']];
 const HR_CONTRACT_TYPES = { OTD: 'Operaio a tempo determinato', OTI: 'Operaio a tempo indeterminato', impiegato: 'Impiegato', quadro: 'Quadro', dirigente: 'Dirigente', apprendista: 'Apprendista', stagionale: 'Stagionale', somministrato: 'Somministrato', collaboratore: 'Collaboratore' };
 const HR_ID_DOCS = { carta_identita: "Carta d'identità", passaporto: 'Passaporto', patente: 'Patente', permesso_soggiorno: 'Permesso di soggiorno' };
 const HR_SKILL_KINDS = { lingua: 'Lingue', titolo_studio: 'Titoli di studio', esperienza: 'Esperienze precedenti', qualifica: 'Qualifiche di settore', competenza: 'Competenze operative' };
@@ -41,10 +41,11 @@ async function openHrRecord(id, tab) {
     REC.jobRoles.length ? REC.jobRoles : api('/api/admin/hr/job-roles'), REC.docTypes.length ? REC.docTypes : api('/api/admin/hr/document-types'),
   ]);
   if (tok !== HR.renderTok) return;
-  Object.assign(REC, { org, file, jobRoles, docTypes, safety: null, safetyFor: null, absences: null, timesheet: null });
+  Object.assign(REC, { org, file, jobRoles, docTypes, safety: null, safetyFor: null, absences: null, timesheet: null, journey: null });
   if (REC.tab === 'sicurezza') await hrLoadSafety();
   if (REC.tab === 'assenze') await hrLoadAbsences();
   if (REC.tab === 'presenze') await hrLoadTimesheetSummary();
+  if (REC.tab === 'percorso') await hrLoadJourney();
   renderHrRecord();
 }
 // La sezione sicurezza si carica solo quando la si apre: la lettura dell'idoneità viene registrata.
@@ -57,6 +58,7 @@ async function hrSelectTab(k) {
   if (k === 'sicurezza' && REC.safetyFor !== REC.id) await hrLoadSafety();
   if (k === 'assenze' && REC.absences?.for !== REC.id) await hrLoadAbsences();
   if (k === 'presenze' && REC.timesheet?.for !== REC.id) await hrLoadTimesheetSummary();
+  if (k === 'percorso' && REC.journey?.for !== REC.id) await hrLoadJourney();
   renderHrRecord();
 }
 function renderHrRecord() {
@@ -99,6 +101,7 @@ function hrRecordTab() {
     case 'sicurezza': return hrTabSafety();
     case 'assenze': return hrTabAbsences();
     case 'presenze': return hrTabTimesheet();
+    case 'percorso': return hrTabJourney();
     case 'documenti': return hrTabDocuments(f);
     case 'scadenze': return f.deadlines.length ? f.deadlines.map(d => hrDeadlineRow(d)).join('') : '<div class="mod-empty">Nessuna scadenza nei prossimi 12 mesi.</div>';
     default: return '';
@@ -415,7 +418,7 @@ async function loadHrDeadlines() {
 // ── Configurazione di People ───────────────────────────────────────────────────
 async function loadHrConfig() {
   const root = document.getElementById('people-sedi-root');
-  root.innerHTML = '<div id="hr-sites-box"></div><div id="hr-config-box"></div><div id="hr-safety-config-box"></div><div id="hr-absence-config-box"></div><div id="hr-timesheet-config-box"></div>';
+  root.innerHTML = '<div id="hr-sites-box"></div><div id="hr-config-box"></div><div id="hr-safety-config-box"></div><div id="hr-absence-config-box"></div><div id="hr-timesheet-config-box"></div><div id="hr-checklist-config-box"></div>';
   await loadHrSites();
   const [roles, settings] = await Promise.all([api('/api/admin/hr/job-roles'), api('/api/admin/hr/settings'), safConfig(true)]);
   REC.jobRoles = roles;
@@ -440,6 +443,7 @@ async function loadHrConfig() {
   loadHrSafetyConfig();
   loadHrAbsenceConfig();
   loadHrTimesheetConfig();
+  loadHrChecklistConfig();
 }
 async function saveHrSettings() {
   try {

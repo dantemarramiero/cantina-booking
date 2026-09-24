@@ -57,6 +57,7 @@ function cancelAbsence(id, status) {
 }
 // Dopo un'azione: ricarica la vista in cui si è (pagina Assenze o scheda del dipendente).
 function absRefresh() {
+  if (document.getElementById('module-me')?.classList.contains('active')) return loadMySpace();
   if (document.getElementById('sub-people-assenze')?.classList.contains('active')) return loadHrAbsences();
   if (REC.id) return openHrRecord(REC.id, 'assenze');
 }

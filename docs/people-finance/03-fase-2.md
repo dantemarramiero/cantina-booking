@@ -1,14 +1,14 @@
 # People e Finance — Fase 2: People
 
-Stato: **in corso, in locale** (non ancora in produzione). La fase è divisa in blocchi:
+Stato: **completata**. I blocchi 2A–2D sono in produzione dal 24/09/2026; il 2E è in locale, in attesa di conferma. La fase è divisa in blocchi:
 
 | Blocco | Contenuto | Stato |
 |---|---|---|
-| 2A | Fascicolo: dati personali, rapporto di lavoro, retribuzione, competenze, documenti cifrati, scadenzario con notifiche | completato |
-| 2B | Sicurezza (D.Lgs. 81/08): formazione, requisiti per mansione, idoneità sanitaria, DPI, infortuni, deroghe | completato |
-| 2C | Assenze: richieste e approvazioni, contatori, periodi bloccati, disponibilità per l'Enoturismo | completato |
-| 2D | Presenze: ore per squadra, proposte da prenotazioni e fiere, stati del mese, rettifiche, export, controlli bloccanti | completato |
-| 2E | Self-service, onboarding e offboarding, dotazioni, richieste di modifica, cedolini in blocco, modello dati del recruiting | da fare |
+| 2A | Fascicolo: dati personali, rapporto di lavoro, retribuzione, competenze, documenti cifrati, scadenzario con notifiche | in produzione |
+| 2B | Sicurezza (D.Lgs. 81/08): formazione, requisiti per mansione, idoneità sanitaria, DPI, infortuni, deroghe | in produzione |
+| 2C | Assenze: richieste e approvazioni, contatori, periodi bloccati, disponibilità per l'Enoturismo | in produzione |
+| 2D | Presenze: ore per squadra, proposte da prenotazioni e fiere, stati del mese, rettifiche, export, controlli bloccanti | in produzione |
+| 2E | Self-service, onboarding e offboarding, dotazioni, richieste di modifica, cedolini in blocco, modello dati del recruiting | completato, in locale |
 
 Valutazione e disciplinare sono rimandati, come concordato.
 
@@ -574,5 +574,142 @@ Esito: **102 test, 102 superati** (12 nuovi del blocco 2D).
 - **Durata delle proposte.** Visite e eventi durano quanto l'esperienza, arrotondata al passo. Le fiere durano l'orario del giorno, 8 ore se non c'è orario, dalle 9.
 - **Tutto o niente per le squadre.** Registrare le ore solo per una parte della squadra, in silenzio, sarebbe peggio di un rifiuto chiaro.
 - **Righe di assenza senza centro di costo.** Il driver «Ore lavorate» conta solo le ore lavorate.
-- **Le assenze approvate prima di questo blocco non hanno righe.** In produzione non ce ne sono: il blocco 2C non è ancora stato pubblicato.
+- **Le assenze approvate prima di questo blocco non hanno righe.** In produzione non ce n'erano: i blocchi 2C e 2D sono stati pubblicati insieme.
 - **Un mese «inviato»** lo corregge solo chi lo approva. Un mese «approvato» non si riapre: solo rettifiche.
+
+---
+
+## 2E — Self-service e servizi
+
+### Cosa c'è
+
+**«Il mio spazio»** (voce in basso nel menu, per ogni utente collegato a una scheda dipendente, anche senza il workspace People):
+- **I miei dati:**
+  - il proprio fascicolo in lettura (niente dati disciplinari);
+  - la **richiesta di modifica** di IBAN, residenza, domicilio, contatti personali, taglie e contatti di emergenza. È controllata subito (per esempio un IBAN sbagliato è rifiutato) e si applica solo dopo l'approvazione di HR. Una richiesta alla volta, ritirabile.
+- **Documenti:** cedolini, CU, attestati e gli altri tipi visibili al dipendente, da scaricare con un link firmato.
+- **Ferie e permessi:** saldi, ferie arretrate, le proprie richieste, nuova richiesta.
+- **Presenze:** il proprio foglio del mese, con l'invio al responsabile.
+- **Dotazioni:** ciò che ha in consegna.
+
+**People → Richieste.** HR vede ogni richiesta con il valore di prima e quello proposto, e la approva o la rifiuta con un motivo. Il dipendente riceve una notifica. Nel registro attività finiscono i nomi dei campi, non i valori.
+
+**Scheda del dipendente → Ingresso e uscita:**
+- **Onboarding e offboarding.** Si avviano da checklist configurabili per tipo di contratto (vince quella specifica, altrimenti quella generale). Ogni voce ha una **verifica automatica** dai dati:
+  - dati personali completi, documento caricato, formazione valida;
+  - visita medica (o «non necessaria» se la mansione non la prevede);
+  - DPI e dotazioni consegnati, accesso al portale;
+  - dotazioni restituite, cessazione registrata, presenze del mese di uscita approvate.
+
+  La spunta resta manuale. La checklist si conclude solo con tutte le voci obbligatorie fatte.
+- **Offboarding concluso.** Il dipendente diventa non attivo e, con l'evento `employee.offboarded`:
+  - l'accesso al portale è disattivato e le sessioni revocate;
+  - l'operatore dell'Enoturismo è disattivato, non cancellato.
+- **Dotazioni:** chiavi, badge, telefono, PC, tablet, auto, abbigliamento, con consegna e restituzione.
+
+**People → Dipendenti → Carica cedolini.**
+- Caricamento in blocco di cedolini o CU.
+- Ogni file si abbina al dipendente con il codice fiscale nel **nome del file** o, se manca, nel **testo del PDF**, leggendo anche i flussi compressi.
+- Si abbina solo se il codice fiscale è unico e appartiene a un dipendente. I file non abbinati o già caricati restano fuori, con il motivo.
+- I dipendenti ricevono una notifica.
+
+**People → Dipendenti → Stagionali.** Per chi ha avuto contratti stagionali o a termine: le campagne lavorate (dal-al, mansione) e se è da richiamare.
+
+**Recruiting (solo modello dati, senza schermate).**
+- **Candidati:** posizione, stato della selezione, consenso privacy e data di cancellazione (predefinita a 12 mesi dal consenso). Il CV è cifrato come gli altri documenti.
+- **Conversione in dipendente:** nome, contatti, codice fiscale e CV passano al fascicolo, senza reinserirli.
+- **Cancellazione automatica:** un job quotidiano cancella i candidati non assunti oltre la data, file del CV compreso.
+
+### Migrazioni
+
+| Versione | Cosa |
+|---|---|
+| `0013_people_services` | Tabelle:<br>• `employee_assets`<br>• `personal_change_requests`<br>• `checklist_templates` e `checklist_template_items` (+ una checklist di ingresso da 9 voci e una di uscita da 5)<br>• `employee_checklists` e `employee_checklist_items` (un solo percorso aperto per tipo)<br>• `job_positions`<br>• `candidates`<br>• `candidate_documents` |
+
+Ha il `down`.
+
+### Eventi di dominio
+
+| Evento | Emittente | Consumer | Effetto |
+|---|---|---|---|
+| `employee.offboarded` | Conclusione dell'offboarding | `portal.deactivate-access` (server) | Disattiva l'utente del portale, revoca le sessioni, disattiva l'operatore dell'Enoturismo e lo registra nel registro attività |
+
+### Logica di business (QUANDO/ALLORA) e test
+
+Tutti i test di questa sezione sono nel file `hr-services`.
+
+| Regola | Test |
+|---|---|
+| QUANDO il dipendente chiede una modifica dei dati ALLORA è controllata subito e si applica solo dopo l'approvazione di HR | self-service |
+| QUANDO c'è già una richiesta aperta ALLORA non se ne apre un'altra | self-service |
+| QUANDO il dipendente prova ad approvare la propria richiesta ALLORA rifiuto | self-service |
+| QUANDO HR decide una richiesta ALLORA vede prima e dopo e il dipendente è avvisato | self-service |
+| QUANDO si registra una richiesta di modifica ALLORA il registro attività contiene i campi ma non i valori | self-service |
+| QUANDO il dipendente senza il workspace People apre il suo spazio ALLORA vede i propri dati | self-service |
+| QUANDO il dipendente chiede il fascicolo di altri (o il proprio fuori dal self-service) ALLORA rifiuto | self-service |
+| QUANDO il dipendente scarica un documento visibile a lui ALLORA lo ottiene anche senza il workspace People | scarica i propri cedolini |
+| QUANDO un collega prova a scaricarlo ALLORA 403 | scarica i propri cedolini |
+| QUANDO si registra la restituzione di una dotazione prima della consegna ALLORA rifiuto | dotazioni |
+| QUANDO il dipendente prova a registrare dotazioni ALLORA 403 | dotazioni |
+| QUANDO si avvia un onboarding ALLORA vince la checklist del tipo di contratto e le verifiche seguono i dati | onboarding |
+| QUANDO restano voci obbligatorie aperte ALLORA la checklist non si conclude | onboarding |
+| QUANDO si conclude l'offboarding ALLORA l'accesso al portale è disattivato (sessioni revocate) e l'operatore corrispondente viene disattivato, non cancellato | offboarding |
+| QUANDO si caricano cedolini in blocco ALLORA ognuno si abbina per codice fiscale nel nome o nel testo del PDF, solo se unico. I doppioni e i non abbinati restano fuori con il motivo | cedolini in blocco |
+| QUANDO si caricano cedolini in blocco ALLORA i dipendenti sono avvisati e servono i livelli *personale* e *retributivo* | cedolini in blocco |
+| QUANDO si guardano gli stagionali ALLORA si vedono le campagne lavorate e l'indicazione da richiamare | stagionali |
+| QUANDO un candidato dà il consenso ALLORA ha una data di cancellazione | recruiting |
+| QUANDO la data di cancellazione è passata e il candidato non è assunto ALLORA il job lo cancella, CV compreso | recruiting |
+| QUANDO un candidato è convertito in dipendente ALLORA i dati e il CV passano al fascicolo | recruiting |
+| QUANDO un dipendente ha dotazioni, checklist o richieste ALLORA non si elimina | non si elimina |
+
+Esito: **111 test, 111 superati** (9 nuovi del blocco 2E).
+
+### Punti toccati nei moduli esistenti
+
+- **Menu del portale:** nuova voce «Il mio spazio», per tutti.
+- **Permessi:**
+  - self-service aperto a chi ha fatto l'accesso;
+  - il download dei documenti HR passa dai link firmati anche senza il workspace People. Il controllo di livello e di visibilità resta sul server.
+- **Utenti del portale:** l'offboarding li disattiva con la stessa logica di Impostazioni → Utenti (sessioni revocate, operatore disattivato).
+
+### Decisioni prese in autonomia
+
+- **Cosa si può chiedere di cambiare dal self-service:** IBAN, residenza, domicilio, contatti, taglie e contatti di emergenza. Codice fiscale e dati di nascita no: serve un documento.
+- **Le verifiche automatiche delle checklist suggeriscono, non spuntano.** Chi segue la persona conferma.
+- **Offboarding concluso = dipendente non attivo.** Il fascicolo resta per la conservazione.
+- **Recruiting senza schermate**, come chiesto («solo modello dati ora»). Le API ci sono già.
+
+---
+
+## Riepilogo della Fase 2 e decisioni aperte
+
+### Cosa serve ancora da voi
+
+1. **Dominio `prenotazioni.marramiero.it`:** configurato su Railway il 15/09 ma mai verificato, oggi non risolve. Chi gestisce il DNS di marramiero.it deve aggiungere due record:
+   - `CNAME prenotazioni → je8kvimb.up.railway.app`
+   - `TXT _railway-verify.prenotazioni → railway-verify=70cb5c8a4116fbc83c1e4a512399293bd130f3d796800b6a04017197dc91603e`
+2. **Copia della chiave `HR_FILES_KEY`:** è impostata su Railway. Copiatela da Railway (servizio → Variables) in un posto sicuro fuori da Railway, per esempio un gestore di password. Senza la chiave i documenti HR non si aprono.
+3. **Da verificare con l'RSPP e il medico competente:**
+   - periodicità dei corsi;
+   - formazione obbligatoria per mansione;
+   - mansioni soggette a sorveglianza sanitaria;
+   - periodicità dei DPI.
+
+   Sono tutti dati modificabili da People → Configurazione.
+4. **Da decidere con il consulente del lavoro:**
+   - colonne dell'export delle presenze;
+   - spettanze di ferie, ROL ed ex festività per contratto;
+   - saldo iniziale alla data di avvio.
+5. **Ruoli:**
+   - creare i ruoli con People (livello *personale* per l'ufficio del personale; *retributivo* per amministrazione e direzione; *sanitario* per il responsabile sicurezza);
+   - indicare i responsabili sicurezza (Configurazione).
+
+   Oggi vedono tutto solo la chiave master e gli utenti senza ruolo.
+6. **Fiere:** il responsabile è un testo libero. Un collegamento vero al dipendente, nel modulo Fiere, renderebbe le proposte delle presenze più affidabili degli abbinamenti per nome.
+
+### Rimandati
+
+- **Valutazione e sviluppo, disciplinare** (2.0.9): rimandati come concordato. Le note del responsabile, escluse dal self-service, arriveranno con loro.
+- **Operazioni di Produzione nelle proposte delle presenze:** quando il modulo Produzione registrerà le operazioni per persona.
+- **Foto del dipendente** (2.0.1): non ancora gestita.
+- **Schermate del recruiting.**

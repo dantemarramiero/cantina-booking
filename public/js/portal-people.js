@@ -23,6 +23,8 @@ async function loadHrEmployees() {
       <div class="search-input"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="hr-emp-search" placeholder="Cerca dipendente" value="${UI.attr(q)}" oninput="loadHrEmployees()"></div>
       <div class="list-spacer"></div>
+      <button class="btn secondary small" onclick="openSeasonalModal()">Stagionali</button>
+      <button class="btn secondary small" onclick="openBulkDocsModal()">Carica cedolini</button>
       <button class="btn-generate" onclick="openHrEmployeeModal()">${UI.icon.plus} Nuovo dipendente</button>
     </div>
     ${shown.map(e => `<div class="mod-row mod-clickable ${e.active ? '' : 'cc-inactive'}" onclick="openHrEmployeeDetail(${e.id})">
