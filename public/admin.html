@@ -1024,7 +1024,7 @@
 
     <!-- DISPONIBILITÀ -->
     <div class="exp-tab-panel" id="exp-tab-disponibilita">
-      <p style="margin:0 0 12px;font-size:12.5px;color:var(--ink-soft)">Imposta il pattern settimanale ricorrente: gli slot vengono generati automaticamente per i prossimi 90 giorni. Per aggiungere una data eccezionale fuori pattern, usa "+ Aggiungi" nel Calendario.</p>
+      <p style="margin:0 0 12px;font-size:12.5px;color:var(--ink-soft)">Imposta il pattern settimanale ricorrente: gli slot vengono generati automaticamente per i prossimi <span id="avail-window-days">90</span> giorni (si cambia in Impostazioni → Customizations → Enoturismo). Per aggiungere una data eccezionale fuori pattern, usa "+ Aggiungi" nel Calendario.</p>
       <div id="exp-availability-rows"></div>
       <button type="button" class="btn secondary small" onclick="addExpAvailabilityRow()">+ Aggiungi orario</button>
     </div>
@@ -1398,6 +1398,7 @@ document.querySelectorAll('#exp-modal-tabs button[data-exptab]').forEach(btn => 
 
 async function openExpModal(e, presetType) {
   document.getElementById('exp-modal-msg').innerHTML = '';
+  api('/api/admin/settings').then(s => { document.getElementById('avail-window-days').textContent = s.slot_window_days || 90; }).catch(() => {});
   const type = e ? e.type : (presetType || 'visita');
   document.getElementById('exp-type').value = type;
   const noun = type === 'evento' ? 'evento' : 'esperienza';

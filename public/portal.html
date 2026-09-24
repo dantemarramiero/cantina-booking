@@ -236,6 +236,64 @@
   .euro-input-wrap::before { content: '€'; position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); font-size: 12.5px; pointer-events: none; }
   .euro-input-wrap input { padding-left: 20px !important; }
 
+  /* Impostazioni → Customizations: definizioni, automatismi e liste divisi per modulo (stile Odoo) */
+  .cz-head { margin-bottom: 18px; }
+  .cz-head h2 { font: 400 26px/1.2 var(--display); color: var(--ink); }
+  .cz-head p { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); }
+  .cz { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; align-items: start; max-width: 1080px; }
+  .cz-nav { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 2px; padding: 8px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+  .cz-nav button { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; border: none; border-left: 2px solid transparent; border-radius: 2px; background: none; text-align: left; font-size: 14px; color: var(--ink); transition: background-color .14s cubic-bezier(.22,.61,.36,1); }
+  .cz-nav button:hover { background: var(--cream); }
+  .cz-nav button.active { background: var(--gold-light); border-left-color: var(--wine); font-weight: 600; }
+  .cz-nav button span { font-size: 11.5px; font-weight: 400; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  .cz-module { display: none; }
+  .cz-module.active { display: block; }
+  .cz-module-title { margin: 0 0 16px; font: 400 22px var(--display); color: var(--ink); }
+  .cz-group { margin-bottom: 26px; }
+  .cz-group-title { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+  .cz-group-title span { font-size: 12.5px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .cz-block { margin-bottom: 12px; padding: 18px 20px; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 1px 2px rgba(56,17,18,.04); }
+  .cz-block-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .cz-block-title { font-size: 14.5px; font-weight: 600; color: var(--ink); }
+  .cz-block-desc { margin: 4px 0 0; max-width: 680px; font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
+  .cz-block-desc b { font-weight: 600; color: var(--ink); }
+  .cz-where { margin-top: 8px; font-size: 12px; color: var(--ink-faint); }
+  .cz-where b { font-weight: 600; color: var(--ink-soft); }
+  .cz-controls { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .cz-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; color: var(--ink); }
+  .cz-inline input[type=number], .cz-inline select { height: 36px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 4px; background: #fff; font: 400 13.5px var(--sans); color: var(--ink); }
+  .cz-inline input[type=number] { width: 96px; text-align: right; font-variant-numeric: tabular-nums; }
+  .cz-inline input:focus, .cz-inline select:focus, .cz-list-row input:focus { outline: none; border-color: var(--wine); box-shadow: 0 0 0 3px rgba(165,98,58,.32); }
+  .cz-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .cz-actions .btn { border-radius: 4px; }
+  .cz-msg .msg { margin: 12px 0 0; }
+  .cz-summary { margin-top: 10px; font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
+  .cz-summary b { font-weight: 600; color: var(--ink); }
+  .cz-note { margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-faint); }
+  .cz-warn { margin-top: 12px; padding: 9px 12px; border-radius: 4px; background: var(--warn-bg); color: var(--warn); font-size: 12.5px; }
+  .cz-criteria { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; transition: opacity .14s cubic-bezier(.22,.61,.36,1); }
+  .cz-criteria.off { opacity: .5; }
+  .cz-check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .cz-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--wine); }
+  .cz-list { display: flex; flex-direction: column; gap: 6px; }
+  .cz-list-row { display: flex; align-items: center; gap: 10px; }
+  .cz-list-row input { flex: 1; min-width: 0; max-width: 320px; height: 36px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 4px; font: 400 13.5px var(--sans); color: var(--ink); }
+  .cz-list-used { min-width: 130px; font-size: 12px; color: var(--ink-faint); }
+  .cz-list-row .link-pill-btn:disabled { opacity: .35; cursor: not-allowed; }
+  .cz-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .cz-grid2 .field { margin-bottom: 0; }
+  @media (max-width: 860px) {
+    .cz { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .cz-nav { position: static; flex-direction: row; overflow-x: auto; }
+    .cz-nav button { flex-shrink: 0; border-left: none; border-bottom: 2px solid transparent; white-space: nowrap; }
+    .cz-nav button.active { border-bottom-color: var(--wine); }
+    .cz-grid2 { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .cz-block { padding: 14px 16px; }
+    .cz-list-used { min-width: 0; }
+  }
+
   /* Commerciale → Obiettivi di vendita (handoff MyWinery "Obiettivi") */
   .ob-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 24px; }
   .ob-head h1 { font: 400 28px/1.15 var(--display); color: var(--ink); }
@@ -1287,8 +1345,7 @@
             <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Generale</h4>
             <button type="button" onclick="openMyProfilePanel()" data-settings-label="Impostazioni personali">Impostazioni personali</button>
             <button type="button" onclick="openCompanySettingsPanel()" data-settings-label="Impostazioni aziendali">Impostazioni aziendali</button>
-            <button type="button" onclick="openSettingsPanel('email-avvisi')" data-settings-label="Email per gli avvisi di magazzino">Email per gli avvisi di magazzino</button>
-            <button type="button" onclick="openSettingsPanel('regole')" data-settings-label="Regole">Regole</button>
+            <button type="button" onclick="openSettingsPanel('customizations')" data-settings-label="Customizations" data-settings-keywords="regole automatismi definizioni liste wine club clienti attivi inattivi fermi zone commerciali aree paesi email avvisi magazzino scorte soglie tipologie cliente ruoli contatto disponibilità pagamenti">Customizations</button>
             <button type="button" onclick="openSettingsPanel('dashboard-widgets')" data-settings-label="Dashboard">Dashboard</button>
           </div>
           <div class="settings-card-group" data-settings-group="utenti">
@@ -1369,51 +1426,254 @@
           </div>
         </div>
 
-        <div class="settings-panel" id="settings-panel-email-avvisi">
-          <div class="box" style="max-width:520px">
-            <h3>Email per gli avvisi di magazzino</h3>
-            <div id="settings-msg"></div>
-            <div class="field">
-              <label>Avviso scarsità prodotto finito (Commerciale)</label>
-              <input type="email" id="set-commercial-email" placeholder="commerciale@cantina.it">
-            </div>
-            <div class="field">
-              <label>Avviso riordino materie prime (Acquisti/Produzione)</label>
-              <input type="email" id="set-procurement-email" placeholder="acquisti@cantina.it">
-            </div>
-            <button class="btn" onclick="saveSettings()">Salva impostazioni</button>
+        <div class="settings-panel" id="settings-panel-customizations">
+          <div class="cz-head">
+            <h2>Customizations</h2>
+            <p>Definizioni, automatismi e liste del gestionale, divisi per modulo.</p>
           </div>
-        </div>
+          <div class="cz">
+            <nav class="cz-nav" id="cz-nav">
+              <button type="button" data-cz="crm" class="active" onclick="czShowModule('crm')">CRM<span></span></button>
+              <button type="button" data-cz="commerciale" onclick="czShowModule('commerciale')">Commerciale<span></span></button>
+              <button type="button" data-cz="enoturismo" onclick="czShowModule('enoturismo')">Enoturismo<span></span></button>
+              <button type="button" data-cz="magazzino" onclick="czShowModule('magazzino')">Magazzino<span></span></button>
+              <button type="button" data-cz="produzione" onclick="czShowModule('produzione')">Produzione<span></span></button>
+            </nav>
+            <div class="cz-body">
 
-        <div class="settings-panel" id="settings-panel-regole">
-          <div class="box" style="max-width:520px">
-            <h3>Regole</h3>
-            <p style="margin:0 0 14px;font-size:12.5px;color:var(--ink-soft)">Logiche di business del gestionale.</p>
-            <div id="rules-msg"></div>
-            <div class="field-row">
-              <div class="field">
-                <label>Cliente attivo entro (mesi)</label>
-                <input type="number" min="1" id="rule-active-months" placeholder="6">
-              </div>
-              <div class="field">
-                <label>Cliente semi attivo entro (mesi)</label>
-                <input type="number" min="1" id="rule-semi-active-months" placeholder="12">
-              </div>
+              <!-- ═══ CRM ═══ -->
+              <section class="cz-module active" data-cz-module="crm">
+                <h3 class="cz-module-title">CRM</h3>
+                <div class="cz-group">
+                  <div class="cz-group-title">Definizioni<span>come il software classifica</span></div>
+                  <div class="cz-block">
+                    <div class="cz-block-title">Stato di attività dei clienti</div>
+                    <p class="cz-block-desc">Un cliente è attivo se ha fatto almeno un ordine negli ultimi mesi indicati, semi attivo fino alla seconda soglia, poi inattivo.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> CRM → Clienti · Agenti → Clienti seguiti</div>
+                    <div class="cz-controls">
+                      <div class="cz-inline">Attivo entro <input type="number" min="1" id="rule-active-months" placeholder="6"> mesi · semi attivo entro <input type="number" min="1" id="rule-semi-active-months" placeholder="12"> mesi</div>
+                      <div class="cz-actions"><button class="btn small" onclick="saveRules()">Salva</button></div>
+                      <div id="rules-msg" class="cz-msg"></div>
+                    </div>
+                  </div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Riconoscimento delle persone doppie</div><span class="badge grey">Sempre attivo</span></div>
+                    <p class="cz-block-desc">Due persone sono la stessa se hanno la stessa email (maiuscole e minuscole non contano). Se una persona non ha email, si riconosce dal telefono. Così chi prenota, compra e partecipa a un evento resta una sola scheda.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> prenotazioni, vendite, ordini online e contatti delle aziende</div>
+                  </div>
+                </div>
+
+                <div class="cz-group">
+                  <div class="cz-group-title">Automatismi<span>cosa succede da solo</span></div>
+                  <div class="cz-block">
+                    <div class="cz-block-title">Ingresso nel wine club</div>
+                    <p class="cz-block-desc">Quando è attivo, una persona entra da sola nel wine club appena la sua spesa supera le soglie. Si ricontrolla a ogni vendita, ordine online pagato e prenotazione confermata.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> CRM → Contatti, scheda della persona</div>
+                    <div class="cz-controls">
+                      <label class="ob-switch" style="margin-top:0"><input type="checkbox" id="wc-enabled" onchange="wcSyncState()"><span class="ob-switch-track"></span>Ingresso automatico</label>
+                      <div class="cz-criteria" id="wc-criteria">
+                        <div class="cz-inline"><label class="cz-check"><input type="checkbox" id="wc-shop-on" onchange="wcSyncState()">Spesa in negozio ed e-commerce di almeno</label> € <input type="number" min="1" id="wc-shop-min" placeholder="es. 300"></div>
+                        <div class="cz-inline"><label class="cz-check"><input type="checkbox" id="wc-visits-on" onchange="wcSyncState()">Spesa in visite in cantina di almeno</label> € <input type="number" min="1" id="wc-visits-min" placeholder="es. 150"></div>
+                        <div class="cz-inline">Condizione <select id="wc-match"><option value="any">basta uno dei due criteri</option><option value="all">servono entrambi i criteri</option></select></div>
+                        <div class="cz-inline">Periodo: la spesa degli ultimi <input type="number" min="1" max="120" id="wc-months" placeholder="12"> mesi</div>
+                      </div>
+                      <p class="cz-note">Negozio ed e-commerce = vendite in cassa e ordini online pagati. Visite in cantina = prenotazioni confermate. La regola aggiunge soltanto: non toglie nessuno, e chi togli a mano dal wine club non rientra in automatico.</p>
+                      <div class="cz-actions">
+                        <button class="btn small" onclick="saveWineClubRule()">Salva</button>
+                        <button class="btn secondary small" id="wc-apply-btn" onclick="applyWineClub()">Applica a chi ha già speso</button>
+                      </div>
+                      <div class="cz-summary" id="wc-summary"></div>
+                      <div id="wc-msg" class="cz-msg"></div>
+                    </div>
+                  </div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Persone create da prenotazioni e vendite</div><span class="badge grey">Sempre attivo</span></div>
+                    <p class="cz-block-desc">Chi prenota una visita, compra in cassa o fa un ordine online diventa una Persona con il ruolo <b>Cliente finale</b> e il canale da cui arriva (visita, evento in cantina, negozio). Chi organizza un evento di terzi diventa <b>Cliente evento</b>.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Enoturismo → CRM → Contatti</div>
+                  </div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Ruolo «Contatto»</div><span class="badge grey">Sempre attivo</span></div>
+                    <p class="cz-block-desc">Una persona ha il ruolo Contatto finché è referente di almeno un cliente, importatore, agente o fornitore. Lo perde quando si toglie l'ultimo collegamento; la scheda della persona resta.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> CRM → Contatti · scheda Contatti di ogni anagrafica</div>
+                  </div>
+                </div>
+
+                <div class="cz-group">
+                  <div class="cz-group-title">Liste<span>le voci tra cui scegliere</span></div>
+                  <div class="cz-block">
+                    <div class="cz-block-title">Tipologie di cliente</div>
+                    <p class="cz-block-desc">Le voci del campo Tipo nella scheda cliente. Rinominare una voce aggiorna tutte le schede; si può eliminare solo se nessun cliente la usa. «Distributore» attiva la scheda Clienti riforniti: si può rinominare ma non eliminare.</p>
+                    <div class="cz-controls">
+                      <div class="cz-list" id="cz-list-customer_business_types"></div>
+                      <div class="cz-actions">
+                        <button class="btn secondary small" onclick="czAddListItem('customer_business_types')">+ Aggiungi voce</button>
+                        <button class="btn small" onclick="czSaveList('customer_business_types')">Salva</button>
+                      </div>
+                      <div id="cz-list-msg-customer_business_types" class="cz-msg"></div>
+                    </div>
+                  </div>
+                  <div class="cz-block">
+                    <div class="cz-block-title">Ruoli del contatto</div>
+                    <p class="cz-block-desc">Il ruolo che un referente ha presso un'azienda cliente, un importatore, un agente o un fornitore.</p>
+                    <div class="cz-controls">
+                      <div class="cz-list" id="cz-list-contact_roles"></div>
+                      <div class="cz-actions">
+                        <button class="btn secondary small" onclick="czAddListItem('contact_roles')">+ Aggiungi voce</button>
+                        <button class="btn small" onclick="czSaveList('contact_roles')">Salva</button>
+                      </div>
+                      <div id="cz-list-msg-contact_roles" class="cz-msg"></div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- ═══ COMMERCIALE ═══ -->
+              <section class="cz-module" data-cz-module="commerciale">
+                <h3 class="cz-module-title">Commerciale</h3>
+                <div class="cz-group">
+                  <div class="cz-group-title">Definizioni<span>come il software classifica</span></div>
+                  <div class="cz-block">
+                    <div class="cz-block-title">Cliente fermo</div>
+                    <p class="cz-block-desc">Un cliente che ha già ordinato ma non ordina da più di questi giorni compare tra le cose che richiedono attenzione.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Commerciale → Dashboard, riquadro «Richiede attenzione»</div>
+                    <div class="cz-controls">
+                      <div class="cz-inline">Segnala un cliente dopo <input type="number" min="1" max="3650" id="set-stale-days" placeholder="60"> giorni senza ordini</div>
+                      <div class="cz-actions"><button class="btn small" onclick="saveNumericSetting('stale_customer_days', 'set-stale-days', 'stale-msg')">Salva</button></div>
+                      <div id="stale-msg" class="cz-msg"></div>
+                    </div>
+                  </div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Scadenza dei pagamenti</div><span class="badge grey">Sempre attivo</span></div>
+                    <p class="cz-block-desc">Per gli ordini inseriti a mano e dagli agenti la scadenza è la data dell'ordine più i giorni scritti nei termini di pagamento del cliente. Si legge il primo numero: «60 gg DFFM» vale 60 giorni, il fine mese non viene calcolato.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Commerciale → Ordini · crediti scaduti in Dashboard</div>
+                  </div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Prezzi di cassa e negozio online</div><span class="badge grey">Sempre attivo</span></div>
+                    <p class="cz-block-desc">Cassa e negozio online usano sempre il listino obbligatorio <b>«Listino Negozio»</b> (Commerciale → Listini). Una bottiglia senza prezzo in quel listino non compare nel negozio online.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Enoturismo → Cassa · negozio online</div>
+                  </div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Profilo stagionale degli obiettivi</div><span class="badge grey">Sempre attivo</span></div>
+                    <p class="cz-block-desc">Nella distribuzione mensile «Stagionale» ogni zona segue le vendite dell'ultimo anno concluso nei suoi paesi; se non ce ne sono, usa quelle di tutta la cantina.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Commerciale → Obiettivi</div>
+                  </div>
+                </div>
+
+                <div class="cz-group">
+                  <div class="cz-group-title">Automatismi<span>cosa succede da solo</span></div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Sconto del cliente sugli ordini</div><span class="badge grey">Sempre attivo</span></div>
+                    <p class="cz-block-desc">Lo sconto % indicato nella scheda del cliente si applica da solo agli ordini inseriti a mano e dagli agenti.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Commerciale → Ordini · portale agenti</div>
+                  </div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Segnalazioni «Richiede attenzione»</div><span class="badge grey">Sempre attivo</span></div>
+                    <p class="cz-block-desc">La dashboard segnala da sola gli ordini sospesi, gli ordini export ancora da confermare, le bottiglie sotto soglia e i clienti fermi.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Commerciale → Dashboard</div>
+                  </div>
+                </div>
+
+                <div class="cz-group">
+                  <div class="cz-group-title">Liste<span>le voci tra cui scegliere</span></div>
+                  <div class="cz-block">
+                    <div class="cz-block-title">Zone commerciali</div>
+                    <p class="cz-block-desc">Le aree in cui dividi il mercato: ognuna raggruppa uno o più paesi, e un ordine conta per un'area se il paese del cliente è nell'elenco. Sono le stesse aree di Obiettivi e Dashboard.</p>
+                    <div class="cz-controls">
+                      <div id="target-areas-list"></div>
+                      <div class="cz-actions"><button class="btn secondary small" onclick="openTargetAreaModal()">+ Nuova area</button></div>
+                      <p class="cz-note">Le province seguite da ciascun agente si impostano nella scheda dell'agente.</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- ═══ ENOTURISMO ═══ -->
+              <section class="cz-module" data-cz-module="enoturismo">
+                <h3 class="cz-module-title">Enoturismo</h3>
+                <div class="cz-group">
+                  <div class="cz-group-title">Definizioni<span>come il software classifica</span></div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Posti disponibili</div><span class="badge grey">Sempre attivo</span></div>
+                    <p class="cz-block-desc">Occupano un posto le prenotazioni in attesa e quelle confermate; le prenotazioni annullate lo liberano.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Calendario · prenotazioni dal sito</div>
+                  </div>
+                  <div class="cz-block">
+                    <div class="cz-block-title">Finestra delle disponibilità ricorrenti</div>
+                    <p class="cz-block-desc">Con un orario settimanale ricorrente, il calendario viene riempito per questo numero di giorni ogni volta che salvi le disponibilità di un'esperienza.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Enoturismo → Esperienze → Disponibilità</div>
+                    <div class="cz-controls">
+                      <div class="cz-inline">Genera gli orari per i prossimi <input type="number" min="7" max="365" id="set-slot-window" placeholder="90"> giorni</div>
+                      <div class="cz-actions"><button class="btn small" onclick="saveNumericSetting('slot_window_days', 'set-slot-window', 'slot-window-msg')">Salva</button></div>
+                      <div id="slot-window-msg" class="cz-msg"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="cz-group">
+                  <div class="cz-group-title">Automatismi<span>cosa succede da solo</span></div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Pagamento online</div><span class="badge grey">Sempre attivo</span></div>
+                    <p class="cz-block-desc">Quando il pagamento va a buon fine la prenotazione si conferma, il cliente riceve l'email e il codice sconto viene conteggiato. Se il pagamento non si completa, la prenotazione si annulla da sola. Lo stesso vale per gli ordini da ritirare in negozio. Funziona quando i pagamenti online sono configurati.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> prenotazioni e ordini dal sito</div>
+                  </div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Operatori delle visite</div><span class="badge grey">Sempre attivo</span></div>
+                    <p class="cz-block-desc">Gli operatori da assegnare alle visite sono gli utenti del portale: la lista si aggiorna da sola quando aggiungi o togli un utente.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Calendario · scheda della prenotazione</div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- ═══ MAGAZZINO ═══ -->
+              <section class="cz-module" data-cz-module="magazzino">
+                <h3 class="cz-module-title">Magazzino</h3>
+                <div class="cz-group">
+                  <div class="cz-group-title">Definizioni<span>come il software classifica</span></div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Soglie di scorta</div><span class="badge grey">Per articolo</span></div>
+                    <p class="cz-block-desc">La soglia minima si imposta su ogni bottiglia e su ogni materia prima: sotto quella quantità l'articolo risulta sotto soglia.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Magazzino → Prodotti finiti · Materie prime</div>
+                  </div>
+                </div>
+
+                <div class="cz-group">
+                  <div class="cz-group-title">Automatismi<span>cosa succede da solo</span></div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Scarico e ricarico delle bottiglie</div><span class="badge grey">Sempre attivo</span></div>
+                    <p class="cz-block-desc">Una vendita in cassa o un ordine online pagato scaricano le bottiglie dal magazzino; se li elimini, le ricaricano.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Enoturismo → Cassa · ordini online → Magazzino</div>
+                    <div class="cz-warn">Gli ordini B2B del Commerciale oggi non scaricano il magazzino.</div>
+                  </div>
+                  <div class="cz-block">
+                    <div class="cz-block-title">Avvisi di scorta bassa</div>
+                    <p class="cz-block-desc">Quando una scorta scende sotto la soglia parte una sola email, non una a ogni vendita: per le bottiglie al commerciale, per le materie prime agli acquisti. Su ogni articolo puoi indicare un indirizzo diverso da questi.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Magazzino</div>
+                    <div class="cz-controls">
+                      <div class="cz-grid2">
+                        <div class="field"><label>Bottiglie (commerciale)</label><input type="email" id="set-commercial-email" placeholder="commerciale@cantina.it"></div>
+                        <div class="field"><label>Materie prime (acquisti)</label><input type="email" id="set-procurement-email" placeholder="acquisti@cantina.it"></div>
+                      </div>
+                      <div class="cz-actions"><button class="btn small" onclick="saveSettings()">Salva</button></div>
+                      <div id="settings-msg" class="cz-msg"></div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- ═══ PRODUZIONE ═══ -->
+              <section class="cz-module" data-cz-module="produzione">
+                <h3 class="cz-module-title">Produzione</h3>
+                <div class="cz-group">
+                  <div class="cz-group-title">Automatismi<span>cosa succede da solo</span></div>
+                  <div class="cz-block">
+                    <div class="cz-block-top"><div class="cz-block-title">Stati delle righe di produzione</div><span class="badge grey">Manuale</span></div>
+                    <p class="cz-block-desc">Da produrre → In produzione → Completato si cambiano a mano su ogni riga. Per ora in questo modulo non ci sono automatismi.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Produzione → Righe ordine</div>
+                  </div>
+                </div>
+              </section>
+
             </div>
-            <p style="margin:0 0 14px;font-size:11.5px;color:var(--ink-soft)">Oltre la soglia "semi attivo" un cliente è considerato inattivo. Vale per CRM → Clienti e la scheda "Clienti seguiti" di ogni agente.</p>
-            <button class="btn" onclick="saveRules()">Salva regole</button>
-          </div>
-
-          <div class="box" style="max-width:640px">
-            <h3>Aree commerciali</h3>
-            <p style="margin:0 0 14px;font-size:12.5px;color:var(--ink-soft)">Le aree usate per gli obiettivi annui in Commerciale → Obiettivi. Ogni area raggruppa uno o più paesi: un ordine conta per un'area se il paese del cliente è nell'elenco.</p>
-            <div id="target-areas-list" style="margin-bottom:14px"></div>
-            <button class="btn secondary small" onclick="openTargetAreaModal()">+ Nuova area</button>
-          </div>
-
-          <div class="box" style="max-width:520px">
-            <h3>Negozio online e cassa</h3>
-            <p style="margin:0;font-size:12.5px;color:var(--ink-soft)">Cassa e Negozio online usano sempre il listino obbligatorio <strong>"Listino Negozio"</strong> (Commerciale → Listini) come prezzo di riferimento — non è configurabile qui. Aggiungi le bottiglie a quel listino per renderle disponibili in cassa e, in futuro, sull'e-commerce; senza prezzo in quel listino una bottiglia non compare nel Negozio online.</p>
           </div>
         </div>
 
@@ -2763,6 +3023,7 @@ function openSettingsPanel(id) {
   document.getElementById('settings-detail-view').style.display = 'block';
   document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('settings-panel-' + id).classList.add('active');
+  if (id === 'customizations') loadCustomizations();
 }
 
 function closeSettingsPanel() {
@@ -2777,7 +3038,7 @@ function filterSettingsGrid(q) {
     const groupMatches = group.querySelector('h4').textContent.toLowerCase().includes(query);
     let anyLinkVisible = false;
     links.forEach(link => {
-      const visible = groupMatches || link.dataset.settingsLabel.toLowerCase().includes(query);
+      const visible = groupMatches || `${link.dataset.settingsLabel} ${link.dataset.settingsKeywords || ''}`.toLowerCase().includes(query);
       link.style.display = visible ? 'block' : 'none';
       if (visible) anyLinkVisible = true;
     });
@@ -2927,7 +3188,7 @@ async function loadDashboard() {
       <div class="com2-obiettivo-row"><span>${esc(a.area)}</span><b>${a.pct}%</b></div>
       <div class="com2-obiettivo-figure">${a.consegnate.toLocaleString('it-IT')}<span>di ${a.target.toLocaleString('it-IT')} bt</span></div>
       <div class="com2-obiettivo-bar"><div class="com2-obiettivo-bar-fill" style="width:${Math.min(100, a.pct)}%"></div></div>
-    </div>`).join('') : '<p style="font-size:12.5px;color:#c08552">Nessuna area configurata. Impostale da Impostazioni → Regole.</p>';
+    </div>`).join('') : '<p style="font-size:12.5px;color:#c08552">Nessuna area configurata. Impostale da Impostazioni → Customizations → Commerciale.</p>';
   document.getElementById('com2-obiettivi-footer').textContent = o.totaleRestante > 0
     ? `Restano ${o.totaleRestante.toLocaleString('it-IT')} bt da consegnare in ${o.mesiRestanti} ${o.mesiRestanti === 1 ? 'mese' : 'mesi'}`
     : (o.aree.some(a => a.target > 0) ? 'Obiettivi raggiunti per tutte le aree.' : 'Nessun obiettivo impostato per quest\'anno.');
@@ -3271,7 +3532,7 @@ function obAreaViewHtml(a) {
         <div>
           <div class="ob-eyebrow">Area</div>
           <div class="ob-card-title">${esc(a.label)}</div>
-          <div class="ob-countries">${a.countries.length ? 'Paesi: ' + a.countries.map(esc).join(', ') : 'Nessun paese associato: il venduto di quest\'area non viene misurato. Aggiungili in Impostazioni → Regole.'}</div>
+          <div class="ob-countries">${a.countries.length ? 'Paesi: ' + a.countries.map(esc).join(', ') : 'Nessun paese associato: il venduto di quest\'area non viene misurato. Aggiungili in Impostazioni → Customizations → Commerciale.'}</div>
         </div>
         <div class="ob-card-actions">
           <button class="btn ghost small" onclick="obOpenAreaDialog(${a.id})">${obIcon('pencil')}Rinomina</button>
@@ -3433,8 +3694,8 @@ function obOpenAreaDialog(areaId) {
   document.getElementById('ob-area-title').textContent = a ? 'Rinomina area' : 'Aggiungi area';
   document.getElementById('ob-area-btn').textContent = a ? 'Salva nome' : 'Aggiungi';
   document.getElementById('ob-area-hint').textContent = a
-    ? 'Il nome cambia in tutti gli anni e in Impostazioni → Regole. Obiettivi e paesi restano invariati.'
-    : 'Es. Horeca Abruzzo, Germania, GDO. I paesi che servono a misurare il venduto si impostano in Impostazioni → Regole.';
+    ? 'Il nome cambia in tutti gli anni e in Impostazioni → Customizations → Commerciale. Obiettivi e paesi restano invariati.'
+    : 'Es. Horeca Abruzzo, Germania, GDO. I paesi che servono a misurare il venduto si impostano in Impostazioni → Customizations → Commerciale.';
   const input = document.getElementById('ob-area-name');
   input.value = a ? a.label : '';
   openModal('ob-area-modal');
@@ -3451,7 +3712,7 @@ async function obSaveAreaDialog() {
   try {
     if (id) {
       const clash = OB.areas.find(a => a.name.toLowerCase() === lower && a.id !== id);
-      if (clash) { showToast({ tone: 'warning', title: 'Nome già usato', message: `Esiste già un'area "${clash.name}" in Impostazioni → Regole.` }); return; }
+      if (clash) { showToast({ tone: 'warning', title: 'Nome già usato', message: `Esiste già un'area "${clash.name}" in Impostazioni → Customizations → Commerciale.` }); return; }
       await api('/api/admin/sales-target-areas/' + id, { method: 'PATCH', body: JSON.stringify({ name: label }) });
       [OB.data, OB.prev].forEach(y => y?.areas.forEach(a => { if (a.id === id) a.label = label; }));
       OB.areas.forEach(a => { if (a.id === id) a.name = label; });
@@ -4368,6 +4629,7 @@ async function openCustomerModal(c) {
     document.getElementById(elId).value = c ? (c[field] || '') : (field === 'country' ? 'Italia' : '');
   }
   document.getElementById('cust-newsletter-subscribed').checked = !!(c && c.newsletter_subscribed);
+  renderBusinessTypeSelect(c ? (c.business_type || '') : '');
   document.getElementById('cust-estimated-volume').value = c && c.estimated_volume_cents != null ? (c.estimated_volume_cents / 100) : '';
   if (!AGENTS.length) AGENTS = await api('/api/admin/agents');
   document.getElementById('cust-agent').innerHTML = '<option value="">— Nessuno —</option>' +
@@ -4531,10 +4793,11 @@ async function deleteCustomer(id) {
 // ── CRM: Persone (anagrafica unica, tag di ruolo) ──────────────────────────────
 const PEOPLE_ROLE_LABELS = { cliente_finale: 'Cliente finale', cliente_evento: 'Cliente evento', contatto: 'Contatto' };
 const PEOPLE_CHANNEL_LABELS = { negozio_fisico: 'Negozio fisico', ecommerce: 'E-commerce', visita: 'Visita', evento_proprietario: 'Evento proprietario', evento_terzo: 'Evento terzo' };
-const PPL_CONTACT_ROLE_LABELS = { titolare: 'Titolare', maitre: 'Maitre', cameriere: 'Cameriere', commerciale: 'Commerciale', referente: 'Referente' };
+// Ruoli e tipologie: valori iniziali, sostituiti da quelli di Impostazioni → Customizations (loadOptionLists).
+let PPL_CONTACT_ROLE_LABELS = { titolare: 'Titolare', maitre: 'Maitre', cameriere: 'Cameriere', commerciale: 'Commerciale', referente: 'Referente' };
 const PPL_LANGUAGE_LABELS = { it: 'Italiano', en: 'English' };
 const CUST_RELATIONSHIP_LABELS = { diretta: 'Diretta', tramite_importatore: 'Tramite importatore', tramite_distributore: 'Tramite distributore' };
-const CUST_BUSINESS_TYPE_LABELS = { ristoratore: 'Ristoratore', enoteca: 'Enoteca', wine_bar: 'Wine bar', hotel: 'Hotel', catering: 'Catering', gdo: 'GDO', ecommerce_b2b: 'E-commerce B2B', distributore: 'Distributore' };
+let CUST_BUSINESS_TYPE_LABELS = { ristoratore: 'Ristoratore', enoteca: 'Enoteca', wine_bar: 'Wine bar', hotel: 'Hotel', catering: 'Catering', gdo: 'GDO', ecommerce_b2b: 'E-commerce B2B', distributore: 'Distributore' };
 const IMPORTER_EXCLUSIVITY_LABELS = { esclusivo: 'Esclusivo', non_esclusivo: 'Non esclusivo' };
 const AGENT_CONTRACT_TYPE_LABELS = { monomandatario: 'Monomandatario', plurimandatario: 'Plurimandatario', dipendente: 'Dipendente' };
 
@@ -5026,7 +5289,9 @@ function renderCrm2Sections() {
     rows.push(crm2Row('Canale di origine', channelsLabel));
     rows.push(crm2Row('Newsletter', d.newsletter_opt_in ? 'Sì' : 'No'));
     rows.push(crm2Row('Consenso profilazione', d.profiling_consent ? 'Sì' : 'No'));
-    rows.push(crm2Row('Wine club', d.wine_club ? 'Sì' : 'No'));
+    rows.push(crm2Row('Wine club', d.wine_club
+      ? `Sì${d.wine_club_since ? ' · dal ' + new Date(d.wine_club_since + 'T00:00:00').toLocaleDateString('it-IT') : ''}${d.wine_club_auto ? ' (entrato in automatico)' : ''}`
+      : (d.wine_club_excluded ? 'No · tolto a mano, non rientra in automatico' : 'No')));
     rows.push(crm2Row('Note', d.notes));
     contattoHtml = rows.join('');
     document.getElementById('crm2-view-contatto').innerHTML = `<div class="crm2-fields-grid">${contattoHtml}</div>`;
@@ -5949,6 +6214,8 @@ async function loadSettings() {
   document.getElementById('set-procurement-email').value = s.procurement_alert_email || '';
   document.getElementById('rule-active-months').value = s.active_months_threshold || 6;
   document.getElementById('rule-semi-active-months').value = s.semi_active_months_threshold || 12;
+  document.getElementById('set-stale-days').value = s.stale_customer_days || 60;
+  document.getElementById('set-slot-window').value = s.slot_window_days || 90;
 }
 async function saveSettings() {
   const msg = document.getElementById('settings-msg');
@@ -5970,7 +6237,150 @@ async function saveRules() {
       semi_active_months_threshold: document.getElementById('rule-semi-active-months').value,
     }) });
     await loadActivityThresholds();
-    msg.innerHTML = '<div class="msg success">Regole salvate.</div>';
+    msg.innerHTML = '<div class="msg success">Salvato.</div>';
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+// ── IMPOSTAZIONI → Customizations ────────────────────────────────────────────────
+function czShowModule(mod) {
+  document.querySelectorAll('#cz-nav button').forEach(b => b.classList.toggle('active', b.dataset.cz === mod));
+  document.querySelectorAll('.cz-module').forEach(s => s.classList.toggle('active', s.dataset.czModule === mod));
+}
+async function loadCustomizations() {
+  document.querySelectorAll('#cz-nav button').forEach(b => {
+    const n = document.querySelectorAll(`.cz-module[data-cz-module="${b.dataset.cz}"] .cz-block`).length;
+    b.querySelector('span').textContent = n;
+  });
+  await Promise.all([loadWineClubRule(), loadOptionLists().then(renderCzLists)]);
+}
+
+async function saveNumericSetting(key, inputId, msgId) {
+  const msg = document.getElementById(msgId);
+  try {
+    await api('/api/admin/settings', { method: 'POST', body: JSON.stringify({ [key]: document.getElementById(inputId).value }) });
+    msg.innerHTML = '<div class="msg success">Salvato.</div>';
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+// Wine club automatico
+function wcSyncState() {
+  const on = document.getElementById('wc-enabled').checked;
+  document.getElementById('wc-criteria').classList.toggle('off', !on);
+  document.getElementById('wc-shop-min').disabled = !document.getElementById('wc-shop-on').checked;
+  document.getElementById('wc-visits-min').disabled = !document.getElementById('wc-visits-on').checked;
+}
+function wcRenderSummary(s) {
+  const people = n => `${n} ${n === 1 ? 'persona' : 'persone'}`;
+  const parts = [`Oggi nel wine club: <b>${people(s.members)}</b>${s.auto_members ? `, di cui ${s.auto_members} entrate in automatico` : ''}.`];
+  if (s.rule.enabled) parts.push(s.candidates ? `<b>${people(s.candidates)}</b> ${s.candidates === 1 ? 'ha' : 'hanno'} già speso abbastanza ma non ${s.candidates === 1 ? 'è' : 'sono'} ancora nel club.` : 'Nessun altro rientra già nei criteri.');
+  if (s.excluded) parts.push(`${people(s.excluded)} ${s.excluded === 1 ? 'è stata tolta' : 'sono state tolte'} a mano e non ${s.excluded === 1 ? 'rientra' : 'rientrano'} in automatico.`);
+  document.getElementById('wc-summary').innerHTML = parts.join(' ');
+  const btn = document.getElementById('wc-apply-btn');
+  btn.style.display = s.rule.enabled && s.candidates ? '' : 'none';
+  btn.textContent = `Aggiungi ora ${people(s.candidates)}`;
+}
+async function loadWineClubRule() {
+  const s = await api('/api/admin/wine-club/rule');
+  const r = s.rule;
+  document.getElementById('wc-enabled').checked = r.enabled;
+  document.getElementById('wc-shop-on').checked = r.shop.enabled;
+  document.getElementById('wc-shop-min').value = r.shop.min_eur ?? '';
+  document.getElementById('wc-visits-on').checked = r.visits.enabled;
+  document.getElementById('wc-visits-min').value = r.visits.min_eur ?? '';
+  document.getElementById('wc-match').value = r.match;
+  document.getElementById('wc-months').value = r.months;
+  document.getElementById('wc-msg').innerHTML = '';
+  wcSyncState();
+  wcRenderSummary(s);
+}
+async function saveWineClubRule() {
+  const msg = document.getElementById('wc-msg');
+  const val = id => document.getElementById(id).value;
+  const on = id => document.getElementById(id).checked;
+  try {
+    const s = await api('/api/admin/wine-club/rule', { method: 'PUT', body: JSON.stringify({
+      enabled: on('wc-enabled'), match: val('wc-match'), months: val('wc-months'),
+      shop: { enabled: on('wc-shop-on'), min_eur: val('wc-shop-min') },
+      visits: { enabled: on('wc-visits-on'), min_eur: val('wc-visits-min') },
+    }) });
+    msg.innerHTML = `<div class="msg success">${s.rule.enabled ? 'Regola attiva: da ora in poi si applica a ogni acquisto.' : 'Salvato. L\'ingresso automatico è spento.'}</div>`;
+    wcRenderSummary(s);
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+async function applyWineClub() {
+  const msg = document.getElementById('wc-msg');
+  try {
+    const s = await api('/api/admin/wine-club/apply', { method: 'POST' });
+    msg.innerHTML = `<div class="msg success">${s.added === 1 ? 'Aggiunta 1 persona' : `Aggiunte ${s.added} persone`} al wine club.</div>`;
+    wcRenderSummary(s);
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+// Liste modificabili: Tipologie di cliente, Ruoli del contatto
+let OPTION_LISTS = null;
+async function loadOptionLists() {
+  try {
+    OPTION_LISTS = await api('/api/admin/option-lists');
+    CUST_BUSINESS_TYPE_LABELS = Object.fromEntries(OPTION_LISTS.customer_business_types.map(i => [i.key, i.label]));
+    PPL_CONTACT_ROLE_LABELS = Object.fromEntries(OPTION_LISTS.contact_roles.map(i => [i.key, i.label]));
+  } catch (e) {
+    console.error('Liste non caricate:', e.message);
+  }
+  renderBusinessTypeSelect();
+}
+// Keeps a value that is no longer in the list selectable, so saving a customer never loses it.
+function renderBusinessTypeSelect(selected) {
+  const sel = document.getElementById('cust-business-type');
+  const value = selected !== undefined ? selected : sel.value;
+  const opts = [['', '— Non specificato —'], ...Object.entries(CUST_BUSINESS_TYPE_LABELS)];
+  if (value && !CUST_BUSINESS_TYPE_LABELS[value]) opts.push([value, value]);
+  sel.innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
+  sel.value = value || '';
+}
+const CZ_LIST_USED_LABEL = {
+  customer_business_types: n => `usata da ${n} ${n === 1 ? 'cliente' : 'clienti'}`,
+  contact_roles: n => `usato da ${n} ${n === 1 ? 'contatto' : 'contatti'}`,
+};
+function czListRowHtml(name, item = {}) {
+  const locked = item.system ? 'Ha funzioni collegate: puoi solo rinominarla' : item.used ? 'In uso: cambiala prima sulle schede' : '';
+  return `<div class="cz-list-row" data-key="${esc(item.key || '')}">
+    <input value="${obAttr(item.label || '')}" placeholder="Nome della voce" aria-label="Nome della voce">
+    <span class="cz-list-used">${item.used ? CZ_LIST_USED_LABEL[name](item.used) : item.key ? 'non usata' : 'nuova'}</span>
+    <button type="button" class="link-pill-btn danger" title="${locked || 'Elimina'}" aria-label="Elimina" ${locked ? 'disabled' : ''} onclick="this.closest('.cz-list-row').remove()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+    </button>
+  </div>`;
+}
+function renderCzLists() {
+  if (!OPTION_LISTS) return;
+  for (const name of Object.keys(OPTION_LISTS)) {
+    const box = document.getElementById('cz-list-' + name);
+    if (box) box.innerHTML = OPTION_LISTS[name].map(i => czListRowHtml(name, i)).join('');
+  }
+}
+function czAddListItem(name) {
+  const box = document.getElementById('cz-list-' + name);
+  box.insertAdjacentHTML('beforeend', czListRowHtml(name));
+  box.lastElementChild.querySelector('input').focus();
+}
+async function czSaveList(name) {
+  const msg = document.getElementById('cz-list-msg-' + name);
+  const items = [...document.querySelectorAll(`#cz-list-${name} .cz-list-row`)]
+    .map(row => ({ key: row.dataset.key || null, label: row.querySelector('input').value.trim() }))
+    .filter(i => i.key || i.label);
+  try {
+    await api('/api/admin/option-lists/' + name, { method: 'PUT', body: JSON.stringify({ items }) });
+    await loadOptionLists();
+    renderCzLists();
+    msg.innerHTML = '<div class="msg success">Lista salvata.</div>';
   } catch (e) {
     msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
   }
@@ -6344,6 +6754,7 @@ async function boot() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   loadActivityThresholds();
+  loadOptionLists();
   const me = await api('/api/admin/me');
   PERMITTED_WORKSPACES = me.permittedWorkspaces;
   applyPermissions();

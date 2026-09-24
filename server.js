@@ -648,6 +648,11 @@ try { db.exec('ALTER TABLE people ADD COLUMN last_name TEXT'); } catch {}
 try { db.exec('ALTER TABLE people ADD COLUMN birth_date TEXT'); } catch {}
 try { db.exec('ALTER TABLE people ADD COLUMN preferred_language TEXT'); } catch {}
 try { db.exec('ALTER TABLE people ADD COLUMN profiling_consent INTEGER NOT NULL DEFAULT 0'); } catch {}
+// Wine club: quando è entrato, se ce l'ha messo la regola automatica, e se qualcuno l'ha tolto a
+// mano (in quel caso la regola automatica non lo rimette dentro).
+try { db.exec('ALTER TABLE people ADD COLUMN wine_club_since TEXT'); } catch {}
+try { db.exec('ALTER TABLE people ADD COLUMN wine_club_auto INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE people ADD COLUMN wine_club_excluded INTEGER NOT NULL DEFAULT 0'); } catch {}
 
 // ── CRM: anagrafica estesa (Informazioni di contatto / indirizzo / business) ──
 try { db.exec('ALTER TABLE customers ADD COLUMN contact_person TEXT'); } catch {}
@@ -1272,6 +1277,107 @@ function getSetting(key, fallback = null) {
 function setSetting(key, value) {
   db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
 }
+function getIntSetting(key, fallback) {
+  const n = parseInt(getSetting(key, ''));
+  return n > 0 ? n : fallback;
+}
+// Valori numerici modificabili da Impostazioni → Customizations, con i limiti ammessi.
+const NUMERIC_SETTINGS = {
+  stale_customer_days: { fallback: 60, min: 1, max: 3650, error: 'I giorni per "cliente fermo" devono essere tra 1 e 3650.' },
+  slot_window_days: { fallback: 90, min: 7, max: 365, error: 'La finestra delle disponibilità deve essere tra 7 e 365 giorni.' },
+};
+
+// ── Customizations: liste modificabili (Tipologie di cliente, Ruoli del contatto) ──
+// Ogni voce ha una chiave fissa (salvata sulle schede) e un nome modificabile: rinominare non tocca i dati.
+const OPTION_LIST_DEFAULTS = {
+  customer_business_types: [
+    { key: 'ristoratore', label: 'Ristoratore' }, { key: 'enoteca', label: 'Enoteca' }, { key: 'wine_bar', label: 'Wine bar' },
+    { key: 'hotel', label: 'Hotel' }, { key: 'catering', label: 'Catering' }, { key: 'gdo', label: 'GDO' },
+    { key: 'ecommerce_b2b', label: 'E-commerce B2B' },
+    // Ha una logica collegata (la scheda "Clienti riforniti"): si può rinominare, non eliminare.
+    { key: 'distributore', label: 'Distributore', system: true },
+  ],
+  contact_roles: [
+    { key: 'titolare', label: 'Titolare' }, { key: 'maitre', label: 'Maitre' }, { key: 'cameriere', label: 'Cameriere' },
+    { key: 'commerciale', label: 'Commerciale' }, { key: 'referente', label: 'Referente' },
+  ],
+};
+const OPTION_LIST_USAGE = {
+  customer_business_types: key => db.prepare('SELECT COUNT(*) AS c FROM customers WHERE business_type = ?').get(key).c,
+  contact_roles: key => db.prepare('SELECT COUNT(*) AS c FROM person_links WHERE contact_role = ?').get(key).c,
+};
+function getOptionList(name) {
+  const defaults = OPTION_LIST_DEFAULTS[name];
+  let items = null;
+  try { items = JSON.parse(getSetting('list_' + name, 'null')); } catch {}
+  if (!Array.isArray(items)) items = defaults.map(i => ({ key: i.key, label: i.label }));
+  for (const d of defaults) if (d.system && !items.some(i => i.key === d.key)) items.push({ key: d.key, label: d.label });
+  return items.map(i => ({ key: i.key, label: i.label, system: defaults.some(d => d.key === i.key && d.system) }));
+}
+function optionKeyFromLabel(label, taken) {
+  const base = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'voce';
+  let key = base, n = 2;
+  while (taken.has(key)) key = `${base}_${n++}`;
+  return key;
+}
+
+// ── Wine club automatico ──
+// Una persona entra da sola nel wine club quando, negli ultimi N mesi, la sua spesa supera le soglie
+// scelte: negozio + e-commerce (cassa e ordini online pagati) e/o visite in cantina (prenotazioni
+// confermate). La regola aggiunge soltanto: non toglie mai nessuno, e chi è stato tolto a mano non rientra.
+const WINE_CLUB_RULE_DEFAULT = { enabled: false, match: 'any', months: 12, shop: { enabled: true, min_eur: null }, visits: { enabled: true, min_eur: null } };
+function getWineClubRule() {
+  let r = null;
+  try { r = JSON.parse(getSetting('wine_club_rule', 'null')); } catch {}
+  const d = WINE_CLUB_RULE_DEFAULT;
+  return { ...d, ...(r || {}), shop: { ...d.shop, ...(r?.shop || {}) }, visits: { ...d.visits, ...(r?.visits || {}) } };
+}
+function wineClubSpend(months, personId = null) {
+  const since = new Date();
+  since.setMonth(since.getMonth() - months);
+  const sinceStr = since.toISOString().slice(0, 10);
+  const filter = personId ? ' AND person_id = ?' : '';
+  const args = personId ? [sinceStr, personId] : [sinceStr];
+  const spend = new Map();
+  const add = (rows, k) => rows.forEach(r => {
+    const e = spend.get(r.person_id) || { shop: 0, visits: 0 };
+    e[k] += r.c || 0;
+    spend.set(r.person_id, e);
+  });
+  add(db.prepare(`SELECT person_id, SUM(total_cents) AS c FROM shop_sales WHERE person_id IS NOT NULL AND created_at >= ?${filter} GROUP BY person_id`).all(...args), 'shop');
+  add(db.prepare(`SELECT person_id, SUM(amount_cents) AS c FROM pickup_orders WHERE person_id IS NOT NULL AND status IN ('da_ritirare', 'ritirato') AND created_at >= ?${filter} GROUP BY person_id`).all(...args), 'shop');
+  add(db.prepare(`SELECT person_id, SUM(amount_cents) AS c FROM bookings WHERE person_id IS NOT NULL AND status = 'confermata' AND created_at >= ?${filter} GROUP BY person_id`).all(...args), 'visits');
+  return spend;
+}
+function wineClubQualifies(rule, spend) {
+  const checks = [];
+  if (rule.shop.enabled && rule.shop.min_eur > 0) checks.push(spend.shop >= rule.shop.min_eur * 100);
+  if (rule.visits.enabled && rule.visits.min_eur > 0) checks.push(spend.visits >= rule.visits.min_eur * 100);
+  if (!checks.length) return false;
+  return rule.match === 'all' ? checks.every(Boolean) : checks.some(Boolean);
+}
+function wineClubCandidates(rule) {
+  const eligible = new Set(db.prepare('SELECT id FROM people WHERE wine_club = 0 AND wine_club_excluded = 0').all().map(r => r.id));
+  return [...wineClubSpend(rule.months).entries()].filter(([pid, sp]) => eligible.has(pid) && wineClubQualifies(rule, sp)).map(([pid]) => pid);
+}
+function joinWineClub(ids) {
+  const st = db.prepare("UPDATE people SET wine_club = 1, wine_club_auto = 1, wine_club_since = date('now','localtime') WHERE id = ? AND wine_club = 0 AND wine_club_excluded = 0");
+  return ids.reduce((n, id) => n + st.run(id).changes, 0);
+}
+// Chiamata dopo ogni acquisto: con la regola attiva la persona entra appena raggiunge le soglie.
+function checkWineClub(personId) {
+  if (!personId) return;
+  try {
+    const rule = getWineClubRule();
+    if (!rule.enabled) return;
+    const id = Number(personId);
+    const p = db.prepare('SELECT wine_club, wine_club_excluded FROM people WHERE id = ?').get(id);
+    if (!p || p.wine_club || p.wine_club_excluded) return;
+    if (wineClubQualifies(rule, wineClubSpend(rule.months, id).get(id) || { shop: 0, visits: 0 })) joinWineClub([id]);
+  } catch (e) {
+    console.error('Wine club check error:', e.message);
+  }
+}
 
 // ── CRM helpers ───────────────────────────────────────────────────────────────
 function generateAgentToken() {
@@ -1558,6 +1664,7 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) =
       db.prepare("UPDATE bookings SET status = 'confermata', payment_intent_id = ?, stripe_payment_status = 'paid' WHERE id = ?")
         .run(paymentIntentId, bookingId);
       const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
+      checkWineClub(booking?.person_id);
       if (booking?.discount_code_id) {
         db.prepare('UPDATE discount_codes SET used_count = used_count + 1 WHERE id = ?').run(booking.discount_code_id);
       } else if (booking?.discount_code) {
@@ -1576,6 +1683,7 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) =
       const items = db.prepare('SELECT * FROM pickup_order_items WHERE order_id = ?').all(orderId);
       for (const it of items) if (it.product_id) adjustWarehouseStock(it.product_id, -it.quantity);
       const order = db.prepare('SELECT * FROM pickup_orders WHERE id = ?').get(orderId);
+      checkWineClub(order?.person_id);
       if (order) { order.items = items; sendPickupOrderEmail(order).catch(console.error); }
     }
   }
@@ -2001,7 +2109,7 @@ app.put('/api/admin/experiences/:id/products', authAdmin, (req, res) => {
 });
 
 // Disponibilità ricorrente per esperienza: genera slot per una finestra scorrevole di giorni
-function generateSlotsFromAvailability(experienceId, windowDays = 90) {
+function generateSlotsFromAvailability(experienceId, windowDays = getIntSetting('slot_window_days', 90)) {
   const patterns = db.prepare('SELECT * FROM experience_availability WHERE experience_id = ?').all(experienceId);
   if (!patterns.length) return 0;
   const insert = db.prepare('INSERT INTO slots (experience_id, date, time, capacity) VALUES (?, ?, ?, ?)');
@@ -2147,6 +2255,7 @@ app.post('/api/admin/bookings/manual', authAdmin, async (req, res) => {
     INSERT INTO bookings (slot_id, experience_id, customer_name, email, phone, guests, notes, status, amount_cents, person_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(slot.id, exp.id, customer_name.trim(), emailClean, phone?.trim() || null, guestCount, notes?.trim() || null, statusVal, amountCents, personId);
+  if (statusVal === 'confermata') checkWineClub(personId);
 
   const full = bookingWithDetails(result.lastInsertRowid);
   if (send_email) {
@@ -2164,6 +2273,7 @@ app.patch('/api/admin/bookings/:id', authAdmin, (req, res) => {
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
   params.push(req.params.id);
   db.prepare(`UPDATE bookings SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  if (req.body.status === 'confermata') checkWineClub(db.prepare('SELECT person_id FROM bookings WHERE id = ?').get(req.params.id)?.person_id);
   res.json({ success: true });
 });
 
@@ -2183,6 +2293,7 @@ app.post('/api/admin/bookings/confirm/:id', authAdmin, async (req, res) => {
   }
 
   db.prepare("UPDATE bookings SET status = 'confermata', payment_intent_id = ? WHERE id = ?").run(paymentIntentId, booking.id);
+  checkWineClub(booking.person_id);
   try { await sendBookingEmail(bookingWithDetails(booking.id)); } catch (e) { console.error('Email error:', e.message); }
   res.json({ success: true });
 });
@@ -2478,6 +2589,7 @@ app.post('/api/admin/shop-sales', authAdmin, (req, res) => {
     insertItem.run(saleId, it.product_id || null, it.product_name.trim(), it.quantity, it.unit_price_cents || 0, it.quantity * (it.unit_price_cents || 0));
     if (it.product_id) adjustWarehouseStock(it.product_id, -it.quantity);
   }
+  checkWineClub(personId);
 
   res.json({ success: true, id: saleId });
 });
@@ -2544,6 +2656,7 @@ app.get('/api/admin/settings', authAdmin, (req, res) => {
     procurement_alert_email: getSetting('procurement_alert_email', ''),
     active_months_threshold: getSetting('active_months_threshold', '6'),
     semi_active_months_threshold: getSetting('semi_active_months_threshold', '12'),
+    ...Object.fromEntries(Object.entries(NUMERIC_SETTINGS).map(([k, d]) => [k, getIntSetting(k, d.fallback)])),
     ...company,
   });
 });
@@ -2625,10 +2738,91 @@ app.post('/api/admin/settings', authAdmin, (req, res) => {
     if (!n || n < 1) return res.status(400).json({ error: 'La soglia clienti semi attivi deve essere un numero di mesi valido.' });
     setSetting('semi_active_months_threshold', String(n));
   }
+  for (const [k, d] of Object.entries(NUMERIC_SETTINGS)) {
+    if (req.body[k] === undefined) continue;
+    const n = parseInt(req.body[k]);
+    if (!(n >= d.min && n <= d.max)) return res.status(400).json({ error: d.error });
+    setSetting(k, String(n));
+  }
   for (const f of COMPANY_FIELDS) {
     if (req.body[f] !== undefined) setSetting(f, req.body[f].trim());
   }
   res.json({ success: true });
+});
+
+// ── Customizations: liste modificabili ──
+app.get('/api/admin/option-lists', authAdmin, (req, res) => {
+  const out = {};
+  for (const name of Object.keys(OPTION_LIST_DEFAULTS)) out[name] = getOptionList(name).map(i => ({ ...i, used: OPTION_LIST_USAGE[name](i.key) }));
+  res.json(out);
+});
+app.put('/api/admin/option-lists/:name', authAdmin, (req, res) => {
+  const name = req.params.name;
+  if (!OPTION_LIST_DEFAULTS[name]) return res.status(404).json({ error: 'Lista non trovata.' });
+  const incoming = req.body?.items;
+  if (!Array.isArray(incoming) || !incoming.length) return res.status(400).json({ error: 'La lista deve avere almeno una voce.' });
+  const current = getOptionList(name);
+  const currentKeys = new Set(current.map(i => i.key));
+  const taken = new Set(currentKeys), labels = new Set(), result = [];
+  for (const it of incoming) {
+    const label = String(it?.label || '').trim();
+    if (!label) return res.status(400).json({ error: 'Ogni voce deve avere un nome.' });
+    if (labels.has(label.toLowerCase())) return res.status(400).json({ error: `"${label}" compare due volte.` });
+    labels.add(label.toLowerCase());
+    const key = it.key && currentKeys.has(it.key) && !result.some(r => r.key === it.key) ? it.key : optionKeyFromLabel(label, taken);
+    taken.add(key);
+    result.push({ key, label });
+  }
+  for (const old of current) {
+    if (result.some(r => r.key === old.key)) continue;
+    if (old.system) return res.status(400).json({ error: `"${old.label}" non si può eliminare: ha funzioni collegate. Puoi solo rinominarla.` });
+    const used = OPTION_LIST_USAGE[name](old.key);
+    if (used) {
+      const what = name === 'contact_roles' ? (used === 1 ? 'contatto' : 'contatti') : (used === 1 ? 'cliente' : 'clienti');
+      return res.status(409).json({ error: `"${old.label}" è usata da ${used} ${what}: cambiala prima su quelle schede.` });
+    }
+  }
+  setSetting('list_' + name, JSON.stringify(result));
+  res.json({ success: true });
+});
+
+// ── Customizations: regola del wine club ──
+function wineClubSummary(rule) {
+  const c = sql => db.prepare(sql).get().c;
+  return {
+    rule,
+    candidates: wineClubCandidates(rule).length,
+    members: c('SELECT COUNT(*) AS c FROM people WHERE wine_club = 1'),
+    auto_members: c('SELECT COUNT(*) AS c FROM people WHERE wine_club = 1 AND wine_club_auto = 1'),
+    excluded: c('SELECT COUNT(*) AS c FROM people WHERE wine_club = 0 AND wine_club_excluded = 1'),
+  };
+}
+app.get('/api/admin/wine-club/rule', authAdmin, (req, res) => {
+  res.json(wineClubSummary(getWineClubRule()));
+});
+app.put('/api/admin/wine-club/rule', authAdmin, (req, res) => {
+  const b = req.body || {};
+  const months = parseInt(b.months);
+  if (!(months >= 1 && months <= 120)) return res.status(400).json({ error: 'Il periodo deve essere tra 1 e 120 mesi.' });
+  const eur = v => (v === '' || v == null ? null : Math.round(Number(v)) || null);
+  const rule = {
+    enabled: !!b.enabled, match: b.match === 'all' ? 'all' : 'any', months,
+    shop: { enabled: !!b.shop?.enabled, min_eur: eur(b.shop?.min_eur) },
+    visits: { enabled: !!b.visits?.enabled, min_eur: eur(b.visits?.min_eur) },
+  };
+  if (rule.enabled && !rule.shop.enabled && !rule.visits.enabled) return res.status(400).json({ error: 'Attiva almeno un criterio.' });
+  for (const k of ['shop', 'visits']) {
+    if (rule[k].enabled && !(rule[k].min_eur > 0)) return res.status(400).json({ error: 'Indica una spesa minima per ogni criterio attivo.' });
+  }
+  setSetting('wine_club_rule', JSON.stringify(rule));
+  res.json({ success: true, ...wineClubSummary(rule) });
+});
+// Applica la regola a chi ha già speso abbastanza prima che venisse attivata.
+app.post('/api/admin/wine-club/apply', authAdmin, (req, res) => {
+  const rule = getWineClubRule();
+  if (!rule.enabled) return res.status(400).json({ error: 'Attiva prima la regola automatica.' });
+  const added = joinWineClub(wineClubCandidates(rule));
+  res.json({ success: true, added, ...wineClubSummary(rule) });
 });
 
 // ── Prodotti (bottiglie) ───────────────────────────────────────────────────────
@@ -3197,8 +3391,8 @@ app.get('/api/admin/commercial/dashboard', authAdmin, (req, res) => {
   const clientiFermi = db.prepare(`
     SELECT c.name, MAX(o.order_date) AS last_order, CAST(julianday(?) - julianday(MAX(o.order_date)) AS INTEGER) AS days
     FROM customers c JOIN orders o ON o.customer_id = c.id
-    GROUP BY c.id HAVING days >= 60 ORDER BY days DESC LIMIT 2
-  `).all(today);
+    GROUP BY c.id HAVING days >= ? ORDER BY days DESC LIMIT 2
+  `).all(today, getIntSetting('stale_customer_days', 60));
   clientiFermi.forEach(c => attenzione.push({ testo: `${c.name} fermo da ${c.days} gg`, gravita: 'neutro', href: null }));
 
   res.json({
@@ -3576,6 +3770,7 @@ app.post('/api/admin/people', authAdmin, (req, res) => {
   for (const f of PEOPLE_FIELDS) {
     if (body[f] !== undefined && body[f] !== '') { cols.push(f); values.push(normalizePersonField(f, body[f])); }
   }
+  if (body.wine_club) { cols.push('wine_club_since'); values.push(new Date().toISOString().slice(0, 10)); }
   const placeholders = cols.map(() => '?').join(', ');
   const id = db.prepare(`INSERT INTO people (${cols.join(', ')}) VALUES (${placeholders})`).run(...values).lastInsertRowid;
   if (body.links !== undefined && setPersonLinks(id, body.links) > 0) syncContattoRole(id);
@@ -3590,7 +3785,14 @@ app.patch('/api/admin/people/:id', authAdmin, (req, res) => {
   if (body.roles !== undefined) { updates.push('roles = ?'); params.push(JSON.stringify(Array.isArray(body.roles) ? body.roles : [])); }
   if (body.source_channels !== undefined) { updates.push('source_channels = ?'); params.push(JSON.stringify(Array.isArray(body.source_channels) ? body.source_channels : [])); }
   if (body.newsletter_opt_in !== undefined) { updates.push('newsletter_opt_in = ?'); params.push(body.newsletter_opt_in ? 1 : 0); }
-  if (body.wine_club !== undefined) { updates.push('wine_club = ?'); params.push(body.wine_club ? 1 : 0); }
+  if (body.wine_club !== undefined) {
+    const was = db.prepare('SELECT wine_club FROM people WHERE id = ?').get(id)?.wine_club;
+    const now = body.wine_club ? 1 : 0;
+    updates.push('wine_club = ?'); params.push(now);
+    // Tolto a mano: la regola automatica non lo rimette dentro. Aggiunto a mano: vale da oggi.
+    if (was && !now) updates.push('wine_club_excluded = 1', 'wine_club_auto = 0', 'wine_club_since = NULL');
+    if (!was && now) updates.push('wine_club_excluded = 0', 'wine_club_auto = 0', "wine_club_since = date('now','localtime')");
+  }
   if (body.profiling_consent !== undefined) { updates.push('profiling_consent = ?'); params.push(body.profiling_consent ? 1 : 0); }
   for (const f of PEOPLE_FIELDS) {
     if (body[f] !== undefined) { updates.push(`${f} = ?`); params.push(body[f] === '' ? null : normalizePersonField(f, body[f])); }
