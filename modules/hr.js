@@ -95,6 +95,7 @@ module.exports = function registerHr(app, { db, authAdmin, audit, hasAccessLevel
 
   // ── Dipendenti ───────────────────────────────────────────────────────────────
   const employeeRow = id => db.prepare('SELECT * FROM employees WHERE id = ?').get(id);
+  const deleteGuards = []; // fn(employeeId) → descrizione dei dati da conservare, oppure null
   function employee(id) {
     const e = employeeRow(id);
     if (!e) throw new HttpError(404, 'Dipendente non trovato.');
@@ -204,6 +205,9 @@ module.exports = function registerHr(app, { db, authAdmin, audit, hasAccessLevel
       (SELECT COUNT(*) FROM teams WHERE leader_employee_id = ?) +
       (SELECT COUNT(*) FROM employee_hourly_costs WHERE employee_id = ?) AS c`).get(e.id, e.id, e.id, e.id).c;
     if (refs) throw new HttpError(409, `${fullName(e)} ha collaboratori, squadre o costi orari collegati: non si elimina, disattivalo.`);
+    // Gli altri moduli (fascicolo, sicurezza, presenze…) dicono se il dipendente ha dati da conservare.
+    const kept = deleteGuards.map(fn => fn(e.id)).filter(Boolean);
+    if (kept.length) throw new HttpError(409, `${fullName(e)} ha ${kept.join(', ')}: non si elimina, disattivalo.`);
     db.prepare('DELETE FROM employees WHERE id = ?').run(e.id);
     audit(req, 'employee.deleted', { entity: 'employee', entityId: e.id, before: e });
     return { success: true };
@@ -330,5 +334,5 @@ module.exports = function registerHr(app, { db, authAdmin, audit, hasAccessLevel
     return { success: true };
   });
 
-  return { resolveApprover, calendar, currentSchedule };
+  return { resolveApprover, calendar, currentSchedule, registerDeleteGuard: fn => deleteGuards.push(fn) };
 };

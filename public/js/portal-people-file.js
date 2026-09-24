@@ -1,13 +1,14 @@
 // Portale → People: scheda del dipendente (fascicolo), scadenzario, configurazione (mansioni, soglie, oneri).
-const HR_TABS = [['organizzazione', 'Organizzazione'], ['personali', 'Dati personali'], ['lavoro', 'Rapporto di lavoro'], ['competenze', 'Competenze'], ['documenti', 'Documenti'], ['scadenze', 'Scadenze']];
+const HR_TABS = [['organizzazione', 'Organizzazione'], ['personali', 'Dati personali'], ['lavoro', 'Rapporto di lavoro'], ['competenze', 'Competenze'], ['sicurezza', 'Sicurezza'], ['documenti', 'Documenti'], ['scadenze', 'Scadenze']];
 const HR_CONTRACT_TYPES = { OTD: 'Operaio a tempo determinato', OTI: 'Operaio a tempo indeterminato', impiegato: 'Impiegato', quadro: 'Quadro', dirigente: 'Dirigente', apprendista: 'Apprendista', stagionale: 'Stagionale', somministrato: 'Somministrato', collaboratore: 'Collaboratore' };
 const HR_ID_DOCS = { carta_identita: "Carta d'identità", passaporto: 'Passaporto', patente: 'Patente', permesso_soggiorno: 'Permesso di soggiorno' };
 const HR_SKILL_KINDS = { lingua: 'Lingue', titolo_studio: 'Titoli di studio', esperienza: 'Esperienze precedenti', qualifica: 'Qualifiche di settore', competenza: 'Competenze operative' };
 const HR_LANGUAGES = { it: 'Italiano', en: 'Inglese', de: 'Tedesco', fr: 'Francese', es: 'Spagnolo', pt: 'Portoghese', ru: 'Russo', zh: 'Cinese', ja: 'Giapponese', nl: 'Olandese' };
 const HR_LEVELS = { base: 'Base', personale: 'Personale', retributivo: 'Retributivo', sanitario: 'Sanitario', disciplinare: 'Disciplinare' };
-const REC = { id: null, tab: 'organizzazione', org: null, file: null, jobRoles: [], docTypes: [] };
+const REC = { id: null, tab: 'organizzazione', org: null, file: null, safety: null, jobRoles: [], docTypes: [] };
 
 function hrDaysLabel(d) {
+  if (d.missing) return { cls: 'scaduto', text: 'mancante' };
   if (d.days_left < 0) return { cls: 'scaduto', text: `scaduto da ${-d.days_left} gg` };
   if (d.days_left === 0) return { cls: 'scaduto', text: 'scade oggi' };
   return { cls: d.days_left <= 30 ? 'soon' : 'later', text: `tra ${d.days_left} gg` };
@@ -16,7 +17,7 @@ function hrDeadlineRow(d, withName = false) {
   const l = hrDaysLabel(d);
   return `<div class="dl-item">
     <span class="dl-days ${l.cls}">${l.text}</span>
-    <div class="mod-row-main" style="min-width:160px"><div class="mod-row-title">${withName ? `${esc(d.employee_name)} · ` : ''}${esc(d.label)}</div><div class="mod-row-sub">${UI.date(d.due_date)}${d.site_name && withName ? ' · ' + esc(d.site_name) : ''}</div></div>
+    <div class="mod-row-main" style="min-width:160px"><div class="mod-row-title">${withName ? `${esc(d.employee_name)} · ` : ''}${esc(d.label)}</div><div class="mod-row-sub">${d.missing ? `richiesto dal ${UI.date(d.due_date)}` : UI.date(d.due_date)}${d.site_name && withName ? ' · ' + esc(d.site_name) : ''}</div></div>
     ${d.blocking && d.days_left < 0 ? '<span class="badge red">Blocca le ore</span>' : d.blocking ? '<span class="badge yellow">Bloccante alla scadenza</span>' : ''}
   </div>`;
 }
@@ -40,7 +41,18 @@ async function openHrRecord(id, tab) {
     REC.jobRoles.length ? REC.jobRoles : api('/api/admin/hr/job-roles'), REC.docTypes.length ? REC.docTypes : api('/api/admin/hr/document-types'),
   ]);
   if (tok !== HR.renderTok) return;
-  Object.assign(REC, { org, file, jobRoles, docTypes });
+  Object.assign(REC, { org, file, jobRoles, docTypes, safety: null, safetyFor: null });
+  if (REC.tab === 'sicurezza') await hrLoadSafety();
+  renderHrRecord();
+}
+// La sezione sicurezza si carica solo quando la si apre: la lettura dell'idoneità viene registrata.
+async function hrLoadSafety() {
+  REC.safety = await api(`/api/admin/hr/employees/${REC.id}/safety`).catch(() => null);
+  REC.safetyFor = REC.id;
+}
+async function hrSelectTab(k) {
+  REC.tab = k;
+  if (k === 'sicurezza' && REC.safetyFor !== REC.id) await hrLoadSafety();
   renderHrRecord();
 }
 function renderHrRecord() {
@@ -60,7 +72,7 @@ function renderHrRecord() {
       ${expiredBlocking ? `<span class="badge red" title="${UI.attr(f.blocking_today.join('; '))}">Ore bloccate</span>` : ''}
       <button class="btn-outline-pill" onclick="openHrEmployeeModal(${e.id})">Modifica dati</button>
     </div>
-    <div class="rec-tabs">${HR_TABS.map(([k, l]) => `<button class="${REC.tab === k ? 'active' : ''}" onclick="REC.tab='${k}'; renderHrRecord()">${l}${k === 'scadenze' && f.deadlines.length ? ` (${f.deadlines.length})` : ''}</button>`).join('')}</div>
+    <div class="rec-tabs">${HR_TABS.map(([k, l]) => `<button class="${REC.tab === k ? 'active' : ''}" onclick="hrSelectTab('${k}')">${l}${k === 'scadenze' && f.deadlines.length ? ` (${f.deadlines.length})` : ''}</button>`).join('')}</div>
     <div class="mod-body" id="hr-rec-body">${hrRecordTab()}</div>
   </div>`;
   if (REC.tab === 'competenze') hrSkillKindChanged();
@@ -80,6 +92,7 @@ function hrRecordTab() {
     case 'personali': return f.access.personale ? hrTabPersonal(f) : locked('personale');
     case 'lavoro': return f.access.personale || f.access.retributivo ? hrTabWork(f) : locked('personale');
     case 'competenze': return f.access.personale ? hrTabSkills(f) : locked('personale');
+    case 'sicurezza': return hrTabSafety();
     case 'documenti': return hrTabDocuments(f);
     case 'scadenze': return f.deadlines.length ? f.deadlines.map(d => hrDeadlineRow(d)).join('') : '<div class="mod-empty">Nessuna scadenza nei prossimi 12 mesi.</div>';
     default: return '';
@@ -368,7 +381,8 @@ function openHrDocModal(type, supersedes) {
 function deleteHrDoc(id) { UI.confirmDo('Eliminare definitivamente questo documento?', () => api(`/api/admin/hr/documents/${id}`, { method: 'DELETE' }), () => openHrRecord(REC.id, 'documenti')); }
 
 // ── Scadenzario ────────────────────────────────────────────────────────────────
-const HR_DL_KINDS = { permesso_soggiorno: 'Permessi di soggiorno', documento_identita: "Documenti d'identità", contratto_termine: 'Contratti a termine', periodo_prova: 'Periodi di prova', documento_hr: 'Documenti HR' };
+const HR_DL_KINDS = { permesso_soggiorno: 'Permessi di soggiorno', documento_identita: "Documenti d'identità", contratto_termine: 'Contratti a termine', periodo_prova: 'Periodi di prova', documento_hr: 'Documenti HR',
+  formazione: 'Formazione', abilitazione: 'Abilitazioni', formazione_mancante: 'Formazione mancante', visita_medica: 'Visite mediche', dpi: 'DPI', attivita: 'Attività' };
 async function loadHrDeadlines() {
   const root = document.getElementById('people-scadenze-root');
   const f = HR.dlFilter || (HR.dlFilter = { within: 90, site_id: '', team_id: '', kind: '' });
@@ -395,15 +409,15 @@ async function loadHrDeadlines() {
 // ── Configurazione di People ───────────────────────────────────────────────────
 async function loadHrConfig() {
   const root = document.getElementById('people-sedi-root');
-  root.innerHTML = '<div id="hr-sites-box"></div><div id="hr-config-box"></div>';
+  root.innerHTML = '<div id="hr-sites-box"></div><div id="hr-config-box"></div><div id="hr-safety-config-box"></div>';
   await loadHrSites();
-  const [roles, settings] = await Promise.all([api('/api/admin/hr/job-roles'), api('/api/admin/hr/settings')]);
+  const [roles, settings] = await Promise.all([api('/api/admin/hr/job-roles'), api('/api/admin/hr/settings'), safConfig(true)]);
   REC.jobRoles = roles;
   document.getElementById('hr-config-box').innerHTML = `
     <div class="list-card">
-      <div class="list-toolbar"><div class="list-toolbar-title"><h3>Mansioni</h3><p class="mod-intro">Le mansioni dei contratti. Dalla sicurezza (prossimo blocco) ogni mansione avrà le sue formazioni obbligatorie.</p></div>
+      <div class="list-toolbar"><div class="list-toolbar-title"><h3>Mansioni</h3><p class="mod-intro">Le mansioni dei contratti, con la formazione obbligatoria e la sorveglianza sanitaria di ciascuna.</p></div>
         <div class="list-spacer"></div><button class="btn-generate" onclick="openHrJobRoleModal()">${UI.icon.plus} Nuova mansione</button></div>
-      ${roles.map(j => `<div class="mod-row ${j.active ? '' : 'cc-inactive'}"><div class="mod-row-main"><div class="mod-row-title">${esc(j.name)}</div><div class="mod-row-sub">${esc(j.code)}${j.allows_waiver ? ' · ammette deroghe motivate del responsabile sicurezza' : ''}</div></div>
+      ${roles.map(j => `<div class="mod-row ${j.active ? '' : 'cc-inactive'}"><div class="mod-row-main"><div class="mod-row-title">${esc(j.name)}</div><div class="mod-row-sub">${esc(j.code)} · ${hrRoleSafetySummary(j.id)}${j.allows_waiver ? ' · ammette deroghe' : ''}</div></div>
         <button class="btn-outline-pill" onclick="openHrJobRoleModal(${j.id})">Modifica</button></div>`).join('')}
     </div>
     <div class="list-card">
@@ -417,6 +431,7 @@ async function loadHrConfig() {
         <button class="btn small" onclick="saveHrSettings()">Salva</button><div id="hr-set-msg"></div>
       </div>
     </div>`;
+  loadHrSafetyConfig();
 }
 async function saveHrSettings() {
   try {
@@ -427,19 +442,31 @@ async function saveHrSettings() {
     UI.msg(document.getElementById('hr-set-msg'), 'Salvato.', 'success');
   } catch (e) { UI.msg(document.getElementById('hr-set-msg'), e.message); }
 }
-function openHrJobRoleModal(id) {
+function hrRoleSafetySummary(id) {
+  const r = SAF.config?.job_roles.find(x => x.id === id);
+  if (!r) return '';
+  const n = r.training_type_ids.length;
+  return `${n ? `${n} ${n === 1 ? 'corso obbligatorio' : 'corsi obbligatori'}` : 'nessun corso obbligatorio'}${r.medical_surveillance ? ' · sorveglianza sanitaria' : ''}`;
+}
+async function openHrJobRoleModal(id) {
   const j = REC.jobRoles.find(x => x.id === id) || null;
+  const cfg = await safConfig();
+  const sj = cfg.job_roles.find(x => x.id === id);
   UI.modal({
     id: 'hr-jobrole-modal', title: j ? `Modifica ${j.name}` : 'Nuova mansione', width: 480,
     body: `${j ? '' : '<div class="field"><label>Codice</label><input name="code" placeholder="es. potatore"></div>'}
       <div class="field"><label>Nome</label><input name="name" value="${UI.attr(j?.name)}"></div>
       <div class="field"><label>Descrizione</label><input name="description" value="${UI.attr(j?.description)}"></div>
       <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" name="allows_waiver" ${j?.allows_waiver ? 'checked' : ''}> Ammette deroghe motivate del responsabile sicurezza</label>
-      ${j ? `<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px"><input type="checkbox" name="active" ${j.active ? 'checked' : ''}> Attiva</label>` : ''}`,
+      ${j ? `<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px"><input type="checkbox" name="active" ${j.active ? 'checked' : ''}> Attiva</label>` : ''}
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px"><input type="checkbox" data-medical ${sj?.medical_surveillance ? 'checked' : ''}> Soggetta a sorveglianza sanitaria (visita medica obbligatoria)</label>
+      <div class="field" style="margin-top:14px"><label>Formazione obbligatoria</label>${safCheck('rtype', cfg.training_types.filter(t => t.active), sj?.training_type_ids || [])}</div>`,
     onSave: async b => {
       const body = {};
       b.querySelectorAll('[name]').forEach(el => { body[el.name] = el.type === 'checkbox' ? el.checked : el.value.trim(); });
-      await api('/api/admin/hr/job-roles' + (j ? `/${j.id}` : ''), { method: j ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+      const res = await api('/api/admin/hr/job-roles' + (j ? `/${j.id}` : ''), { method: j ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+      await api(`/api/admin/hr/job-roles/${j ? j.id : res.id}/safety`, { method: 'PUT', body: JSON.stringify({ training_type_ids: safChecked(b, 'rtype'), medical_surveillance: b.querySelector('[data-medical]').checked }) });
+      REC.jobRoles = [];
       loadHrConfig();
     },
   });

@@ -45,6 +45,22 @@ module.exports = function registerHrFile(app, deps) {
   const requireSee = (req, e, level) => {
     if (!canSee(req, e, level)) throw new HttpError(403, `Serve il livello di accesso "${level}" per questi dati.`);
   };
+  // Il responsabile (diretto, quello che approva al suo posto o il delegato) vede dei suoi
+  // collaboratori solo ciò che serve alla gestione: scadenze, sicurezza, idoneità e limitazioni.
+  const viewerEmployee = req => (req.portalUser ? db.prepare('SELECT * FROM employees WHERE portal_user_id = ?').get(req.portalUser.id) || null : null);
+  function isManagerOf(req, e, me = viewerEmployee(req)) {
+    if (!me || me.id === e.id) return false;
+    if (e.manager_id === me.id) return true;
+    const a = hr.resolveApprover(e.id);
+    return a?.approver?.id === me.id || a?.delegate?.id === me.id;
+  }
+  // Dipendenti di cui chi chiede vede le scadenze: tutti con il livello "personale", altrimenti sé stesso e i collaboratori.
+  function visibleEmployeeIds(req) {
+    if (hasAccessLevel(req, 'personale')) return null;
+    const me = viewerEmployee(req);
+    if (!me) return new Set();
+    return new Set(db.prepare('SELECT * FROM employees').all().filter(e => e.id === me.id || isManagerOf(req, e, me)).map(e => e.id));
+  }
   function logSensitive(req, e, what) {
     db.prepare('INSERT INTO sensitive_access_log (at, user_id, actor, employee_id, what, ip) VALUES (?, ?, ?, ?, ?, ?)')
       .run(now(), req.portalUser?.id ?? null, actor(req), e?.id ?? null, what, req.ip || null);
@@ -53,6 +69,11 @@ module.exports = function registerHrFile(app, deps) {
     if (d != null && d !== '' && !DATE.test(d)) throw new HttpError(400, `${label}: data nel formato AAAA-MM-GG.`);
     return d || null;
   };
+
+  // Un dipendente con un fascicolo non si elimina (conservazione di legge; i file cifrati resterebbero orfani).
+  hr.registerDeleteGuard(id => (db.prepare(`SELECT (SELECT COUNT(*) FROM employment_contracts WHERE employee_id = ?) + (SELECT COUNT(*) FROM compensations WHERE employee_id = ?)
+    + (SELECT COUNT(*) FROM hr_documents WHERE employee_id = ?) + (SELECT COUNT(*) FROM identity_documents WHERE employee_id = ?) AS c`).get(id, id, id, id).c
+    ? 'un fascicolo (contratti, retribuzioni o documenti)' : null));
 
   // ── Impostazioni del fascicolo ───────────────────────────────────────────────
   function settings() {
@@ -433,7 +454,11 @@ module.exports = function registerHrFile(app, deps) {
       .filter(d => d.days_left <= within && (!siteId || d.site_id === Number(siteId)) && (!managerId || d.manager_id === Number(managerId)) && (!team || team.has(d.employee_id)))
       .sort((a, b) => a.due_date.localeCompare(b.due_date));
   }
-  r.get('/deadlines', req => deadlines({ within: parseInt(req.query.within) || 90, employeeId: req.query.employee_id, siteId: req.query.site_id, teamId: req.query.team_id, managerId: req.query.manager_id, kind: req.query.kind || null }));
+  r.get('/deadlines', req => {
+    const visible = visibleEmployeeIds(req);
+    return deadlines({ within: parseInt(req.query.within) || 90, employeeId: req.query.employee_id, siteId: req.query.site_id, teamId: req.query.team_id, managerId: req.query.manager_id, kind: req.query.kind || null })
+      .filter(d => !visible || visible.has(d.employee_id));
+  });
 
   // Problemi bloccanti di un dipendente a una data (usati dall'inserimento ore, Fase 2.1):
   // permesso di soggiorno scaduto, contratto a termine finito. La sicurezza aggiunge i suoi.
@@ -471,8 +496,8 @@ module.exports = function registerHrFile(app, deps) {
         if (userId === undefined) continue;
         const id = notifications.notify({
           userId, kind: `hr.deadline.${d.kind}`,
-          title: `${d.employee_name}: ${d.label} ${expired ? 'scaduto' : `scade tra ${d.days_left} ${d.days_left === 1 ? 'giorno' : 'giorni'}`}`,
-          body: `${expired ? 'Scaduto il' : 'Scadenza:'} ${d.due_date.split('-').reverse().join('/')}${d.blocking && expired ? ' · blocca l\'inserimento delle ore' : ''}`,
+          title: `${d.employee_name}: ${d.label} ${d.missing ? 'mancante' : expired ? 'scaduto' : `scade tra ${d.days_left} ${d.days_left === 1 ? 'giorno' : 'giorni'}`}`,
+          body: `${d.missing ? 'Richiesto dal' : expired ? 'Scaduto il' : 'Scadenza:'} ${d.due_date.split('-').reverse().join('/')}${d.blocking && expired ? ' · blocca l\'inserimento delle ore' : ''}`,
           link: `/portal.html?workspace=people&employee=${d.employee_id}&tab=scadenze`, dedupeKey: `${d.ref}:${d.bucket}`,
         });
         if (id) sent++;
@@ -501,8 +526,11 @@ module.exports = function registerHrFile(app, deps) {
         edit: { personale: hasAccessLevel(req, 'personale'), retributivo: hasAccessLevel(req, 'retributivo') },
         upload_types: db.prepare('SELECT code, level FROM hr_document_types').all().filter(t => canManageDocType(req, t.level)).map(t => t.code),
       },
-      current_contract: null, deadlines: deadlines({ within: 365, employeeId: e.id }), blocking_today: blockingIssues(e.id, today()),
+      current_contract: null, manager_view: isManagerOf(req, e),
     };
+    // Scadenze e blocchi: a chi ha il livello "personale", al dipendente e al suo responsabile.
+    const seeDeadlines = canSee(req, e, 'personale') || out.manager_view;
+    Object.assign(out, { deadlines: seeDeadlines ? deadlines({ within: 365, employeeId: e.id }) : [], blocking_today: seeDeadlines ? blockingIssues(e.id, today()) : [] });
     const c = contractAt(e.id);
     if (c) out.current_contract = { contract_type: c.contract_type, job_role: c.job_role_id ? db.prepare('SELECT name FROM job_roles WHERE id = ?').get(c.job_role_id)?.name : null, end_date: c.end_date };
     if (out.access.personale) {
@@ -520,5 +548,5 @@ module.exports = function registerHrFile(app, deps) {
       ${req.query.employee_id ? 'WHERE l.employee_id = ?' : ''} ORDER BY l.id DESC LIMIT 500`).all(...(req.query.employee_id ? [req.query.employee_id] : []));
   });
 
-  return { file, deadlines, notifyDeadlines, registerDeadlineSource, registerBlockingCheck, blockingIssues, contractAt, languagesOf, canSee, isSelf, logSensitive, storeDocument, documentsFor, personal, validatePersonal, savePersonal, skills, settings };
+  return { file, deadlines, notifyDeadlines, hrRecipients, isManagerOf, viewerEmployee, visibleEmployeeIds, actor, registerDeadlineSource, registerBlockingCheck, blockingIssues, contractAt, languagesOf, canSee, isSelf, logSensitive, storeDocument, documentsFor, personal, validatePersonal, savePersonal, skills, settings };
 };

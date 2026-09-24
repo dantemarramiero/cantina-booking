@@ -111,6 +111,24 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - Scadenzario HR con notifiche automatiche alle soglie di preavviso. Campanella delle notifiche nella barra in alto.
 - People → Configurazione: sedi, festività, mansioni, soglie di preavviso, oneri.
 
+**People — Fase 2, blocco 2B: sicurezza sul lavoro (D.Lgs. 81/08)**
+- Formazione e abilitazioni con periodicità configurabile e requisiti per mansione. Lo stato è calcolato per ogni persona: valida, in scadenza, scaduta o mancante.
+- Operazioni che richiedono un'abilitazione:
+  - chi non l'ha valida non è assegnabile;
+  - deroghe motivate del responsabile sicurezza, solo se la mansione lo consente.
+- Idoneità del medico competente:
+  - solo giudizio e limitazioni;
+  - blocco se non idoneo, avviso con limitazioni incompatibili;
+  - ogni lettura è registrata.
+- DPI con sostituzione periodica. Registro di infortuni e quasi-infortuni con denuncia INAIL.
+- Pagina People → Sicurezza con la conformità per persona. Le scadenze di sicurezza entrano nello scadenzario.
+- Al cambio di mansione:
+  - attività «visita medica per cambio mansione»;
+  - avviso della formazione da fare.
+- Fix:
+  - un dipendente con fascicolo non si può più eliminare, prima perdeva i dati;
+  - lo scadenzario mostra le scadenze altrui solo a chi ha il livello personale o è il responsabile.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

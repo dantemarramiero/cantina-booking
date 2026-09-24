@@ -78,7 +78,8 @@ test('contratti versionati: mai sovrascritti, copia dei dati organizzativi, even
   const ev = t.db.prepare("SELECT payload FROM domain_events WHERE type = 'employee.role_changed'").all().map(x => JSON.parse(x.payload));
   assert.ok(ev.some(p => p.employee_id === c && p.from_job_role_id === cantiniere && p.to_job_role_id === trattorista));
   const dl = (await t.api('GET', `/api/admin/hr/deadlines?employee_id=${c}`)).data;
-  assert.deepEqual(dl.map(d => [d.kind, d.bucket]).sort(), [['contratto_termine', 30], ['periodo_prova', 7]]);
+  const contractKinds = ['contratto_termine', 'periodo_prova']; // le scadenze di sicurezza della nuova mansione sono nei test di 2B
+  assert.deepEqual(dl.filter(d => contractKinds.includes(d.kind)).map(d => [d.kind, d.bucket]).sort(), [['contratto_termine', 30], ['periodo_prova', 7]]);
 });
 
 test('retribuzione: solo livello "retributivo"; proposta di costo orario esatta; niente importi nel registro', async () => {

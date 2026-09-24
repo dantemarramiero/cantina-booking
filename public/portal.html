@@ -973,6 +973,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/></svg>
         Scadenze
       </button>
+      <button data-sub="people-sicurezza">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6Z"/><path d="m9 12 2 2 4-4"/></svg>
+        Sicurezza
+      </button>
       <button data-sub="people-squadre">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
         Squadre
@@ -1397,6 +1401,7 @@
     <div class="module" id="module-people">
       <div class="subpanel active" id="sub-people-dipendenti"><div id="people-dipendenti-root"></div></div>
       <div class="subpanel" id="sub-people-scadenze"><div id="people-scadenze-root"></div></div>
+      <div class="subpanel" id="sub-people-sicurezza"><div id="people-sicurezza-root"></div></div>
       <div class="subpanel" id="sub-people-squadre"><div id="people-squadre-root"></div></div>
       <div class="subpanel" id="sub-people-sedi"><div id="people-sedi-root"></div></div>
     </div>
@@ -2946,6 +2951,7 @@
 <script src="/js/portal-finance.js"></script>
 <script src="/js/portal-people.js"></script>
 <script src="/js/portal-people-file.js"></script>
+<script src="/js/portal-people-safety.js"></script>
 <script>
 let ADMIN_KEY = null;
 let PRODUCTS = [];
@@ -3203,6 +3209,7 @@ function loadSubpanel(sub) {
   if (sub === 'people-dipendenti') loadHrEmployees();
   if (sub === 'people-squadre') loadHrTeams();
   if (sub === 'people-scadenze') loadHrDeadlines();
+  if (sub === 'people-sicurezza') loadHrSafety();
   if (sub === 'people-sedi') loadHrConfig();
   if (sub === 'fin-centri') loadFinCenters();
   if (sub === 'fin-regole') loadFinRules();

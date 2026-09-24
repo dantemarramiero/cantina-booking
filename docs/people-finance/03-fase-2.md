@@ -5,7 +5,7 @@ Stato: **in corso, in locale** (non ancora in produzione). La fase è divisa in 
 | Blocco | Contenuto | Stato |
 |---|---|---|
 | 2A | Fascicolo: dati personali, rapporto di lavoro, retribuzione, competenze, documenti cifrati, scadenzario con notifiche | completato |
-| 2B | Sicurezza (D.Lgs. 81/08): formazione, requisiti per mansione, idoneità sanitaria, DPI, infortuni, deroghe | da fare |
+| 2B | Sicurezza (D.Lgs. 81/08): formazione, requisiti per mansione, idoneità sanitaria, DPI, infortuni, deroghe | completato |
 | 2C | Assenze: richieste e approvazioni, contatori, periodi bloccati, disponibilità per l'Enoturismo | da fare |
 | 2D | Presenze: ore per squadra, proposte da prenotazioni e fiere, stati del mese, rettifiche, export, controlli bloccanti | da fare |
 | 2E | Self-service, onboarding e offboarding, dotazioni, richieste di modifica, cedolini in blocco, modello dati del recruiting | da fare |
@@ -122,8 +122,13 @@ Tutti i test di questa sezione sono nel file `hr-file`.
 | QUANDO una scadenza raggiunge una soglia di preavviso o scade ALLORA notifica a HR, al responsabile e al dipendente, una sola volta per soglia | scadenzario |
 | QUANDO si impostano soglie fuori da 1–365 giorni ALLORA rifiuto | soglie |
 | QUANDO un documento supera il periodo di conservazione ALLORA segnalazione ad HR, e il documento resta | conservazione |
+| QUANDO si carica o si elimina un documento del fascicolo ALLORA servono il livello *personale* e quello del tipo, anche per i tipi di livello *base* | documenti; il dipendente vede i propri dati |
+| QUANDO il dipendente apre la propria scheda ALLORA vede i propri dati personali e i documenti a lui visibili. Non li modifica e non vede quelli degli altri | il dipendente vede i propri dati |
+| QUANDO si apre una notifica di scadenza ALLORA si apre la scheda del dipendente sulla sezione Scadenze | scadenzario |
+| QUANDO un dipendente ha un fascicolo (contratti, retribuzioni, documenti) ALLORA non si elimina, si disattiva. Senza dati si elimina | `hr-safety` · non si elimina |
+| QUANDO chi chiede le scadenze non ha il livello *personale* ALLORA vede solo le proprie e quelle dei collaboratori | `hr-safety` · chi vede l'idoneità |
 
-Esito: **64 test, 64 superati** (9 nuovi del blocco 2A).
+Esito a fine 2A: **65 test, 65 superati** (10 nuovi). Le ultime due regole sono state aggiunte con il blocco 2B.
 
 ### Punti toccati nei moduli esistenti
 
@@ -147,3 +152,142 @@ Esito: **64 test, 64 superati** (9 nuovi del blocco 2A).
 - Impostare **`HR_FILES_KEY`** su Railway (32 byte casuali).
   - Va conservata anche fuori da Railway: **se si perde, i documenti non si possono più aprire**.
   - È una modifica di configurazione: la faccio solo su tua conferma.
+
+---
+
+## 2B — Sicurezza sul lavoro (D.Lgs. 81/08)
+
+### Cosa c'è
+
+**Sezione Sicurezza della scheda del dipendente.** Contiene:
+- **la formazione richiesta dalla mansione**, con lo stato di ogni corso: valido, in scadenza, scaduto o mancante;
+- **il registro dei corsi**: data, ore, ente e attestato allegato. La scadenza si calcola dalla periodicità del tipo di corso, oppure la si indica a mano;
+- **l'idoneità alla mansione** (livello *sanitario*):
+  - giudizio del medico competente, limitazioni, fine della non idoneità temporanea e prossima visita, con lo storico;
+  - le mansioni e le operazioni incompatibili con le limitazioni;
+  - **nessuna diagnosi**;
+- **i DPI consegnati**: tipo, taglia (presa dalla scheda se non indicata), quantità, verbale firmato, data di sostituzione e restituzione;
+- **le deroghe** del responsabile sicurezza;
+- **le attività aperte**, per esempio la visita per cambio mansione;
+- **gli infortuni** della persona.
+
+La sezione si carica solo quando la si apre, perché la lettura dell'idoneità viene registrata.
+
+**People → Sicurezza.** Due viste:
+- **Conformità**, per ogni persona:
+  - formazione mancante, scaduta o in scadenza;
+  - visita medica;
+  - idoneità, solo per chi può vederla;
+  - attività aperte.
+- **Infortuni e quasi-infortuni**:
+  - di ognuno si registrano data, ora, luogo, operazione in corso, dinamica, giorni di prognosi, denuncia INAIL (numero e data) e misure adottate;
+  - i quasi-infortuni si registrano anche senza una persona coinvolta.
+
+**Controllo di assegnabilità.** Dice se una persona può lavorare a una data su un'operazione o in una mansione.
+- **Blocchi:**
+  - permesso di soggiorno o contratto scaduti;
+  - giudizio di non idoneità;
+  - abilitazione richiesta dall'operazione mancante o scaduta, senza deroga valida.
+- **Avvisi:**
+  - limitazioni incompatibili;
+  - deroga in uso;
+  - non idoneità temporanea terminata senza una nuova visita.
+
+Lo usano le presenze e l'inserimento a squadra (blocco 2D). Il controllo si può chiedere anche dalle API (`/hr/employees/:id/assignment-check`). Ne hanno diritto:
+- HR con il livello *personale*;
+- il responsabile;
+- il caposquadra, per la sua squadra;
+- il dipendente stesso.
+
+**Configurazione → Sicurezza.** Qui si impostano:
+- i **tipi di corso** con periodicità e ore modificabili. Sono già caricati 16 corsi:
+  - formazione generale e specifica per rischio;
+  - preposto, dirigente, RLS;
+  - primo soccorso, antincendio;
+  - trattori, carrello, spazi confinati (DPR 177/2011), fitosanitari;
+  - HACCP, PLE, lavori in quota;
+- **per ogni mansione**: la formazione obbligatoria e se è soggetta a sorveglianza sanitaria;
+- le **operazioni che richiedono un'abilitazione**, cioè gli oggetti di costo di tipo «operazione»;
+- i **DPI**, 12 di partenza, con la periodicità di sostituzione;
+- i **responsabili della sicurezza**, gli unici che concedono deroghe, e il **medico competente**.
+
+**Scadenzario.** Si aggiungono queste voci:
+- formazione e abilitazioni in scadenza;
+- formazione **mancante** per la mansione;
+- visita medica in scadenza, oppure mancante se la mansione è soggetta a sorveglianza;
+- DPI da sostituire;
+- attività aperte.
+
+### Migrazioni
+
+| Versione | Cosa |
+|---|---|
+| `0010_safety` | Tabelle:<br>• `training_types` (+ 16)<br>• `job_role_trainings` (requisiti di partenza per le 11 mansioni)<br>• `operation_trainings`<br>• `trainings`<br>• `medical_visits`<br>• `medical_restrictions`<br>• `ppe_types` (+ 12)<br>• `ppe_deliveries`<br>• `incidents`<br>• `safety_waivers`<br>• `hr_tasks`<br>Colonna nuova: `job_roles.medical_surveillance` |
+
+Ha il `down`.
+
+### Eventi di dominio
+
+| Evento | Emittente | Consumer | Effetto |
+|---|---|---|---|
+| `employee.role_changed` (del blocco 2A) | Nuova versione del contratto con mansione diversa | `hr-safety.role-changed` | Se la mansione è soggetta a sorveglianza, crea l'attività «Visita medica per cambio mansione», una sola per evento. Notifica HR e responsabile con l'elenco della formazione da fare. La formazione mancante entra da sola nello scadenzario. |
+| `incident.recorded` | Registrazione di un infortunio o quasi-infortunio | *nessuno per ora* (2C: crea l'assenza «Infortunio» collegata) | payload: evento, tipo, dipendente, data, giorni di prognosi, numero INAIL |
+| `incident.updated` | Modifica dell'evento (prognosi, INAIL) | *nessuno per ora* (2C: aggiorna l'assenza collegata) | come sopra |
+
+### Logica di business (QUANDO/ALLORA) e test
+
+Tutti i test di questa sezione sono nel file `hr-safety`.
+
+| Regola | Test |
+|---|---|
+| QUANDO si registra un corso senza scadenza ALLORA si calcola dalla periodicità del tipo, che si configura. Un corso nel futuro è rifiutato | formazione |
+| QUANDO chi non ha il livello *personale* registra un corso ALLORA 403 | formazione |
+| QUANDO la mansione richiede un corso ALLORA per ogni dipendente risulta valido, in scadenza, scaduto o mancante. Il mancante entra nello scadenzario come «mancante» | requisiti per mansione |
+| QUANDO un corso non più richiesto è scaduto ALLORA esce dallo scadenzario | requisiti per mansione |
+| QUANDO la mansione è soggetta a sorveglianza e non c'è visita ALLORA la visita mancante è nello scadenzario | requisiti per mansione |
+| QUANDO si assegna una persona a un'operazione che richiede un'abilitazione e lei non ce l'ha o l'ha scaduta ALLORA blocco con messaggio chiaro | operazione con abilitazione |
+| QUANDO il responsabile sicurezza registra una deroga motivata e la mansione la consente ALLORA l'assegnazione passa con un avviso | operazione con abilitazione |
+| QUANDO la deroga la registra chi non è responsabile sicurezza, oppure la mansione non la consente, oppure manca il motivo ALLORA rifiuto | operazione con abilitazione |
+| QUANDO la deroga è revocata ALLORA di nuovo blocco | operazione con abilitazione |
+| QUANDO un dipendente ha un giudizio con limitazioni ALLORA l'assegnazione a mansioni od operazioni incompatibili mostra un avviso (le altre no) | idoneità |
+| QUANDO il giudizio è «non idoneo», anche temporaneo, ALLORA l'assegnazione è bloccata | idoneità |
+| QUANDO finisce l'inidoneità temporanea ALLORA non blocca più e avvisa che manca la nuova visita | idoneità |
+| QUANDO si usa il giudizio per rispondere a un controllo ALLORA l'accesso è registrato | idoneità |
+| QUANDO si registra un giudizio ALLORA il registro attività non lo contiene | idoneità |
+| QUANDO un utente accede a dati di livello *sanitario* ALLORA l'accesso è registrato nel log. Vale per il responsabile e per il dipendente stesso | chi vede l'idoneità |
+| QUANDO HR senza livello *sanitario* o un collega apre la sicurezza ALLORA niente giudizio, o 403 | chi vede l'idoneità |
+| QUANDO il responsabile guarda scadenze e conformità ALLORA vede sé e i suoi collaboratori, non gli altri | chi vede l'idoneità |
+| QUANDO la visita medica è scaduta ALLORA il dipendente compare in anomalia nello scadenzario e il responsabile riceve notifica | visita scaduta |
+| QUANDO cambia la mansione ALLORA si ricalcolano i requisiti e si propone la visita per cambio mansione | cambio mansione |
+| QUANDO si registra la visita per cambio mansione ALLORA l'attività si chiude | cambio mansione |
+| QUANDO si consegna un DPI ALLORA la sostituzione si calcola dalla sua periodicità e la taglia viene dalla scheda | DPI |
+| QUANDO un DPI è restituito ALLORA esce dallo scadenzario | DPI |
+| QUANDO si registra un infortunio ALLORA serve il dipendente e parte l'evento `incident.recorded`. L'assenza collegata arriva col blocco 2C | infortuni |
+| QUANDO c'è un numero INAIL ALLORA serve la data della denuncia | infortuni |
+| QUANDO si registra un quasi-infortunio ALLORA la persona è facoltativa | infortuni |
+| Calendario: aggiungere mesi si ferma all'ultimo giorno del mese | addMonths |
+
+Esito: **76 test, 76 superati** (11 nuovi del blocco 2B).
+
+### Punti toccati nei moduli esistenti
+
+- **Eliminazione di un dipendente:**
+  - i moduli ora dicono se ha dati da conservare (fascicolo, sicurezza);
+  - in quel caso si disattiva invece di eliminarlo.
+
+  Prima un'eliminazione cancellava a cascata il fascicolo e lasciava i file cifrati orfani sul disco.
+- **Scadenzario del blocco 2A.** Chi non ha il livello *personale* vede solo le proprie scadenze e quelle dei collaboratori. Prima le vedeva chiunque avesse il workspace People.
+- **Mansioni** (Configurazione): nella finestra ci sono formazione obbligatoria e sorveglianza sanitaria.
+- **Finance → Oggetti di costo**: nessun cambiamento. Le operazioni esistenti diventano selezionabili come «operazioni che richiedono un'abilitazione».
+
+### Decisioni prese in autonomia
+
+- **Periodicità di partenza.** Seguono gli accordi Stato-Regioni e i decreti più diffusi, ma sono dati modificabili: vanno verificate con l'RSPP.
+- **Requisiti di partenza per mansione.** Per esempio: cantiniere = generale, specifica rischio alto, spazi confinati, HACCP, carrello. Anche la sorveglianza sanitaria di partenza (6 mansioni operative) va confermata dal documento di valutazione dei rischi.
+- **«Assegnazione a mansioni incompatibili».** Il blocco e l'avviso valgono per l'assegnazione al lavoro (ore, squadre, operazioni), non per il cambio di mansione nel contratto: spostare una persona non idonea su un'altra mansione dev'essere possibile.
+- **Idoneità fuori dai blocchi generali.** La non idoneità non compare tra i «problemi bloccanti» della scheda, che vede anche HR senza livello *sanitario*. Blocca attraverso il controllo di assegnabilità, che registra ogni volta l'accesso.
+- **Il caposquadra** può chiedere se le persone della sua squadra sono assegnabili: riceve blocchi e avvisi con il minimo necessario, non la scheda sanitaria.
+- **Il responsabile vede anche le scadenze** di documenti e contratto dei collaboratori, oltre a quelle di sicurezza, perché la regola sulle notifiche lo prevede per permessi di soggiorno e contratti a termine.
+- **Visita per cambio mansione solo se la nuova mansione è soggetta a sorveglianza.** Altrimenti non si crea l'attività.
+- **Deroghe:** durata massima 12 mesi, motivo obbligatorio, revocabili.
+- **Infortuni e documentazione:** livello *personale*. La documentazione sanitaria dell'infortunio va nei documenti di tipo «Documentazione infortunio», livello *sanitario*.
