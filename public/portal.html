@@ -116,10 +116,6 @@
   .list-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 18px 22px; border-bottom: 1px solid var(--line); }
   .list-toolbar-title { flex-shrink: 0; }
   .list-toolbar-title h3 { font-size: 15px; }
-  .target-months-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
-  @media (max-width: 700px) { .target-months-grid { grid-template-columns: repeat(3, 1fr); } }
-  .target-month-field label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #8d8274; margin-bottom: 5px; font-weight: 600; }
-  .target-month-field input { width: 100%; padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; font-family: var(--sans); background: #fff; color: var(--ink); box-sizing: border-box; text-align: right; }
   .list-toolbar-title p { margin: 2px 0 0; font-size: 12px; color: var(--ink-soft); }
   .list-spacer { flex: 1; }
   .search-input { position: relative; min-width: 200px; }
@@ -239,6 +235,161 @@
   .euro-input-wrap { position: relative; display: inline-block; }
   .euro-input-wrap::before { content: '€'; position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); font-size: 12.5px; pointer-events: none; }
   .euro-input-wrap input { padding-left: 20px !important; }
+
+  /* Commerciale → Obiettivi di vendita (handoff MyWinery "Obiettivi") */
+  .ob-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 24px; }
+  .ob-head h1 { font: 400 28px/1.15 var(--display); color: var(--ink); }
+  .ob-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ob-dirty { font-size: 12.5px; font-weight: 600; color: var(--warn); }
+  .ob-year { display: flex; align-items: center; gap: 4px; height: 40px; padding: 0 4px; border: 1px solid var(--line-strong); border-radius: 4px; background: #fff; }
+  .ob-year span { min-width: 56px; text-align: center; font: 400 20px var(--display); color: var(--ink); }
+  .ob-icon-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border: none; border-radius: 4px; background: transparent; color: var(--ink-soft); transition: background-color .14s cubic-bezier(.22,.61,.36,1), color .14s cubic-bezier(.22,.61,.36,1); }
+  .ob-icon-btn:hover { background: var(--cream-2); color: var(--ink); }
+  .ob-icon-btn svg { width: 16px; height: 16px; }
+  .ob-icon-btn.sm { width: 28px; height: 28px; }
+  .ob-icon-btn.sm svg { width: 14px; height: 14px; }
+  .ob .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 4px; white-space: nowrap; }
+  .ob .btn.small { height: 32px; padding: 0 12px; font-size: 13px; }
+  .ob .btn svg { width: 15px; height: 15px; }
+  .btn.ghost { background: transparent; color: var(--ink-soft); }
+  .btn.ghost:hover { background: var(--cream-2); color: var(--ink); }
+  .ob-full { width: 100%; }
+  .ob-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .ob-stat { padding: 20px; }
+  .ob-stat .value small { margin-left: 6px; font: 400 14px var(--sans); color: var(--ink-soft); }
+  .ob-stat-delta { margin-top: 10px; font-size: 13px; color: var(--ink-soft); }
+  .ob-layout { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .ob-col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+  .ob-card { background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 1px 2px rgba(56,17,18,.06), 0 6px 18px -10px rgba(56,17,18,.18); min-width: 0; }
+  .ob-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 20px 24px 0; }
+  .ob-card-head.pad { padding-bottom: 16px; }
+  .ob-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ob-card-body { padding: 20px 24px 24px; }
+  .ob-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+  .ob-card-title { margin-top: 4px; font: 400 22px/1.25 var(--display); color: var(--ink); }
+  .ob-small { font-size: 13px; color: var(--ink-soft); }
+  .ob-countries { margin-top: 6px; font-size: 12.5px; color: var(--ink-faint); }
+  .ob-nav { padding: 8px; }
+  .ob-nav-row { display: flex; align-items: center; border-left: 2px solid transparent; border-radius: 2px; transition: background-color .14s cubic-bezier(.22,.61,.36,1); }
+  .ob-nav-row:hover { background: var(--cream); }
+  .ob-nav-row.active { background: var(--gold-light); border-left-color: var(--wine); }
+  .ob-nav-main { flex: 1; min-width: 0; display: flex; justify-content: space-between; gap: 8px; padding: 12px 8px 12px 14px; border: none; background: transparent; text-align: left; font-size: 14px; color: var(--ink); }
+  .ob-nav-main span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ob-nav-row.active .ob-nav-main span:first-child { font-weight: 600; }
+  .ob-nav-main span:last-child { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .ob-nav-actions { display: flex; padding-right: 4px; }
+  .ob-nav-label { padding: 14px 14px 6px; font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+  .ob-g2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .ob-g3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  .ob-target { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 20px; background: var(--cream-2); border: 1px solid var(--line); border-radius: 6px; }
+  .ob-target-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .ob-target-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--ink-soft); }
+  .ob-target-foot b { font-weight: 600; color: #2e2925; }
+  .ob-num { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 0 10px; background: #fff; border: 1px solid var(--line-strong); border-radius: 4px; box-shadow: inset 0 1px 2px rgba(56,17,18,.05); transition: border-color .14s cubic-bezier(.22,.61,.36,1), box-shadow .14s cubic-bezier(.22,.61,.36,1); }
+  .ob-num:focus-within { border-color: var(--wine); box-shadow: 0 0 0 3px rgba(165,98,58,.32); }
+  .ob-num.disabled { background: var(--cream-2); }
+  .ob-num input { flex: 1; width: 100%; min-width: 0; padding: 0; border: none; outline: none; background: transparent; text-align: right; font: 400 14px var(--sans); color: #2e2925; font-variant-numeric: tabular-nums; }
+  .ob-num input:disabled { color: var(--ink-soft); }
+  .ob-num span { font-size: 13px; color: var(--ink-faint); }
+  .ob-share { height: 4px; border-radius: 99px; background: var(--line); overflow: hidden; }
+  .ob-share > div { height: 100%; transition: width .22s cubic-bezier(.22,.61,.36,1); }
+  .ob-share-cell { display: flex; align-items: center; gap: 10px; }
+  .ob-share-cell > .ob-share { flex: 1; }
+  .ob-share-cell > span { width: 40px; text-align: right; font-size: 12px; color: var(--ink-soft); }
+  .ob-up { color: var(--ok); }
+  .ob-down { color: var(--bad); }
+  .ob-none { color: var(--ink-faint); }
+  .ob-footer-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .ob-price { font: 400 22px var(--display); color: var(--ink); }
+  .ob-price small { margin-left: 6px; font: 400 13px var(--sans); color: var(--ink-soft); }
+  .ob-field > label { display: block; margin-bottom: 6px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-faint); }
+  .ob-hint { margin-top: 6px; font-size: 12px; color: var(--ink-faint); }
+  .ob-delta-line { height: 40px; display: flex; align-items: center; gap: 16px; font-size: 14px; color: #2e2925; }
+  .ob-table-wrap { overflow-x: auto; }
+  .ob-table-wrap table { min-width: 560px; background: transparent; }
+  .ob-table-wrap table.ob-entry { min-width: 680px; }
+  .ob-table-wrap th { padding: 12px 16px; background: var(--cream-2); font-size: 11px; white-space: nowrap; }
+  .ob-table-wrap td { padding: 10px 16px; font-size: 14px; color: #2e2925; vertical-align: middle; }
+  .ob-table-wrap tbody tr:not(.ob-click):hover td { background: transparent; }
+  .ob-table-wrap .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ob-table-wrap .muted { color: var(--ink-soft); }
+  .ob-table-wrap tr.ob-click { cursor: pointer; }
+  .ob-table-wrap tr.ob-total td { font-weight: 600; border-bottom: none; }
+  .ob-table-wrap td.ob-area-name { font-weight: 600; color: var(--ink); }
+  .ob-prod { display: flex; align-items: center; gap: 10px; }
+  .ob-dot { width: 8px; height: 8px; flex: 0 0 auto; display: inline-block; border-radius: 99px; background: var(--ink-faint); }
+  .ob-notice { padding: 10px 14px; border-radius: 4px; font-size: 13px; }
+  .ob-notice.warn { background: var(--warn-bg); color: var(--warn); }
+  .ob-notice.bad { background: var(--bad-bg); color: var(--bad); }
+  .ob-switch { position: relative; display: inline-flex; align-items: center; gap: 10px; margin-top: 16px; font-size: 14px; color: var(--ink); cursor: pointer; user-select: none; }
+  .ob-switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .ob-switch-track { position: relative; flex: 0 0 auto; width: 36px; height: 20px; border-radius: 999px; background: var(--line-strong); transition: background-color .22s cubic-bezier(.22,.61,.36,1); }
+  .ob-switch-track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(56,17,18,.2); transition: transform .22s cubic-bezier(.22,.61,.36,1); }
+  .ob-switch input:checked + .ob-switch-track { background: var(--wine); }
+  .ob-switch input:checked + .ob-switch-track::after { transform: translateX(16px); }
+  .ob-switch input:focus-visible + .ob-switch-track { box-shadow: 0 0 0 3px rgba(165,98,58,.32); }
+  .ob-tabs { display: flex; gap: 24px; padding: 0 24px; box-shadow: inset 0 -1px 0 var(--line); overflow-x: auto; overflow-y: hidden; }
+  .ob-tabs button { display: inline-flex; align-items: center; gap: 6px; padding: 16px 0 12px; border: none; border-bottom: 2px solid transparent; background: none; font-size: 14px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+  .ob-tabs button.active { color: var(--ink); border-bottom-color: var(--wine); }
+  .ob-tabs .count { padding: 1px 7px; border-radius: 999px; background: var(--cream-2); font-size: 11px; color: var(--ink-soft); }
+  .ob-months-body { display: flex; flex-direction: column; gap: 20px; padding: 24px; }
+  .ob-radios { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+  .ob-radios label { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); cursor: pointer; }
+  .ob-radios input { width: 16px; height: 16px; margin: 0; accent-color: var(--wine); }
+  .ob-radios .badge { margin-left: auto; }
+  .ob-months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px; }
+  .ob-month { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .ob-month-bar { height: 64px; display: flex; align-items: flex-end; }
+  .ob-month-bar div { width: 100%; border-radius: 2px 2px 0 0; background: #e4c4a6; transition: height .22s cubic-bezier(.22,.61,.36,1); }
+  .ob-month-bar div.peak { background: var(--wine); }
+  .ob-month-label { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+  .ob-month .ob-num { padding: 0 6px; }
+  .ob-month .ob-num input { font-size: 13px; }
+  .ob-month-val { text-align: right; font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .ob-month-val.faint { color: var(--ink-faint); }
+  .ob-empty { padding: 56px 24px; text-align: center; }
+  .ob-empty-icon { width: 56px; height: 56px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; border-radius: 50%; background: var(--gold-light); color: var(--wine); }
+  .ob-empty-icon svg { width: 28px; height: 28px; }
+  .ob-empty h3 { margin-bottom: 8px; font: 400 22px var(--display); color: var(--ink); }
+  .ob-empty p { max-width: 420px; margin: 0 auto 20px; font-size: 14px; line-height: 1.55; color: var(--ink-soft); }
+  .ob-empty-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .ob-dialog h3 { margin-bottom: 8px; font: 400 22px/1.25 var(--display); color: var(--ink); }
+  .ob-dialog-desc { margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: var(--ink-soft); }
+  .ob-dialog-warn { margin: 16px 0 0; font-size: 13px; color: var(--bad); }
+  .ob-dialog-note { margin: 10px 0 0; font-size: 13px; color: var(--ink-soft); }
+  .ob-dialog .ob-text-input { width: 100%; height: 40px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 4px; font: 400 14px var(--sans); color: #2e2925; box-shadow: inset 0 1px 2px rgba(56,17,18,.05); }
+  .ob-dialog .ob-text-input:focus { outline: none; border-color: var(--wine); box-shadow: 0 0 0 3px rgba(165,98,58,.32); }
+  /* Breakpoints on the space the screen actually gets (the portal sidebar takes 248px), not the viewport */
+  .ob { container-type: inline-size; }
+  @container (max-width: 1040px) { .ob-months { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+  @container (max-width: 860px) {
+    .ob-layout { grid-template-columns: minmax(0, 1fr); }
+    .ob-months { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+  @container (max-width: 600px) { .ob-stats, .ob-g2, .ob-g3 { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 640px) { .ob-dialog .ob-g2 { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 640px) {
+    .ob-head h1 { font-size: 24px; }
+    .ob-card-head { padding: 16px 16px 0; }
+    .ob-card-body, .ob-months-body { padding: 16px; }
+    .ob-tabs { padding: 0 16px; }
+    .ob-months { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .ob-table-wrap th { padding: 10px; font-size: 9.5px; }
+    .ob-table-wrap td { padding: 8px 10px; font-size: 13px; }
+  }
+
+  /* Toast: conferme brevi in basso a destra, si chiudono da sole */
+  .toast-stack { position: fixed; right: 24px; bottom: 24px; z-index: 300; display: flex; flex-direction: column; gap: 10px; max-width: calc(100vw - 48px); pointer-events: none; }
+  .toast { width: 340px; max-width: 100%; padding: 12px 16px; background: #fff; border-top: 2px solid var(--wine); border-radius: 6px; box-shadow: 0 2px 6px rgba(56,17,18,.08), 0 16px 32px -18px rgba(56,17,18,.28); animation: toast-in .22s cubic-bezier(.16,.84,.44,1); pointer-events: auto; }
+  .toast.success { border-top-color: var(--ok); }
+  .toast.warning { border-top-color: var(--warn); }
+  .toast.danger { border-top-color: var(--bad); }
+  .toast.info { border-top-color: var(--ink-soft); }
+  .toast-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .toast-msg { margin-top: 2px; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+  @media (max-width: 640px) { .toast-stack { left: 16px; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); max-width: none; } .toast { width: auto; } }
 
   /* Kanban ordini (Magazzino) */
   .kanban-board { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 16px; align-items: start; overflow-x: auto; }
@@ -936,37 +1087,7 @@
       </div>
 
       <div class="subpanel" id="sub-com-obiettivi">
-        <div class="box">
-          <div class="list-toolbar-title" style="margin-bottom:14px"><h3>Imposta obiettivo</h3><p>Fissa un target in bottiglie per un'area, per l'intera annata o per una singola etichetta, spalmato sui 12 mesi.</p></div>
-          <div id="target-form-msg"></div>
-          <div class="field-row">
-            <div class="field"><label>Anno</label><input type="number" id="target-year" placeholder="2026"></div>
-            <div class="field"><label>Area</label><select id="target-area"></select></div>
-            <div class="field">
-              <label>Ambito</label>
-              <select id="target-scope" onchange="onTargetScopeChange()">
-                <option value="totale">Totale (tutte le bottiglie)</option>
-                <option value="prodotto">Singola etichetta</option>
-              </select>
-            </div>
-          </div>
-          <div class="field" id="target-product-field" style="display:none">
-            <label>Etichetta</label>
-            <select id="target-product"></select>
-          </div>
-          <button class="btn secondary small" onclick="loadTargetFormMonths()">Carica / aggiorna mesi</button>
-          <div id="target-months-grid" class="target-months-grid" style="margin-top:16px"></div>
-          <div id="target-annual-total" style="margin-top:10px;font-size:13px;color:var(--ink-soft)"></div>
-          <div style="margin-top:16px;display:flex;gap:10px">
-            <button class="btn" onclick="saveTargetSet()">Salva obiettivo</button>
-            <button class="btn-outline-pill danger" onclick="deleteTargetSet()">Elimina questo obiettivo</button>
-          </div>
-        </div>
-
-        <div class="box">
-          <div class="list-toolbar-title" style="margin-bottom:14px"><h3>Obiettivi impostati</h3><p id="target-list-year-label"></p></div>
-          <div class="table-wrap"><table><thead><tr><th>Area</th><th>Ambito</th><th>Totale anno</th><th></th></tr></thead><tbody id="target-sets-tbody"></tbody></table></div>
-        </div>
+        <div class="ob" id="ob-root"></div>
       </div>
     </div>
 
@@ -1404,6 +1525,55 @@
     </div>
   </div>
 </div>
+
+<!-- Obiettivi: crea un anno partendo da un altro -->
+<div class="modal-overlay" id="ob-copy-modal">
+  <div class="modal-box ob-dialog" style="max-width:520px">
+    <h3 id="ob-copy-title">Crea obiettivi</h3>
+    <p class="ob-dialog-desc" id="ob-copy-desc"></p>
+    <div id="ob-copy-msg"></div>
+    <div class="ob-g2">
+      <div class="ob-field"><label for="ob-copy-g">Crescita volumi</label><div class="ob-num" style="height:40px"><input id="ob-copy-g" inputmode="decimal" autocomplete="off"><span>%</span></div><div class="ob-hint">Applicata alle bottiglie</div></div>
+      <div class="ob-field"><label for="ob-copy-p">Aumento prezzi</label><div class="ob-num" style="height:40px"><input id="ob-copy-p" inputmode="decimal" autocomplete="off"><span>%</span></div><div class="ob-hint">Si somma alla crescita sul fatturato</div></div>
+    </div>
+    <p class="ob-dialog-warn" id="ob-copy-warn"></p>
+    <p class="ob-dialog-note" id="ob-copy-dirty"></p>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('ob-copy-modal')">Annulla</button>
+      <button class="btn" id="ob-copy-btn" onclick="obDoCopy()">Crea</button>
+    </div>
+  </div>
+</div>
+
+<!-- Obiettivi: aggiungi / rinomina area -->
+<div class="modal-overlay" id="ob-area-modal">
+  <div class="modal-box ob-dialog" style="max-width:420px">
+    <h3 id="ob-area-title">Aggiungi area</h3>
+    <div class="ob-field" style="margin-top:14px">
+      <label for="ob-area-name">Nome area</label>
+      <input class="ob-text-input" id="ob-area-name" placeholder="Nome area" autocomplete="off" onkeydown="if (event.key === 'Enter') obSaveAreaDialog()">
+      <div class="ob-hint" id="ob-area-hint"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('ob-area-modal')">Annulla</button>
+      <button class="btn" id="ob-area-btn" onclick="obSaveAreaDialog()">Aggiungi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Obiettivi: togli un'area dall'anno -->
+<div class="modal-overlay" id="ob-delete-modal">
+  <div class="modal-box ob-dialog" style="max-width:460px">
+    <h3 id="ob-delete-title">Eliminare l'area?</h3>
+    <p class="ob-dialog-desc" id="ob-delete-desc"></p>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('ob-delete-modal')">Annulla</button>
+      <button class="btn danger" onclick="obDoDelete()">Elimina area</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-stack" id="toast-stack" aria-live="polite"></div>
 
 <!-- Target area modal -->
 <div class="modal-overlay" id="target-area-modal">
@@ -2783,88 +2953,546 @@ async function loadDashboard() {
     : '<p style="font-size:12.5px;color:#8d8274">Nessuna azione in sospeso.</p>';
 }
 
-// ── COMMERCIALE: obiettivi annui per area ───────────────────────────────────────
+// ── COMMERCIALE: obiettivi di vendita (cantina → aree → prodotti, per anno) ─────
+// Le modifiche restano in memoria finché non si preme "Salva obiettivi"; creare un anno
+// (copia o da zero) e rinominare un'area invece vengono salvati subito.
 const MONTH_LABELS = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+const OB = {
+  year: new Date().getFullYear(), loaded: null, data: null, prev: null, areas: [], products: [], years: [], seasonal: null,
+  sel: 'cantina', tab: 'prodotti', dirty: false, editing: null, rendering: false, copy: null, areaDlg: null, delId: null,
+};
+window.addEventListener('beforeunload', e => { if (OB.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+const OB_ICONS = {
+  'chevron-left': '<path d="m15 18-6-6 6-6"/>',
+  'chevron-right': '<path d="m9 18 6-6-6-6"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  'refresh-cw': '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+  'trash-2': '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+};
+function obIcon(name) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${OB_ICONS[name]}</svg>`;
+}
+
+function showToast({ tone = 'success', title, message }) {
+  const el = document.createElement('div');
+  el.className = 'toast ' + tone;
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<div class="toast-title">${esc(title)}</div>${message ? `<div class="toast-msg">${esc(message)}</div>` : ''}`;
+  document.getElementById('toast-stack').appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+
+// Formato italiano ovunque: 18.400 bt, € 1.234.567, € 18,42, +6,0%.
+const obFmt = (n, d = 0) => (Number(n) || 0).toLocaleString('it-IT', { maximumFractionDigits: d, minimumFractionDigits: d, useGrouping: 'always' });
+const obEur = n => '€ ' + obFmt(n);
+const obParse = s => Number(String(s).replace(/\./g, '').replace(',', '.')) || 0;
+const obPctDelta = (v, p) => (p ? (v - p) / p * 100 : null);
+const obAttr = s => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+const obSigned = v => `${v >= 0 ? '+' : ''}${obFmt(v, 1)}%`;
+function obDeltaHtml(v) {
+  return v == null ? '<span class="ob-none">—</span>' : `<span class="${v >= 0 ? 'ob-up' : 'ob-down'}">${obSigned(v)}</span>`;
+}
+
+// Valori derivati: mai salvati, sempre ricalcolati dallo stato.
+function obSumProducts(a) {
+  return Object.values(a.products).reduce((t, p) => ({ bt: t.bt + (p.bt || 0), eur: t.eur + (p.eur || 0) }), { bt: 0, eur: 0 });
+}
+const obAreaTot = a => (a.sumMode ? obSumProducts(a) : { bt: a.bt, eur: a.eur });
+const obAllTot = y => y.areas.reduce((t, a) => { const x = obAreaTot(a); return { bt: t.bt + x.bt, eur: t.eur + x.eur }; }, { bt: 0, eur: 0 });
+const obSeasonal = a => OB.seasonal.byArea[a.id] || OB.seasonal.cantina;
+function obPcts(a) {
+  if (a.monthMode === 'uniforme') return Array(12).fill(100 / 12);
+  if (a.monthMode === 'stagionale') return obSeasonal(a).pct;
+  return a.manualPct.length === 12 ? a.manualPct : Array(12).fill(0);
+}
+// Arrotonda a un decimale mantenendo il totale a 100: i decimi mancanti vanno ai mesi
+// con il resto più alto (metodo dei resti maggiori), così 1/12 diventa 8,4 × 4 + 8,3 × 8.
+function obRounded100(p) {
+  const units = p.map(x => x * 10), base = units.map(Math.floor);
+  let rest = Math.round(1000 - base.reduce((a, b) => a + b, 0));
+  const order = units.map((u, i) => [u - base[i], i]).sort((x, y) => y[0] - x[0]);
+  for (let k = 0; rest > 0 && k < order.length; k++, rest--) base[order[k][1]]++;
+  return base.map(u => u / 10);
+}
+const obSelArea = () => OB.data?.areas.find(a => a.id === OB.sel) || null;
+const obPrevArea = id => OB.prev?.areas.find(a => a.id === id) || null;
+
 async function loadObiettiviPanel() {
-  document.getElementById('target-year').value = document.getElementById('target-year').value || new Date().getFullYear();
-  const areas = await api('/api/admin/sales-target-areas');
-  document.getElementById('target-area').innerHTML = areas.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('') || '<option value="">Nessuna area — creane una da Impostazioni → Regole</option>';
-  if (!PRODUCTS.length) PRODUCTS = await api('/api/admin/products');
-  document.getElementById('target-product').innerHTML = PRODUCTS.map(p => `<option value="${p.id}">${esc(p.name)}${p.vintage ? ' ' + esc(p.vintage) : ''}</option>`).join('');
-  renderTargetMonthsGrid(Array(12).fill(0));
-  loadTargetSetsTable();
+  if (OB.dirty && OB.loaded === OB.year) { obRender(); return; }
+  await obLoadYear(OB.year);
 }
-function onTargetScopeChange() {
-  document.getElementById('target-product-field').style.display = document.getElementById('target-scope').value === 'prodotto' ? 'block' : 'none';
+async function obLoadYear(year) {
+  const res = await api('/api/admin/sales-targets/' + year);
+  Object.assign(OB, {
+    year, loaded: year, data: res.targets, prev: res.prev, areas: res.areas, products: res.products,
+    years: res.years, seasonal: res.seasonal, dirty: false, editing: null,
+  });
+  if (OB.sel !== 'cantina' && !obSelArea()) OB.sel = 'cantina';
+  obRender();
 }
-function renderTargetMonthsGrid(months) {
-  document.getElementById('target-months-grid').innerHTML = MONTH_LABELS.map((label, i) => `
-    <div class="target-month-field">
-      <label>${label}</label>
-      <input type="number" min="0" step="1" value="${months[i] || 0}" oninput="updateTargetAnnualTotal()" class="target-month-input">
-    </div>
-  `).join('');
-  updateTargetAnnualTotal();
+async function obChangeYear(delta) {
+  if (OB.dirty && !confirm(`Ci sono modifiche non salvate agli obiettivi ${OB.year}. Vuoi scartarle?`)) return;
+  await obLoadYear(OB.year + delta);
 }
-function updateTargetAnnualTotal() {
-  const total = [...document.querySelectorAll('.target-month-input')].reduce((s, el) => s + (parseInt(el.value) || 0), 0);
-  document.getElementById('target-annual-total').textContent = `Totale annuo: ${total.toLocaleString('it-IT')} bt`;
-}
-async function loadTargetFormMonths() {
-  const year = document.getElementById('target-year').value;
-  const areaId = document.getElementById('target-area').value;
-  if (!year || !areaId) return;
-  const productId = document.getElementById('target-scope').value === 'prodotto' ? document.getElementById('target-product').value : 0;
-  const res = await api(`/api/admin/sales-targets?year=${year}&area_id=${areaId}&product_id=${productId}`);
-  renderTargetMonthsGrid(res.months);
-}
-async function saveTargetSet() {
-  const msg = document.getElementById('target-form-msg');
-  const year = document.getElementById('target-year').value;
-  const areaId = document.getElementById('target-area').value;
-  if (!year || !areaId) { msg.innerHTML = '<div class="msg error">Seleziona anno e area.</div>'; return; }
-  const productId = document.getElementById('target-scope').value === 'prodotto' ? document.getElementById('target-product').value : 0;
-  const months = [...document.querySelectorAll('.target-month-input')].map(el => parseInt(el.value) || 0);
+
+// Ridisegna la schermata. Se si sta scrivendo in un campo numerico, il campo viene
+// ricreato con lo stesso testo e il cursore rimesso dov'era.
+function obRender() {
+  const root = document.getElementById('ob-root');
+  if (!root) return;
+  const active = document.activeElement;
+  const key = active && root.contains(active) ? active.dataset.obNum : null;
+  const selStart = key ? active.selectionStart : null, selEnd = key ? active.selectionEnd : null;
+  OB.rendering = true;
   try {
-    await api('/api/admin/sales-targets', { method: 'POST', body: JSON.stringify({ year: parseInt(year), area_id: parseInt(areaId), product_id: parseInt(productId), months }) });
-    msg.innerHTML = '<div class="msg success">Obiettivo salvato.</div>';
-    loadTargetSetsTable();
-  } catch (e) {
-    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+    root.innerHTML = obPageHtml();
+    if (key) {
+      const el = root.querySelector(`[data-ob-num="${key}"]`);
+      if (el && !el.disabled) {
+        el.focus({ preventScroll: true });
+        try { el.setSelectionRange(selStart, selEnd); } catch {}
+      } else {
+        OB.editing = null;
+      }
+    }
+  } finally {
+    OB.rendering = false;
   }
 }
-async function deleteTargetSet() {
-  const year = document.getElementById('target-year').value;
-  const areaId = document.getElementById('target-area').value;
-  if (!year || !areaId) return;
-  const productId = document.getElementById('target-scope').value === 'prodotto' ? document.getElementById('target-product').value : 0;
-  if (!confirm('Eliminare questo obiettivo?')) return;
-  await api(`/api/admin/sales-targets?year=${year}&area_id=${areaId}&product_id=${productId}`, { method: 'DELETE' });
-  renderTargetMonthsGrid(Array(12).fill(0));
-  loadTargetSetsTable();
+function obChanged() { OB.dirty = true; obRender(); }
+
+// Campi numerici: formattati quando non hanno il focus, valore grezzo mentre si scrive.
+function obNumHtml(key, value, { suffix = '', dec = 0, h = 36, disabled = false } = {}) {
+  const text = OB.editing && OB.editing.key === key ? OB.editing.text : obFmt(value, dec);
+  return `<div class="ob-num${disabled ? ' disabled' : ''}" style="height:${h}px"><input type="text" inputmode="decimal" autocomplete="off" data-ob-num="${key}" data-dec="${dec}" value="${obAttr(text)}"${disabled ? ' disabled' : ''} onfocus="obNumFocus(this)" oninput="obNumInput(this)" onblur="obNumBlur(this)" onkeydown="if (event.key === 'Enter') this.blur()">${suffix ? `<span>${suffix}</span>` : ''}</div>`;
 }
-async function loadTargetSetsTable() {
-  const year = document.getElementById('target-year').value || new Date().getFullYear();
-  document.getElementById('target-list-year-label').textContent = `Anno ${year}`;
-  const rows = await api(`/api/admin/sales-targets/list?year=${year}`);
-  document.getElementById('target-sets-tbody').innerHTML = rows.length ? rows.map(r => `
-    <tr>
-      <td>${esc(r.area_name)}</td>
-      <td>${esc(r.product_name)}</td>
-      <td>${r.total_bottles.toLocaleString('it-IT')} bt</td>
-      <td>
-        <button class="btn-outline-pill" onclick="editTargetSet(${r.area_id}, ${r.product_id})">Modifica</button>
-      </td>
-    </tr>
-  `).join('') : '<tr><td colspan="4" class="empty">Nessun obiettivo impostato per questo anno.</td></tr>';
+function obGetNum(key) {
+  const [k, a1, a2] = key.split('.');
+  const area = obSelArea();
+  if (k === 'cantina') return OB.data.cantina[a1];
+  if (k === 'area') return obAreaTot(area)[a1];
+  if (k === 'prod') return area.products[a1]?.[a2] || 0;
+  if (k === 'month') return obPcts(area)[+a1];
+  return 0;
 }
-async function editTargetSet(areaId, productId) {
-  document.getElementById('target-area').value = areaId;
-  document.getElementById('target-scope').value = productId ? 'prodotto' : 'totale';
-  onTargetScopeChange();
-  if (productId) document.getElementById('target-product').value = productId;
-  await loadTargetFormMonths();
-  document.getElementById('target-months-grid').scrollIntoView({ behavior: 'smooth', block: 'center' });
+function obSetNum(key, raw, dec) {
+  const v = Math.max(0, dec ? Math.round(raw * 10 ** dec) / 10 ** dec : Math.round(raw));
+  const [k, a1, a2] = key.split('.');
+  const area = obSelArea();
+  if (k === 'cantina') OB.data.cantina[a1] = v;
+  else if (k === 'area') area[a1] = v;
+  else if (k === 'prod') area.products[a1] = { bt: 0, eur: 0, ...(area.products[a1] || {}), [a2]: v };
+  else if (k === 'month') area.manualPct[+a1] = v;
+}
+function obNumFocus(el) {
+  if (OB.rendering) return;
+  const v = obGetNum(el.dataset.obNum);
+  const raw = v ? String(v).replace('.', ',') : '';
+  OB.editing = { key: el.dataset.obNum, text: raw };
+  el.value = raw;
+}
+function obNumInput(el) {
+  OB.editing = { key: el.dataset.obNum, text: el.value };
+  obSetNum(el.dataset.obNum, obParse(el.value), +el.dataset.dec);
+  obChanged();
+}
+function obNumBlur(el) {
+  if (OB.rendering) return;
+  if (OB.editing && OB.editing.key === el.dataset.obNum) OB.editing = null;
+  el.value = obFmt(obGetNum(el.dataset.obNum), +el.dataset.dec);
+}
+
+function obShareHtml(v, max, color = '#c08552') {
+  return `<div class="ob-share"><div style="width:${Math.min(100, max ? v / max * 100 : 0)}%;background:${color}"></div></div>`;
+}
+function obShareCellHtml(v, max, d = 1) {
+  return `<div class="ob-share-cell">${obShareHtml(v, max)}<span>${obFmt(max ? v / max * 100 : 0, d)}%</span></div>`;
+}
+const obDotHtml = type => `<span class="ob-dot" style="background:${WINE_TYPE_COLORS[type] || '#8d8274'}"></span>`;
+
+function obPageHtml() {
+  if (!OB.data) return obHeadHtml() + obEmptyHtml();
+  const area = obSelArea();
+  return obHeadHtml() + obStatsHtml() + `<div class="ob-layout">${obNavHtml()}<div class="ob-col">${area ? obAreaViewHtml(area) : obCantinaViewHtml()}</div></div>`;
+}
+
+function obHeadHtml() {
+  const y = OB.data;
+  return `<div class="ob-head">
+    <h1>Obiettivi di vendita</h1>
+    <div class="ob-head-actions">
+      ${OB.dirty ? '<span class="ob-dirty">Modifiche non salvate</span>' : ''}
+      <div class="ob-year">
+        <button class="ob-icon-btn" onclick="obChangeYear(-1)" aria-label="Anno precedente" title="Anno precedente">${obIcon('chevron-left')}</button>
+        <span>${OB.year}</span>
+        <button class="ob-icon-btn" onclick="obChangeYear(1)" aria-label="Anno successivo" title="Anno successivo">${obIcon('chevron-right')}</button>
+      </div>
+      ${y ? `<button class="btn secondary small" onclick="obOpenCopy(${OB.year}, ${OB.year + 1})">${obIcon('copy')}Crea ${OB.year + 1} da ${OB.year}</button>
+      <button class="btn small" onclick="obSave()">Salva obiettivi</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function obEmptyHtml() {
+  const earlier = OB.years.filter(v => v < OB.year);
+  const from = earlier.length ? earlier[earlier.length - 1] : OB.years[OB.years.length - 1];
+  return `<div class="ob-card ob-empty">
+    <div class="ob-empty-icon">${obIcon('target')}</div>
+    <h3>Nessun obiettivo per il ${OB.year}</h3>
+    <p>Parti dagli obiettivi di un anno già impostato applicando una crescita, oppure comincia da zero.</p>
+    <div class="ob-empty-actions">
+      ${OB.years.length ? `<button class="btn" onclick="obOpenCopy(${from}, ${OB.year})">Copia da un anno precedente</button>` : ''}
+      <button class="btn secondary" onclick="obStartEmpty()">Parti da zero</button>
+    </div>
+  </div>`;
+}
+
+function obStatHtml(label, value, unit, delta) {
+  return `<div class="card ob-stat"><div class="label">${label}</div><div class="value">${value}${unit ? `<small>${unit}</small>` : ''}</div><div class="ob-stat-delta">${delta}</div></div>`;
+}
+function obStatsHtml() {
+  const y = OB.data, p = OB.prev, t = obAllTot(y);
+  const vsPrev = (v, pv) => (p ? `${obDeltaHtml(obPctDelta(v, pv))} vs ${OB.year - 1}` : 'Nessun confronto');
+  return `<div class="ob-stats">
+    ${obStatHtml('Obiettivo bottiglie', obFmt(y.cantina.bt), 'bt', vsPrev(y.cantina.bt, p?.cantina.bt))}
+    ${obStatHtml('Obiettivo fatturato', obEur(y.cantina.eur), '', vsPrev(y.cantina.eur, p?.cantina.eur))}
+    ${obStatHtml('Allocato alle aree', obFmt(y.cantina.bt ? t.bt / y.cantina.bt * 100 : 0, 1), '%', `${obFmt(t.bt)} bt · ${obEur(t.eur)}`)}
+  </div>`;
+}
+
+function obNavHtml() {
+  const y = OB.data;
+  const row = (id, label, sub, a) => `<div class="ob-nav-row${OB.sel === id ? ' active' : ''}">
+    <button class="ob-nav-main" onclick="obSelect(${a ? a.id : "'cantina'"})"><span>${esc(label)}</span><span>${sub}</span></button>
+    ${a ? `<div class="ob-nav-actions">
+      <button class="ob-icon-btn sm" onclick="obOpenAreaDialog(${a.id})" aria-label="Rinomina ${obAttr(a.label)}" title="Rinomina">${obIcon('pencil')}</button>
+      <button class="ob-icon-btn sm" onclick="obOpenDelete(${a.id})" aria-label="Elimina ${obAttr(a.label)}" title="Elimina">${obIcon('trash-2')}</button>
+    </div>` : ''}
+  </div>`;
+  return `<div class="ob-card ob-nav">
+    ${row('cantina', 'Tutta la cantina', obFmt(y.cantina.bt))}
+    <div class="ob-nav-label">Aree</div>
+    ${y.areas.map(a => row(a.id, a.label, obFmt(obAreaTot(a).bt), a)).join('') || '<div class="ob-small" style="padding:4px 14px 8px">Nessuna area in questo anno.</div>'}
+    <div style="padding:8px 6px 4px"><button class="btn ghost small ob-full" onclick="obOpenAreaDialog()">${obIcon('plus')}Aggiungi area</button></div>
+  </div>`;
+}
+function obSelect(id) { OB.sel = id; obRender(); }
+
+function obTargetBlockHtml(label, unit, key, value, prevValue, allocated) {
+  const isE = unit === '€', f = v => (isE ? obEur(v) : obFmt(v) + ' bt'), diff = value - allocated;
+  const tone = Math.abs(diff) < 1 ? 'green' : diff > 0 ? 'yellow' : 'red';
+  return `<div class="ob-target">
+    <div class="ob-target-top">
+      <span class="ob-eyebrow">${label}</span>
+      <span class="ob-small">${prevValue ? `${OB.year - 1}: ${f(prevValue)} · ${obDeltaHtml(obPctDelta(value, prevValue))}` : 'Nessun anno precedente'}</span>
+    </div>
+    ${obNumHtml(key, value, { suffix: isE ? '€' : 'bt', h: 48 })}
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${obShareHtml(allocated, Math.max(value, allocated), tone === 'red' ? 'var(--bad)' : 'var(--wine)')}
+      <div class="ob-target-foot">
+        <span>Nelle aree: <b>${f(allocated)}</b> (${obFmt(value ? allocated / value * 100 : 0, 1)}%)</span>
+        <span class="badge ${tone}">${tone === 'green' ? 'Allineato' : diff > 0 ? `Mancano ${f(diff)}` : `Oltre di ${f(-diff)}`}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function obCantinaViewHtml() {
+  const y = OB.data, p = OB.prev, t = obAllTot(y), year = OB.year;
+  const differs = Math.abs(y.cantina.bt - t.bt) >= 1 || Math.abs(y.cantina.eur - t.eur) >= 1;
+  const price = y.cantina.bt ? y.cantina.eur / y.cantina.bt : 0;
+  const prevPrice = p?.cantina.bt ? p.cantina.eur / p.cantina.bt : 0;
+
+  const sumAcross = (yt, pid) => (yt ? yt.areas.reduce((o, a) => ({ bt: o.bt + (a.products[pid]?.bt || 0), eur: o.eur + (a.products[pid]?.eur || 0) }), { bt: 0, eur: 0 }) : { bt: 0, eur: 0 });
+  const prodRows = OB.products.map(pr => ({ pr, ...sumAcross(y, pr.id), prevBt: sumAcross(p, pr.id).bt })).filter(r => r.bt || r.eur || r.prevBt);
+  const prodTotal = prodRows.reduce((o, r) => o + r.bt, 0);
+
+  return `<div class="ob-card">
+      <div class="ob-card-head">
+        <div><div class="ob-eyebrow">Tutta la cantina · ${year}</div><div class="ob-card-title">Obiettivo complessivo</div></div>
+        ${differs ? `<div class="ob-card-actions"><button class="btn secondary small" onclick="obUseAreasSum()">${obIcon('refresh-cw')}Usa la somma delle aree</button></div>` : ''}
+      </div>
+      <div class="ob-card-body">
+        <div class="ob-g2">
+          ${obTargetBlockHtml('Bottiglie', 'bt', 'cantina.bt', y.cantina.bt, p?.cantina.bt, t.bt)}
+          ${obTargetBlockHtml('Fatturato', '€', 'cantina.eur', y.cantina.eur, p?.cantina.eur, t.eur)}
+        </div>
+        <div class="ob-footer-row">
+          <span class="ob-eyebrow">Prezzo medio implicito</span>
+          <span class="ob-price">${price ? '€ ' + obFmt(price, 2) : '—'}<small>/ bt</small></span>
+          ${prevPrice && price ? `<span class="ob-small">${year - 1}: € ${obFmt(prevPrice, 2)} · ${obDeltaHtml(obPctDelta(price, prevPrice))}</span>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="ob-card">
+      <div class="ob-card-head pad"><div class="ob-card-title">Ripartizione per area</div></div>
+      <div class="ob-table-wrap"><table>
+        <thead><tr><th>Area</th><th class="num">Bottiglie</th><th class="num">Fatturato</th><th style="width:22%">Quota</th><th class="num">vs ${year - 1}</th></tr></thead>
+        <tbody>${y.areas.map(a => {
+          const x = obAreaTot(a), pa = obPrevArea(a.id);
+          return `<tr class="ob-click" onclick="obSelect(${a.id})">
+            <td class="ob-area-name">${esc(a.label)}</td><td class="num">${obFmt(x.bt)}</td><td class="num">${obEur(x.eur)}</td>
+            <td>${obShareCellHtml(x.bt, t.bt)}</td><td class="num">${obDeltaHtml(pa ? obPctDelta(x.bt, obAreaTot(pa).bt) : null)}</td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="5" class="muted">Nessuna area: aggiungine una dalla colonna a sinistra.</td></tr>'}</tbody>
+      </table></div>
+    </div>
+
+    <div class="ob-card">
+      <div class="ob-card-head pad"><div><div class="ob-eyebrow">Somma di tutte le aree</div><div class="ob-card-title">Totale per prodotto</div></div></div>
+      <div class="ob-table-wrap"><table>
+        <thead><tr><th>Prodotto</th><th class="num">Bottiglie</th><th class="num">Fatturato</th><th class="num">Prezzo medio</th><th class="num">Mix</th><th class="num">vs ${year - 1}</th></tr></thead>
+        <tbody>${prodRows.map(r => `<tr>
+          <td><div class="ob-prod">${obDotHtml(r.pr.wine_type)}${esc(r.pr.label)}</div></td>
+          <td class="num">${obFmt(r.bt)}</td><td class="num">${obEur(r.eur)}</td>
+          <td class="num">${r.bt ? '€ ' + obFmt(r.eur / r.bt, 2) : '—'}</td>
+          <td class="num">${obFmt(prodTotal ? r.bt / prodTotal * 100 : 0, 1)}%</td>
+          <td class="num">${obDeltaHtml(p ? obPctDelta(r.bt, r.prevBt) : null)}</td>
+        </tr>`).join('') || '<tr><td colspan="6" class="muted">Nessun obiettivo per prodotto: impostali dentro ciascuna area.</td></tr>'}</tbody>
+      </table></div>
+    </div>`;
+}
+function obUseAreasSum() {
+  const t = obAllTot(OB.data);
+  OB.data.cantina = { bt: t.bt, eur: t.eur };
+  obChanged();
+}
+
+function obAreaViewHtml(a) {
+  const s = obSumProducts(a), t = obAreaTot(a), pa = obPrevArea(a.id);
+  const sumHint = a.sumMode ? '<div class="ob-hint">Calcolato dalla somma dei prodotti</div>' : '';
+  return `<div class="ob-card">
+      <div class="ob-card-head">
+        <div>
+          <div class="ob-eyebrow">Area</div>
+          <div class="ob-card-title">${esc(a.label)}</div>
+          <div class="ob-countries">${a.countries.length ? 'Paesi: ' + a.countries.map(esc).join(', ') : 'Nessun paese associato: il venduto di quest\'area non viene misurato. Aggiungili in Impostazioni → Regole.'}</div>
+        </div>
+        <div class="ob-card-actions">
+          <button class="btn ghost small" onclick="obOpenAreaDialog(${a.id})">${obIcon('pencil')}Rinomina</button>
+          <button class="btn ghost small" onclick="obOpenDelete(${a.id})">${obIcon('trash-2')}Elimina area</button>
+        </div>
+      </div>
+      <div class="ob-card-body">
+        <div class="ob-g3">
+          <div class="ob-field"><label>Bottiglie area</label>${obNumHtml('area.bt', t.bt, { suffix: 'bt', h: 40, disabled: a.sumMode })}${sumHint}</div>
+          <div class="ob-field"><label>Fatturato area</label>${obNumHtml('area.eur', t.eur, { suffix: '€', h: 40, disabled: a.sumMode })}${sumHint}</div>
+          <div class="ob-field"><label>Rispetto all'anno precedente</label><div class="ob-delta-line">
+            <span>bt ${obDeltaHtml(pa ? obPctDelta(t.bt, obAreaTot(pa).bt) : null)}</span>
+            <span>€ ${obDeltaHtml(pa ? obPctDelta(t.eur, obAreaTot(pa).eur) : null)}</span>
+          </div></div>
+        </div>
+        <label class="ob-switch"><input type="checkbox"${a.sumMode ? ' checked' : ''} onchange="obToggleSumMode(this.checked)"><span class="ob-switch-track"></span>Totale area = somma dei prodotti</label>
+      </div>
+    </div>
+
+    <div class="ob-card">
+      <div class="ob-tabs">
+        <button class="${OB.tab === 'prodotti' ? 'active' : ''}" onclick="obSetTab('prodotti')">Per prodotto <span class="count">${OB.products.length}</span></button>
+        <button class="${OB.tab === 'mesi' ? 'active' : ''}" onclick="obSetTab('mesi')">Distribuzione mensile</button>
+      </div>
+      ${OB.tab === 'prodotti' ? obAreaProductsHtml(a, s, t) : obAreaMonthsHtml(a, t)}
+    </div>`;
+}
+
+function obAreaProductsHtml(a, s, t) {
+  const un = { bt: t.bt - s.bt, eur: t.eur - s.eur };
+  const over = un.bt < 0 || un.eur < 0;
+  const notice = !a.sumMode && (un.bt || un.eur)
+    ? `<tr><td colspan="5" style="padding:0 16px 16px;border-bottom:none"><div class="ob-notice ${over ? 'bad' : 'warn'}">${over
+      ? `I prodotti superano il totale area di ${obFmt(Math.max(0, -un.bt))} bt · ${obEur(Math.max(0, -un.eur))}`
+      : `Non ancora assegnato ai prodotti: ${obFmt(un.bt)} bt · ${obEur(un.eur)}`}</div></td></tr>` : '';
+  return `<div class="ob-table-wrap"><table class="ob-entry">
+    <thead><tr><th>Prodotto</th><th class="num" style="width:150px">Bottiglie</th><th class="num" style="width:170px">Fatturato</th><th class="num">Prezzo medio</th><th style="width:16%">Quota area</th></tr></thead>
+    <tbody>
+      ${OB.products.map(pr => {
+        const x = a.products[pr.id] || { bt: 0, eur: 0 };
+        return `<tr>
+          <td><div class="ob-prod">${obDotHtml(pr.wine_type)}${esc(pr.label)}</div></td>
+          <td>${obNumHtml(`prod.${pr.id}.bt`, x.bt)}</td>
+          <td>${obNumHtml(`prod.${pr.id}.eur`, x.eur, { suffix: '€' })}</td>
+          <td class="num muted">${x.bt ? '€ ' + obFmt(x.eur / x.bt, 2) : '—'}</td>
+          <td>${obShareCellHtml(x.bt, t.bt, 0)}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="5" class="muted">Nessun prodotto attivo nel catalogo.</td></tr>'}
+      <tr class="ob-total"><td>Totale prodotti</td><td class="num">${obFmt(s.bt)} bt</td><td class="num">${obEur(s.eur)}</td><td class="num muted">${s.bt ? '€ ' + obFmt(s.eur / s.bt, 2) : '—'}</td><td></td></tr>
+      ${notice}
+    </tbody>
+  </table></div>`;
+}
+
+function obAreaMonthsHtml(a, t) {
+  const P = obPcts(a), total = P.reduce((x, y) => x + y, 0), max = Math.max(...P);
+  const src = obSeasonal(a), sy = OB.seasonal.year;
+  const srcHint = src.source === 'area' ? `Profilo delle vendite ${sy} nei paesi dell'area.`
+    : src.source === 'cantina' ? `Profilo delle vendite ${sy} di tutta la cantina: ${a.countries.length ? "nessuna vendita registrata nei paesi dell'area" : "l'area non ha paesi associati"}.`
+    : `Profilo standard: nessuna vendita registrata nel ${sy}.`;
+  const modes = [['uniforme', 'Uniforme (1/12)'], ['stagionale', 'Stagionale (profilo storico)'], ['manuale', 'Manuale']];
+  return `<div class="ob-months-body">
+    <div>
+      <div class="ob-radios">
+        ${modes.map(([v, l]) => `<label><input type="radio" name="ob-month-mode" value="${v}"${a.monthMode === v ? ' checked' : ''} onchange="obSetMonthMode('${v}')">${l}</label>`).join('')}
+        <span class="badge ${Math.abs(total - 100) < 0.05 ? 'green' : 'yellow'}">Totale ${obFmt(total, 1)}%</span>
+      </div>
+      ${a.monthMode === 'stagionale' ? `<div class="ob-hint">${srcHint}</div>` : ''}
+    </div>
+    <div class="ob-months">${MONTH_LABELS.map((m, i) => `<div class="ob-month">
+      <div class="ob-month-bar"><div class="${i >= 10 ? 'peak' : ''}" style="height:${max ? P[i] / max * 100 : 0}%"></div></div>
+      <span class="ob-month-label">${m}</span>
+      ${obNumHtml('month.' + i, P[i], { dec: 1, suffix: '%', h: 32, disabled: a.monthMode !== 'manuale' })}
+      <span class="ob-month-val">${obFmt(t.bt * P[i] / 100)} bt</span>
+      <span class="ob-month-val faint">${obEur(t.eur * P[i] / 100)}</span>
+    </div>`).join('')}</div>
+  </div>`;
+}
+
+function obToggleSumMode(on) {
+  const a = obSelArea();
+  if (!on) { const s = obSumProducts(a); a.bt = s.bt; a.eur = s.eur; }
+  a.sumMode = on;
+  obChanged();
+}
+function obSetTab(tab) { OB.tab = tab; obRender(); }
+function obSetMonthMode(mode) {
+  const a = obSelArea();
+  if (mode === 'manuale' && a.monthMode !== 'manuale') a.manualPct = obRounded100(obPcts(a));
+  a.monthMode = mode;
+  obChanged();
+}
+
+function obPayload() {
+  return {
+    cantina: OB.data.cantina,
+    areas: OB.data.areas.map(a => ({
+      id: a.id, sumMode: a.sumMode, bt: a.bt, eur: a.eur, monthMode: a.monthMode,
+      manualPct: a.monthMode === 'manuale' ? a.manualPct : [], products: a.products,
+    })),
+  };
+}
+async function obSave() {
+  try {
+    await api('/api/admin/sales-targets/' + OB.year, { method: 'PUT', body: JSON.stringify(obPayload()) });
+    const productIds = new Set(OB.data.areas.flatMap(a => Object.entries(a.products).filter(([, x]) => x.bt || x.eur).map(([pid]) => pid)));
+    const year = OB.year;
+    await obLoadYear(year);
+    showToast({ tone: 'success', title: `Obiettivi ${year} salvati`, message: `${OB.data.areas.length} ${OB.data.areas.length === 1 ? 'area' : 'aree'}, ${productIds.size} ${productIds.size === 1 ? 'prodotto' : 'prodotti'}.` });
+  } catch (e) {
+    showToast({ tone: 'danger', title: 'Salvataggio non riuscito', message: e.message });
+  }
+}
+async function obStartEmpty() {
+  const year = OB.year;
+  const areas = OB.areas.filter(a => a.active).map(a => ({ id: a.id, sumMode: true, bt: 0, eur: 0, monthMode: 'stagionale', manualPct: [], products: {} }));
+  try {
+    await api('/api/admin/sales-targets/' + year, { method: 'PUT', body: JSON.stringify({ cantina: { bt: 0, eur: 0 }, areas }) });
+    OB.sel = 'cantina';
+    await obLoadYear(year);
+    showToast({ tone: 'success', title: `Obiettivi ${year} creati`, message: `${areas.length} ${areas.length === 1 ? 'area' : 'aree'}, tutti i valori a zero.` });
+  } catch (e) {
+    showToast({ tone: 'danger', title: 'Creazione non riuscita', message: e.message });
+  }
+}
+
+function obOpenCopy(from, to) {
+  const exists = OB.years.includes(to);
+  OB.copy = { from, to };
+  document.getElementById('ob-copy-title').textContent = `Crea obiettivi ${to}`;
+  document.getElementById('ob-copy-desc').textContent = `Parte dagli obiettivi ${from} di cantina, aree e prodotti. Potrai modificare tutto dopo.`;
+  document.getElementById('ob-copy-msg').innerHTML = '';
+  document.getElementById('ob-copy-g').value = '5';
+  document.getElementById('ob-copy-p').value = '2';
+  document.getElementById('ob-copy-warn').textContent = exists ? `Esistono già obiettivi per il ${to}: verranno sostituiti.` : '';
+  document.getElementById('ob-copy-dirty').textContent = OB.dirty && from === OB.year ? `Prima della copia verranno salvate le modifiche al ${from}.` : '';
+  document.getElementById('ob-copy-btn').textContent = `${exists ? 'Sovrascrivi' : 'Crea'} ${to}`;
+  openModal('ob-copy-modal');
+}
+async function obDoCopy() {
+  const { from, to } = OB.copy;
+  const g = obParse(document.getElementById('ob-copy-g').value);
+  const p = obParse(document.getElementById('ob-copy-p').value);
+  try {
+    if (OB.dirty && from === OB.year) await api('/api/admin/sales-targets/' + from, { method: 'PUT', body: JSON.stringify(obPayload()) });
+    await api(`/api/admin/sales-targets/${to}/copy`, { method: 'POST', body: JSON.stringify({ fromYear: from, volumePct: g, pricePct: p }) });
+    closeModal('ob-copy-modal');
+    OB.sel = 'cantina';
+    await obLoadYear(to);
+    showToast({ tone: 'success', title: `Obiettivi ${to} creati`, message: `Copiati dal ${from}: volumi ${obSigned(g)}, prezzi ${obSigned(p)}.` });
+  } catch (e) {
+    document.getElementById('ob-copy-msg').innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
+}
+
+function obOpenAreaDialog(areaId) {
+  const a = areaId ? OB.data.areas.find(x => x.id === areaId) : null;
+  OB.areaDlg = { id: a ? a.id : null };
+  document.getElementById('ob-area-title').textContent = a ? 'Rinomina area' : 'Aggiungi area';
+  document.getElementById('ob-area-btn').textContent = a ? 'Salva nome' : 'Aggiungi';
+  document.getElementById('ob-area-hint').textContent = a
+    ? 'Il nome cambia in tutti gli anni e in Impostazioni → Regole. Obiettivi e paesi restano invariati.'
+    : 'Es. Horeca Abruzzo, Germania, GDO. I paesi che servono a misurare il venduto si impostano in Impostazioni → Regole.';
+  const input = document.getElementById('ob-area-name');
+  input.value = a ? a.label : '';
+  openModal('ob-area-modal');
+  setTimeout(() => input.focus(), 0);
+}
+async function obSaveAreaDialog() {
+  const label = document.getElementById('ob-area-name').value.trim();
+  if (!label) return;
+  const id = OB.areaDlg.id, lower = label.toLowerCase();
+  if (OB.data.areas.some(a => a.label.toLowerCase() === lower && a.id !== id)) {
+    showToast({ tone: 'warning', title: 'Nome già usato', message: `Esiste già un'area "${label}" nel ${OB.year}.` });
+    return;
+  }
+  try {
+    if (id) {
+      const clash = OB.areas.find(a => a.name.toLowerCase() === lower && a.id !== id);
+      if (clash) { showToast({ tone: 'warning', title: 'Nome già usato', message: `Esiste già un'area "${clash.name}" in Impostazioni → Regole.` }); return; }
+      await api('/api/admin/sales-target-areas/' + id, { method: 'PATCH', body: JSON.stringify({ name: label }) });
+      [OB.data, OB.prev].forEach(y => y?.areas.forEach(a => { if (a.id === id) a.label = label; }));
+      OB.areas.forEach(a => { if (a.id === id) a.name = label; });
+      showToast({ tone: 'success', title: 'Area rinominata', message: `Ora si chiama "${label}".` });
+    } else {
+      // Un'area con lo stesso nome esiste già (in un altro anno o in Regole): si riusa quella.
+      let area = OB.areas.find(a => a.name.toLowerCase() === lower);
+      if (!area) {
+        const r = await api('/api/admin/sales-target-areas', { method: 'POST', body: JSON.stringify({ name: label, countries: [], sort_order: OB.areas.length + 1 }) });
+        area = { id: r.id, name: label, countries: [], active: true };
+        OB.areas.push(area);
+      }
+      OB.seasonal.byArea[area.id] = OB.seasonal.byArea[area.id] || OB.seasonal.cantina;
+      OB.data.areas.push({ id: area.id, label: area.name, countries: area.countries, sumMode: true, bt: 0, eur: 0, monthMode: 'stagionale', manualPct: [], products: {} });
+      OB.sel = area.id;
+      OB.dirty = true;
+    }
+    closeModal('ob-area-modal');
+    obRender();
+  } catch (e) {
+    showToast({ tone: 'danger', title: 'Operazione non riuscita', message: e.message });
+  }
+}
+
+function obOpenDelete(areaId) {
+  const a = OB.data.areas.find(x => x.id === areaId);
+  if (!a) return;
+  const t = obAreaTot(a);
+  OB.delId = areaId;
+  document.getElementById('ob-delete-title').textContent = `Eliminare l'area "${a.label}"?`;
+  document.getElementById('ob-delete-desc').textContent = `Verranno rimossi gli obiettivi ${OB.year} di quest'area: ${obFmt(t.bt)} bt · ${obEur(t.eur)}. Gli altri anni non cambiano.`;
+  openModal('ob-delete-modal');
+}
+function obDoDelete() {
+  const a = OB.data.areas.find(x => x.id === OB.delId);
+  if (!a) return;
+  OB.data.areas = OB.data.areas.filter(x => x.id !== a.id);
+  if (OB.sel === a.id) OB.sel = 'cantina';
+  closeModal('ob-delete-modal');
+  obChanged();
+  showToast({ tone: 'info', title: 'Area eliminata', message: `"${a.label}" rimossa dagli obiettivi ${OB.year}. Salva per confermare.` });
 }
 
 // ── CRM: dashboard ─────────────────────────────────────────────────────────────
@@ -5391,7 +6019,7 @@ async function saveTargetArea() {
   }
 }
 async function deleteTargetArea(id) {
-  if (!confirm('Eliminare questa area? Verranno eliminati anche gli obiettivi associati.')) return;
+  if (!confirm('Eliminare questa area? Verranno eliminati anche i suoi obiettivi di vendita, in tutti gli anni.')) return;
   await api('/api/admin/sales-target-areas/' + id, { method: 'DELETE' });
   loadTargetAreas();
 }

@@ -958,8 +958,8 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now','localtime'))
   )
 `);
-// Un obiettivo per (anno, area, prodotto, mese). product_id = 0 significa "totale" (tutte le bottiglie),
-// non un vero prodotto — evita gli NULL, che SQLite non considera uguali in un vincolo UNIQUE.
+// Vecchio modello (anno, area, prodotto, mese) in sole bottiglie: non più usato — sostituito dalle
+// tabelle sales_target_years/_year_areas/_products qui sotto. Era vuoto al momento del passaggio.
 db.exec(`
   CREATE TABLE IF NOT EXISTS sales_targets (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -972,6 +972,42 @@ db.exec(`
     UNIQUE(year, area_id, product_id, month),
     FOREIGN KEY (area_id) REFERENCES sales_target_areas(id)
   )
+`);
+// Obiettivi di vendita per anno (Commerciale → Obiettivi), in bottiglie e in euro:
+// - sales_target_years: obiettivo complessivo di cantina;
+// - sales_target_year_areas: le aree incluse in quell'anno, con il loro totale (usato solo se
+//   sum_mode = 0, altrimenti il totale area è la somma dei prodotti) e la distribuzione mensile;
+// - sales_target_products: obiettivo per prodotto dentro ciascuna area.
+// Le aree sono quelle di Impostazioni → Regole (con i paesi che misurano il venduto): ogni anno ne
+// usa un sottoinsieme, così togliere un'area da un anno non tocca gli altri.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sales_target_years (
+    year           INTEGER PRIMARY KEY,
+    target_bottles INTEGER NOT NULL DEFAULT 0,
+    target_eur     INTEGER NOT NULL DEFAULT 0,
+    updated_at     TEXT DEFAULT (datetime('now','localtime'))
+  );
+  CREATE TABLE IF NOT EXISTS sales_target_year_areas (
+    year           INTEGER NOT NULL,
+    area_id        INTEGER NOT NULL,
+    sort_order     INTEGER NOT NULL DEFAULT 0,
+    sum_mode       INTEGER NOT NULL DEFAULT 1,
+    target_bottles INTEGER NOT NULL DEFAULT 0,
+    target_eur     INTEGER NOT NULL DEFAULT 0,
+    month_mode     TEXT NOT NULL DEFAULT 'stagionale',
+    manual_pct     TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (year, area_id),
+    FOREIGN KEY (area_id) REFERENCES sales_target_areas(id)
+  );
+  CREATE TABLE IF NOT EXISTS sales_target_products (
+    year           INTEGER NOT NULL,
+    area_id        INTEGER NOT NULL,
+    product_id     INTEGER NOT NULL,
+    target_bottles INTEGER NOT NULL DEFAULT 0,
+    target_eur     INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (year, area_id, product_id),
+    FOREIGN KEY (area_id) REFERENCES sales_target_areas(id)
+  );
 `);
 if (db.prepare('SELECT COUNT(*) AS c FROM sales_target_areas').get().c === 0) {
   const insertArea = db.prepare('INSERT INTO sales_target_areas (name, countries, sort_order) VALUES (?, ?, ?)');
@@ -2857,60 +2893,175 @@ app.patch('/api/admin/sales-target-areas/:id', authAdmin, (req, res) => {
   if (active !== undefined) { updates.push('active = ?'); params.push(active ? 1 : 0); }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
   params.push(req.params.id);
-  db.prepare(`UPDATE sales_target_areas SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  try {
+    db.prepare(`UPDATE sales_target_areas SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  } catch (e) {
+    return res.status(409).json({ error: 'Esiste già un\'area con questo nome.' });
+  }
   res.json({ success: true });
 });
 app.delete('/api/admin/sales-target-areas/:id', authAdmin, (req, res) => {
   db.prepare('DELETE FROM sales_targets WHERE area_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM sales_target_products WHERE area_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM sales_target_year_areas WHERE area_id = ?').run(req.params.id);
   db.prepare('DELETE FROM sales_target_areas WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
-// Obiettivi: un set = (anno, area, prodotto) con 12 valori mensili. product_id 0 = totale.
-app.get('/api/admin/sales-targets', authAdmin, (req, res) => {
-  const { year, area_id, product_id } = req.query;
-  if (!year || !area_id) return res.status(400).json({ error: 'year e area_id sono obbligatori.' });
-  const pid = product_id ? parseInt(product_id) : 0;
-  const rows = db.prepare('SELECT month, target_bottles FROM sales_targets WHERE year = ? AND area_id = ? AND product_id = ?').all(year, area_id, pid);
-  const months = Array(12).fill(0);
-  rows.forEach(r => { months[r.month - 1] = r.target_bottles; });
-  res.json({ months });
-});
+// Obiettivi di vendita per anno: cantina, aree, prodotti e distribuzione mensile.
+const TARGET_MONTH_MODES = ['uniforme', 'stagionale', 'manuale'];
+// Profilo usato solo se non ci sono vendite registrate nell'anno di riferimento.
+const SEASONAL_STANDARD = [6, 6, 7, 7, 8, 7, 8, 6, 8, 9, 13, 15];
+const targetInt = v => Math.max(0, Math.round(Number(v) || 0));
 
-app.get('/api/admin/sales-targets/list', authAdmin, (req, res) => {
-  const year = req.query.year || new Date().getFullYear();
-  const rows = db.prepare(`
-    SELECT st.area_id, a.name AS area_name, st.product_id, COALESCE(p.name, 'Totale') AS product_name,
-      SUM(st.target_bottles) AS total_bottles
-    FROM sales_targets st
-    JOIN sales_target_areas a ON a.id = st.area_id
-    LEFT JOIN products p ON p.id = st.product_id AND st.product_id != 0
-    WHERE st.year = ?
-    GROUP BY st.area_id, st.product_id
-    ORDER BY a.sort_order, st.product_id
+function loadTargetYear(year) {
+  const y = db.prepare('SELECT * FROM sales_target_years WHERE year = ?').get(year);
+  if (!y) return null;
+  const areas = db.prepare(`
+    SELECT ya.*, a.name AS label, a.countries FROM sales_target_year_areas ya
+    JOIN sales_target_areas a ON a.id = ya.area_id
+    WHERE ya.year = ? ORDER BY ya.sort_order, a.name
   `).all(year);
-  res.json(rows);
+  // JOIN products: an obiettivo for a product deleted from the catalogue no longer counts.
+  const products = db.prepare('SELECT tp.* FROM sales_target_products tp JOIN products p ON p.id = tp.product_id WHERE tp.year = ?').all(year);
+  return {
+    year, updated_at: y.updated_at,
+    cantina: { bt: y.target_bottles, eur: y.target_eur },
+    areas: areas.map(a => ({
+      id: a.area_id, label: a.label, countries: JSON.parse(a.countries || '[]'),
+      sumMode: !!a.sum_mode, bt: a.target_bottles, eur: a.target_eur,
+      monthMode: a.month_mode, manualPct: JSON.parse(a.manual_pct || '[]'),
+      products: Object.fromEntries(products.filter(p => p.area_id === a.area_id)
+        .map(p => [p.product_id, { bt: p.target_bottles, eur: p.target_eur }])),
+    })),
+  };
+}
+
+function areaTargetTotal(a) {
+  if (!a.sumMode) return { bt: a.bt, eur: a.eur };
+  return Object.values(a.products).reduce((t, p) => ({ bt: t.bt + p.bt, eur: t.eur + p.eur }), { bt: 0, eur: 0 });
+}
+
+function saveTargetYear(year, data) {
+  const areaExists = db.prepare('SELECT 1 FROM sales_target_areas WHERE id = ?');
+  const productExists = db.prepare('SELECT 1 FROM products WHERE id = ?');
+  const insertArea = db.prepare(`
+    INSERT INTO sales_target_year_areas (year, area_id, sort_order, sum_mode, target_bottles, target_eur, month_mode, manual_pct)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertProduct = db.prepare('INSERT INTO sales_target_products (year, area_id, product_id, target_bottles, target_eur) VALUES (?, ?, ?, ?, ?)');
+  db.exec('BEGIN');
+  try {
+    db.prepare(`
+      INSERT INTO sales_target_years (year, target_bottles, target_eur, updated_at) VALUES (?, ?, ?, datetime('now','localtime'))
+      ON CONFLICT(year) DO UPDATE SET target_bottles = excluded.target_bottles, target_eur = excluded.target_eur, updated_at = excluded.updated_at
+    `).run(year, targetInt(data.cantina?.bt), targetInt(data.cantina?.eur));
+    db.prepare('DELETE FROM sales_target_products WHERE year = ?').run(year);
+    db.prepare('DELETE FROM sales_target_year_areas WHERE year = ?').run(year);
+    const seen = new Set();
+    (Array.isArray(data.areas) ? data.areas : []).forEach((a, i) => {
+      const areaId = parseInt(a.id);
+      if (!areaId || seen.has(areaId) || !areaExists.get(areaId)) return;
+      seen.add(areaId);
+      const mode = TARGET_MONTH_MODES.includes(a.monthMode) ? a.monthMode : 'stagionale';
+      const manual = Array.isArray(a.manualPct) && a.manualPct.length === 12
+        ? a.manualPct.map(v => Math.max(0, Math.round((Number(v) || 0) * 10) / 10)) : [];
+      insertArea.run(year, areaId, i, a.sumMode === false ? 0 : 1, targetInt(a.bt), targetInt(a.eur), mode, JSON.stringify(manual));
+      for (const [pid, t] of Object.entries(a.products || {})) {
+        const productId = parseInt(pid), bt = targetInt(t?.bt), eur = targetInt(t?.eur);
+        if (!productId || (!bt && !eur) || !productExists.get(productId)) continue;
+        insertProduct.run(year, areaId, productId, bt, eur);
+      }
+    });
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
+
+// Bottiglie vendute per mese in un anno, per paese — la base del profilo "stagionale".
+function monthlySalesByCountry(year) {
+  return db.prepare(`
+    SELECT CAST(strftime('%m', o.order_date) AS INTEGER) AS m, COALESCE(o.customer_country, '') AS country, SUM(oi.quantity) AS q
+    FROM order_items oi JOIN orders o ON o.id = oi.order_id
+    WHERE o.order_date >= ? AND o.order_date < ?
+    GROUP BY m, country
+  `).all(`${year}-01-01`, `${year + 1}-01-01`);
+}
+function salesProfile(rows, countries) {
+  const months = Array(12).fill(0);
+  for (const r of rows) if (r.m >= 1 && r.m <= 12 && (!countries || countries.includes(r.country))) months[r.m - 1] += r.q;
+  const total = months.reduce((a, b) => a + b, 0);
+  return total ? months.map(q => q / total * 100) : null;
+}
+
+function parseTargetYear(req, res) {
+  const year = parseInt(req.params.year);
+  if (!(year >= 2000 && year <= 2100)) { res.status(400).json({ error: 'Anno non valido.' }); return null; }
+  return year;
+}
+
+app.get('/api/admin/sales-targets/years', authAdmin, (req, res) => {
+  res.json(db.prepare('SELECT year FROM sales_target_years ORDER BY year').all().map(r => r.year));
 });
 
-app.post('/api/admin/sales-targets', authAdmin, (req, res) => {
-  const { year, area_id, product_id, months } = req.body || {};
-  if (!year || !area_id || !Array.isArray(months) || months.length !== 12) {
-    return res.status(400).json({ error: 'year, area_id e 12 valori mensili sono obbligatori.' });
+app.get('/api/admin/sales-targets/:year', authAdmin, (req, res) => {
+  const year = parseTargetYear(req, res);
+  if (!year) return;
+  const targets = loadTargetYear(year);
+  const prev = loadTargetYear(year - 1);
+  const areas = db.prepare('SELECT * FROM sales_target_areas ORDER BY sort_order, name').all()
+    .map(a => ({ id: a.id, name: a.name, countries: JSON.parse(a.countries || '[]'), active: !!a.active }));
+
+  // Catalogo: prodotti attivi + quelli che hanno già un obiettivo in questo anno o nel precedente.
+  const withTargets = new Set([targets, prev].filter(Boolean).flatMap(t => t.areas.flatMap(a => Object.keys(a.products).map(Number))));
+  const products = db.prepare('SELECT id, name, vintage, wine_type, active FROM products ORDER BY name, vintage').all()
+    .filter(p => p.active || withTargets.has(p.id))
+    .map(p => ({ id: p.id, label: p.name + (p.vintage ? ' ' + p.vintage : ''), wine_type: p.wine_type || null }));
+
+  // Profilo stagionale: vendite dell'ultimo anno concluso prima di quello degli obiettivi.
+  const profileYear = Math.min(year - 1, new Date().getFullYear() - 1);
+  const rows = monthlySalesByCountry(profileYear);
+  const cantinaPct = salesProfile(rows, null);
+  const cantina = cantinaPct ? { pct: cantinaPct, source: 'cantina' } : { pct: SEASONAL_STANDARD, source: 'standard' };
+  const byArea = {};
+  for (const a of areas) {
+    const pct = a.countries.length ? salesProfile(rows, a.countries) : null;
+    byArea[a.id] = pct ? { pct, source: 'area' } : cantina;
   }
-  const pid = product_id || 0;
-  const upsert = db.prepare(`
-    INSERT INTO sales_targets (year, area_id, product_id, month, target_bottles) VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(year, area_id, product_id, month) DO UPDATE SET target_bottles = excluded.target_bottles
-  `);
-  months.forEach((v, i) => upsert.run(year, area_id, pid, i + 1, v || 0));
+
+  res.json({
+    year, targets, prev, areas, products,
+    years: db.prepare('SELECT year FROM sales_target_years ORDER BY year').all().map(r => r.year),
+    seasonal: { year: profileYear, cantina, byArea },
+  });
+});
+
+app.put('/api/admin/sales-targets/:year', authAdmin, (req, res) => {
+  const year = parseTargetYear(req, res);
+  if (!year) return;
+  saveTargetYear(year, req.body || {});
   res.json({ success: true });
 });
 
-app.delete('/api/admin/sales-targets', authAdmin, (req, res) => {
-  const { year, area_id, product_id } = req.query;
-  if (!year || !area_id) return res.status(400).json({ error: 'year e area_id sono obbligatori.' });
-  const pid = product_id ? parseInt(product_id) : 0;
-  db.prepare('DELETE FROM sales_targets WHERE year = ? AND area_id = ? AND product_id = ?').run(year, area_id, pid);
+// Crea (o sovrascrive) un anno partendo da un altro: volumi × (1 + crescita), fatturato × (1 + crescita) × (1 + aumento prezzi).
+app.post('/api/admin/sales-targets/:year/copy', authAdmin, (req, res) => {
+  const year = parseTargetYear(req, res);
+  if (!year) return;
+  const { fromYear, volumePct, pricePct } = req.body || {};
+  const from = loadTargetYear(parseInt(fromYear));
+  if (!from) return res.status(404).json({ error: `Nessun obiettivo per il ${fromYear}.` });
+  if (from.year === year) return res.status(400).json({ error: 'Scegli un anno diverso da quello di partenza.' });
+  const k = 1 + (Number(volumePct) || 0) / 100, kp = k * (1 + (Number(pricePct) || 0) / 100);
+  const scale = t => ({ bt: Math.round(t.bt * k), eur: Math.round(t.eur * kp) });
+  saveTargetYear(year, {
+    cantina: scale(from.cantina),
+    areas: from.areas.map(a => ({
+      ...a, ...scale(a),
+      products: Object.fromEntries(Object.entries(a.products).map(([pid, t]) => [pid, scale(t)])),
+    })),
+  });
   res.json({ success: true });
 });
 
@@ -2998,6 +3149,8 @@ app.get('/api/admin/commercial/dashboard', authAdmin, (req, res) => {
   const yearStart = `${year}-01-01`;
   const yearEndExclusive = today;
   let totalRemaining = 0;
+  const yearTargets = loadTargetYear(year);
+  const targetByArea = new Map((yearTargets?.areas || []).map(a => [a.id, areaTargetTotal(a).bt]));
   const obiettivi = areas.map(a => {
     const countries = JSON.parse(a.countries || '[]');
     let consegnate = 0;
@@ -3008,7 +3161,7 @@ app.get('/api/admin/commercial/dashboard', authAdmin, (req, res) => {
         WHERE o.order_date >= ? AND o.order_date <= ? AND o.customer_country IN (${placeholders})
       `).get(yearStart, yearEndExclusive, ...countries).q;
     }
-    const target = db.prepare('SELECT COALESCE(SUM(target_bottles),0) AS t FROM sales_targets WHERE year = ? AND area_id = ? AND product_id = 0').get(year, a.id).t;
+    const target = targetByArea.get(a.id) || 0;
     if (target > consegnate) totalRemaining += (target - consegnate);
     return { area: a.name, consegnate, target, pct: target ? Math.round((consegnate / target) * 100) : 0 };
   });
@@ -3752,10 +3905,6 @@ app.get('/api/admin/crm/:entityType/:entityId/activity', authAdmin, (req, res) =
   res.json(all);
 });
 
-// Contatti (persone collegate all'anagrafica). Per customer/agent/importer, i "contatti"
-// sono ora Persone (people, ruolo "contatto") collegate tramite la FK dedicata — non la
-// vecchia tabella polimorfica contacts. Supplier resta sulla vecchia tabella: il modello
-// Persone non copre i fornitori per scelta esplicita.
 // Contatti di un'anagrafica = persone collegate tramite person_links. La stessa persona può essere
 // referente di più anagrafiche, con un ruolo diverso per ciascuna.
 app.get('/api/admin/crm/:entityType/:entityId/contacts', authAdmin, (req, res) => {
