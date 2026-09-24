@@ -1,5 +1,5 @@
-// Portale → People (Fase 1): dipendenti con responsabile e delegato, orario contrattuale, costo
-// orario (livello retributivo), squadre, sedi e festività. Il fascicolo completo arriva in Fase 2.
+// Portale → People: elenco dipendenti e dati organizzativi, orario contrattuale, costo orario
+// (livello retributivo), squadre, sedi e festività. Scheda/fascicolo in portal-people-file.js.
 const PPL_WEEKDAYS = { 1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Gio', 5: 'Ven', 6: 'Sab', 7: 'Dom' };
 const HR = { employees: [], sites: [], teams: [], year: new Date().getFullYear(), siteId: null };
 
@@ -12,7 +12,10 @@ async function hrLoadBasics() {
 // ── Dipendenti ─────────────────────────────────────────────────────────────────
 async function loadHrEmployees() {
   const root = document.getElementById('people-dipendenti-root');
+  REC.id = null;
+  const tok = HR.renderTok = (HR.renderTok || 0) + 1;
   await hrLoadBasics();
+  if (tok !== HR.renderTok) return; // nel frattempo si è aperta una scheda
   const q = (document.getElementById('hr-emp-search')?.value || '').toLowerCase();
   const shown = HR.employees.filter(e => !q || `${hrName(e)} ${e.job_title || ''}`.toLowerCase().includes(q));
   root.innerHTML = `<div class="list-card">
@@ -66,75 +69,29 @@ async function openHrEmployeeModal(id) {
       const body = {};
       for (const k of ['first_name', 'last_name', 'job_title', 'work_email', 'work_phone', 'site_id', 'cost_center_id', 'manager_id', 'delegate_id', 'portal_user_id', 'active']) body[k] = UI.val(b, k);
       const res = await api('/api/admin/hr/employees' + (e ? `/${e.id}` : ''), { method: e ? 'PATCH' : 'POST', body: JSON.stringify(body) });
-      await loadHrEmployees();
-      openHrEmployeeDetail(e ? e.id : res.id);
+      await hrLoadBasics();
+      openHrRecord(e ? e.id : res.id);
     },
   });
 }
 
-async function openHrEmployeeDetail(id) {
-  const e = await api(`/api/admin/hr/employees/${id}`);
-  const s = e.schedule;
-  const costs = e.hourly_costs || [];
-  const today = new Date().toISOString().slice(0, 10);
-  UI.modal({
-    id: 'hr-detail-modal', title: hrName(e), width: 720,
-    extraButtons: `<button class="btn secondary" type="button" onclick="document.getElementById('hr-detail-modal').remove(); openHrEmployeeModal(${e.id})">Modifica dati</button>`,
-    body: `
-      <div class="mod-section-title">Organizzazione</div>
-      <dl class="mod-kv">
-        <dt>Ruolo</dt><dd>${esc(e.job_title || '—')}</dd>
-        <dt>Sede</dt><dd>${esc(e.site_name || '—')}</dd>
-        <dt>Centro di costo</dt><dd>${e.cost_center_code ? `${esc(e.cost_center_code)} ${esc(e.cost_center_name)}` : '—'}</dd>
-        <dt>Contatti aziendali</dt><dd>${esc([e.work_email, e.work_phone].filter(Boolean).join(' · ') || '—')}</dd>
-        <dt>Accesso al portale</dt><dd>${e.portal_username ? '@' + esc(e.portal_username) : 'No'}</dd>
-        <dt>Stato</dt><dd>${e.active ? 'Attivo' : 'Non attivo'}</dd>
-      </dl>
-      <div class="mod-section-title">Chi approva le sue richieste</div>
-      <dl class="mod-kv">
-        <dt>Responsabile</dt><dd>${e.approval.approver ? esc(e.approval.approver.name) : '<span style="color:var(--bad)">Nessuno</span>'}${e.approval.escalated ? ' <span class="badge yellow">salito di livello: il responsabile diretto non è attivo</span>' : ''}</dd>
-        <dt>Delegato</dt><dd>${e.approval.delegate ? esc(e.approval.delegate.name) : '—'}</dd>
-        <dt>Collaboratori</dt><dd>${e.reports.length ? e.reports.map(r => esc(r.name)).join(', ') : '—'}</dd>
-        <dt>Squadre</dt><dd>${e.teams.length ? e.teams.map(t => `${esc(t.name)}${t.is_leader ? ' (caposquadra)' : ''}`).join(', ') : '—'}</dd>
-      </dl>
-      ${e.can_see_schedule ? `
-        <div class="mod-section-title">Orario contrattuale (ore per giorno)</div>
-        <div class="mod-week" id="hr-week">${Object.entries(PPL_WEEKDAYS).map(([d, l]) => `<div class="field" style="margin:0"><label>${l}</label><input inputmode="decimal" data-day="${d}" value="${s ? UI.decimal((s.days[d] || 0) / 60) : ''}" placeholder="0"></div>`).join('')}</div>
-        <div class="field-row" style="margin-top:10px;align-items:end">
-          <div class="field" style="margin:0"><label>In vigore dal</label><input type="date" id="hr-week-from" value="${today}"></div>
-          <div><button class="btn secondary small" type="button" onclick="saveHrSchedule(${e.id})">Salva orario</button></div>
-        </div>
-        <p class="mod-note">${s ? `Orario attuale dal ${UI.date(s.valid_from)}: ${UI.decimal(s.weekly_minutes / 60)} ore a settimana.` : 'Nessun orario impostato.'} Un nuovo orario vale dalla data indicata; lo storico resta.</p>
-        <div id="hr-week-msg"></div>` : ''}
-      ${e.can_see_costs ? `
-        <div class="mod-section-title">Costo orario standard <span class="badge grey">riservato</span></div>
-        ${costs.length ? `<div class="mod-table-wrap"><table class="mod-table" style="min-width:0"><thead><tr><th>Dal</th><th>Al</th><th class="num">€ / ora</th><th></th></tr></thead><tbody>
-          ${costs.map(c => `<tr><td>${UI.date(c.valid_from)}</td><td>${c.valid_to ? UI.date(c.valid_to) : 'in vigore'}</td><td class="num">€ ${UI.decimal(c.cost_per_hour)}</td>
-            <td><button class="btn-outline-pill danger" type="button" title="Elimina" onclick="deleteHrCost(${c.id}, ${e.id})">${UI.icon.trash}</button></td></tr>`).join('')}
-        </tbody></table></div>` : '<p class="mod-note">Nessun costo orario: in Finance le sue ore andranno in anomalia finché non lo inserisci.</p>'}
-        <div class="field-row" style="margin-top:10px;align-items:end">
-          <div class="field" style="margin:0"><label>Dal</label><input type="date" id="hr-cost-from" value="${today}"></div>
-          <div class="field" style="margin:0"><label>€ / ora (fino a 4 decimali)</label><input id="hr-cost-value" inputmode="decimal" placeholder="es. 23,4567"></div>
-          <div><button class="btn secondary small" type="button" onclick="addHrCost(${e.id})">Aggiungi</button></div>
-        </div>
-        <div id="hr-cost-msg"></div>` : ''}`,
-  });
-}
+// La scheda completa (fascicolo) è in portal-people-file.js.
+const openHrEmployeeDetail = id => openHrRecord(id);
 async function saveHrSchedule(id) {
   const days = Object.fromEntries([...document.querySelectorAll('#hr-week [data-day]')].map(i => [i.dataset.day, i.value.trim() || '0']));
   try {
     await api(`/api/admin/hr/employees/${id}/schedule`, { method: 'PUT', body: JSON.stringify({ valid_from: document.getElementById('hr-week-from').value, days }) });
-    openHrEmployeeDetail(id);
+    openHrRecord(id, 'organizzazione');
   } catch (err) { UI.msg(document.getElementById('hr-week-msg'), err.message); }
 }
 async function addHrCost(id) {
   try {
-    await api(`/api/admin/hr/employees/${id}/hourly-costs`, { method: 'POST', body: JSON.stringify({ valid_from: document.getElementById('hr-cost-from').value, cost_per_hour: document.getElementById('hr-cost-value').value }) });
-    openHrEmployeeDetail(id);
+    await api(`/api/admin/hr/employees/${id}/hourly-costs`, { method: 'POST', body: JSON.stringify({ valid_from: document.getElementById('hr-cost-from').value, cost_per_hour: UI.num(document.getElementById('hr-cost-value').value) }) });
+    openHrRecord(id, 'organizzazione');
   } catch (err) { UI.msg(document.getElementById('hr-cost-msg'), err.message); }
 }
 function deleteHrCost(costId, employeeId) {
-  UI.confirmDo('Eliminare questo costo orario?', () => api(`/api/admin/hr/hourly-costs/${costId}`, { method: 'DELETE' }), () => openHrEmployeeDetail(employeeId));
+  UI.confirmDo('Eliminare questo costo orario?', () => api(`/api/admin/hr/hourly-costs/${costId}`, { method: 'DELETE' }), () => openHrRecord(employeeId, 'organizzazione'));
 }
 
 // ── Squadre ────────────────────────────────────────────────────────────────────
@@ -188,7 +145,7 @@ function deleteHrTeam(id) {
 // ── Sedi e festività ───────────────────────────────────────────────────────────
 const HR_HOLIDAY_KIND = { nazionale: 'Nazionale', sede: 'Della sede', patrono: 'Patrono', mobile: 'Calcolata' };
 async function loadHrSites() {
-  const root = document.getElementById('people-sedi-root');
+  const root = document.getElementById('hr-sites-box') || document.getElementById('people-sedi-root');
   HR.sites = await api('/api/admin/hr/sites');
   HR.siteId = HR.siteId || HR.sites[0]?.id || null;
   const data = await api(`/api/admin/hr/holidays?year=${HR.year}${HR.siteId ? `&site_id=${HR.siteId}` : ''}`);

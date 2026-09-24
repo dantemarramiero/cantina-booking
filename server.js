@@ -13,6 +13,7 @@ const { createScheduler } = require('./lib/scheduler');
 const { createSessions, createSigner, createLoginThrottle, canAccess, safeEqual, ACCESS_LEVELS } = require('./lib/security');
 const { createAudit } = require('./lib/audit');
 const { createNotifications } = require('./lib/notifications');
+const { createSecureStore, resolveKey } = require('./lib/secure-files');
 
 const app   = express();
 const PORT  = process.env.PORT || 3000;
@@ -5091,6 +5092,10 @@ app.delete('/api/admin/warehouse/raw/:id', authAdmin, (req, res) => {
 // ── Moduli People e Finance (Fase 1) ──────────────────────────────────────────
 const finance = require('./modules/finance')(app, { db, authAdmin, audit, events });
 const hr = require('./modules/hr')(app, { db, authAdmin, audit, hasAccessLevel, finance });
+// Archivio cifrato dei documenti HR sul volume persistente (chiave in HR_FILES_KEY).
+const hrFilesKey = resolveKey({ dataDir: DATA_DIR });
+const secureStore = createSecureStore({ dir: path.join(DATA_DIR, 'hr-files'), key: hrFilesKey.key });
+const hrFile = require('./modules/hr-file')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, signer, secureStore, getSetting, setSetting, hr, finance });
 
 // Avvio: solo quando il file è eseguito direttamente (node server.js). I test lo importano e
 // avviano l'app su una porta a caso, senza scheduler.
@@ -5100,9 +5105,11 @@ if (require.main === module) {
     console.log(`   Portale interno  →  http://localhost:${PORT}/portal.html`);
     console.log(`   Stripe           →  ${stripe ? '✓ configurato' : '✗ non configurato (modalità richiesta di prenotazione)'}`);
     const emailProvider = gmailTransporter ? `✓ Gmail (${process.env.GMAIL_USER})` : resend ? '✓ Resend' : '✗ Nessun provider email';
-    console.log(`   Email            →  ${emailProvider}\n`);
+    console.log(`   Email            →  ${emailProvider}`);
+    const hrFilesState = { env: '✓ archivio cifrato', dev: '✓ archivio cifrato (chiave di sviluppo locale)', missing: '✗ manca HR_FILES_KEY: caricamento documenti disattivato' };
+    console.log(`   Documenti HR     →  ${hrFilesState[hrFilesKey.source]}\n`);
   });
   scheduler.start();
 }
 
-module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr };
+module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, secureStore };

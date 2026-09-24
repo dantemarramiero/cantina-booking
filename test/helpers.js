@@ -12,6 +12,7 @@ async function startApp() {
   process.env.RAILWAY_VOLUME_MOUNT_PATH = dir;
   process.env.ADMIN_PASSWORD = MASTER_KEY;
   process.env.MIGRATION_BACKUPS = 'off';
+  process.env.HR_FILES_KEY = require('crypto').randomBytes(32).toString('hex');
   delete process.env.STRIPE_SECRET_KEY;
   delete process.env.GMAIL_USER;
   delete process.env.RESEND_API_KEY;

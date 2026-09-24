@@ -62,3 +62,40 @@
   .mod-week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .mod-kv { grid-template-columns: 1fr; }
 }
+
+/* Campanella delle notifiche */
+.bell-wrap { position: relative; margin-left: auto; margin-right: 10px; }
+.bell-btn { position: relative; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 50%; background: #fff; color: var(--ink); cursor: pointer; }
+.bell-btn svg { width: 17px; height: 17px; }
+.bell-btn:hover { background: var(--cream); }
+.bell-count { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 10.5px; font-weight: 700; line-height: 18px; text-align: center; }
+.bell-panel { display: none; position: absolute; top: calc(100% + 8px); right: 0; z-index: 250; width: 360px; max-width: calc(100vw - 24px); max-height: 460px; overflow-y: auto; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 2px 6px rgba(56,17,18,.08), 0 16px 32px -18px rgba(56,17,18,.28); }
+.bell-panel.open { display: block; }
+.bell-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 13.5px; color: var(--ink); }
+.bell-head button { border: none; background: none; color: var(--wine); font-size: 12px; cursor: pointer; }
+.bell-item { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 11px 14px; border: none; border-bottom: 1px solid var(--line); background: #fff; text-align: left; cursor: pointer; font-family: var(--sans); }
+.bell-item:hover { background: var(--cream); }
+.bell-item.unread { background: var(--gold-light); }
+.bell-item.unread .bell-title { font-weight: 700; }
+.bell-title { font-size: 13px; color: var(--ink); }
+.bell-body { font-size: 12px; color: var(--ink-soft); }
+.bell-time { font-size: 11px; color: var(--ink-faint); }
+.bell-empty { padding: 24px; text-align: center; font-size: 13px; color: var(--ink-soft); }
+
+/* Scheda del dipendente (fascicolo) */
+.rec-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+.rec-avatar { width: 46px; height: 46px; border-radius: 50%; background: var(--gold-light); color: var(--wine); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0; }
+.rec-name { font: 400 22px/1.2 var(--display); color: var(--ink); }
+.rec-sub { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+.rec-tabs { display: flex; gap: 22px; padding: 0 22px; box-shadow: inset 0 -1px 0 var(--line); overflow-x: auto; scrollbar-width: none; }
+.rec-tabs::-webkit-scrollbar { display: none; }
+.rec-tabs button { padding: 13px 0 11px; border: none; border-bottom: 2px solid transparent; background: none; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; cursor: pointer; }
+.rec-tabs button.active { color: var(--ink); border-bottom-color: var(--wine); }
+.rec-locked { padding: 26px 22px; font-size: 13px; color: var(--ink-soft); }
+.dl-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.dl-item:last-child { border-bottom: none; }
+.dl-days { min-width: 92px; font-size: 12px; font-weight: 700; }
+.dl-days.scaduto { color: var(--bad); }
+.dl-days.soon { color: var(--warn); }
+.dl-days.later { color: var(--ink-soft); }
+@media (max-width: 640px) { .bell-wrap { margin-right: 6px; } .bell-btn { width: 34px; height: 34px; } }

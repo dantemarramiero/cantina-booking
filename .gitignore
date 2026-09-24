@@ -7,3 +7,5 @@ catalogs/*
 !catalogs/.gitkeep
 uploads/
 backups/
+.hr-files-dev-key
+hr-files/

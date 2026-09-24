@@ -969,13 +969,17 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"/></svg>
         Dipendenti
       </button>
+      <button data-sub="people-scadenze">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/></svg>
+        Scadenze
+      </button>
       <button data-sub="people-squadre">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
         Squadre
       </button>
       <button data-sub="people-sedi">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
-        Sedi e festività
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="6" r="2" fill="#fff"/><circle cx="15" cy="12" r="2" fill="#fff"/><circle cx="7" cy="18" r="2" fill="#fff"/></svg>
+        Configurazione
       </button>
     </nav>
 
@@ -1030,6 +1034,13 @@
   <div class="main-area">
     <header class="topbar">
       <div class="crumb"><small>Marramiero</small><span id="topbar-title">Commerciale</span></div>
+      <div class="bell-wrap">
+        <button type="button" id="bell-btn" class="bell-btn" onclick="toggleBell(event)" aria-label="Notifiche">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span id="bell-count" class="bell-count" style="display:none"></span>
+        </button>
+        <div id="bell-panel" class="bell-panel"></div>
+      </div>
       <button type="button" class="mobile-settings-btn" onclick="openSettings()" aria-label="Impostazioni">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3h-6l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4L4.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1L9 21h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4Z"/></svg>
       </button>
@@ -1385,6 +1396,7 @@
     <!-- ═══ PEOPLE ═══ -->
     <div class="module" id="module-people">
       <div class="subpanel active" id="sub-people-dipendenti"><div id="people-dipendenti-root"></div></div>
+      <div class="subpanel" id="sub-people-scadenze"><div id="people-scadenze-root"></div></div>
       <div class="subpanel" id="sub-people-squadre"><div id="people-squadre-root"></div></div>
       <div class="subpanel" id="sub-people-sedi"><div id="people-sedi-root"></div></div>
     </div>
@@ -2933,6 +2945,7 @@
 <script src="/js/portal-ui.js"></script>
 <script src="/js/portal-finance.js"></script>
 <script src="/js/portal-people.js"></script>
+<script src="/js/portal-people-file.js"></script>
 <script>
 let ADMIN_KEY = null;
 let PRODUCTS = [];
@@ -3189,7 +3202,8 @@ function loadSubpanel(sub) {
   if (sub === 'crm-dashboard') loadCrmDashboard();
   if (sub === 'people-dipendenti') loadHrEmployees();
   if (sub === 'people-squadre') loadHrTeams();
-  if (sub === 'people-sedi') loadHrSites();
+  if (sub === 'people-scadenze') loadHrDeadlines();
+  if (sub === 'people-sedi') loadHrConfig();
   if (sub === 'fin-centri') loadFinCenters();
   if (sub === 'fin-regole') loadFinRules();
   if (sub === 'fin-driver') loadFinDrivers();
@@ -6873,6 +6887,7 @@ async function boot() {
   const me = await api('/api/admin/me');
   PERMITTED_WORKSPACES = me.permittedWorkspaces;
   applyPermissions();
+  initBell();
   if (me.name) {
     document.getElementById('sidebar-user').style.display = 'flex';
     document.getElementById('sidebar-user-avatar').textContent = me.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -6885,6 +6900,7 @@ async function boot() {
   }
   if (ws && ws !== 'commerciale' && WORKSPACE_LABELS[ws]) {
     switchWorkspace(ws);
+    if (ws === 'people' && params.get('employee')) openHrRecord(parseInt(params.get('employee')), params.get('tab') || undefined);
   } else {
     renderMobileSectionTabs('commerciale');
     await loadDashboard();

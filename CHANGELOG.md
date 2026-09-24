@@ -94,6 +94,23 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
   - sedi con santo patrono e calendario delle festività.
 - Matrice ruoli: nuovi workspace e livelli di riservatezza per i dati HR.
 
+**People — Fase 2, blocco 2A: fascicolo del dipendente** (vedi `docs/people-finance/03-fase-2.md`)
+- Scheda del dipendente a pagina intera, con queste sezioni:
+  - organizzazione;
+  - dati personali e contatti di emergenza;
+  - documenti d'identità e permessi di soggiorno;
+  - contratto a versioni;
+  - retribuzione, con la proposta del costo orario;
+  - competenze e lingue;
+  - documenti;
+  - scadenze.
+- Documenti HR cifrati sul volume:
+  - riservatezza per tipo di documento;
+  - link che scadono;
+  - registro degli accessi ai documenti sanitari.
+- Scadenzario HR con notifiche automatiche alle soglie di preavviso. Campanella delle notifiche nella barra in alto.
+- People → Configurazione: sedi, festività, mansioni, soglie di preavviso, oneri.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

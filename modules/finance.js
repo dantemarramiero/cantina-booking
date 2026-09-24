@@ -10,9 +10,7 @@ const OBJECT_TYPES = ['annata', 'lotto', 'sku', 'operazione', 'esperienza', 'fie
 const NATURES = ['personale', 'materie', 'servizi', 'utenze', 'ammortamenti', 'altro'];
 const BASE = '/api/admin/finance';
 
-class HttpError extends Error {
-  constructor(status, message, extra = {}) { super(message); this.status = status; this.extra = extra; }
-}
+const { HttpError } = require('../lib/http');
 const now = () => new Date().toISOString();
 const intOrNull = v => (v === '' || v == null ? null : parseInt(v));
 
