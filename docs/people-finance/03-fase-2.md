@@ -7,7 +7,7 @@ Stato: **in corso, in locale** (non ancora in produzione). La fase è divisa in 
 | 2A | Fascicolo: dati personali, rapporto di lavoro, retribuzione, competenze, documenti cifrati, scadenzario con notifiche | completato |
 | 2B | Sicurezza (D.Lgs. 81/08): formazione, requisiti per mansione, idoneità sanitaria, DPI, infortuni, deroghe | completato |
 | 2C | Assenze: richieste e approvazioni, contatori, periodi bloccati, disponibilità per l'Enoturismo | completato |
-| 2D | Presenze: ore per squadra, proposte da prenotazioni e fiere, stati del mese, rettifiche, export, controlli bloccanti | da fare |
+| 2D | Presenze: ore per squadra, proposte da prenotazioni e fiere, stati del mese, rettifiche, export, controlli bloccanti | completato |
 | 2E | Self-service, onboarding e offboarding, dotazioni, richieste di modifica, cedolini in blocco, modello dati del recruiting | da fare |
 
 Valutazione e disciplinare sono rimandati, come concordato.
@@ -429,3 +429,150 @@ Esito: **90 test, 90 superati** (14 nuovi del blocco 2C).
 - **Visita di rientro solo per le mansioni con sorveglianza sanitaria**, come la visita per cambio mansione.
 - **L'infortunio parte dal giorno dopo l'evento.** Il giorno dell'infortunio si considera lavorato.
 - **Approvazione e comunicazione aggiornano subito il contatore**, perché è calcolato. Non c'è un saldo da tenere allineato.
+
+---
+
+## 2D — Presenze
+
+### Cosa c'è
+
+**People → Presenze.** Il riepilogo del mese mostra, per ogni persona visibile:
+- stato del mese;
+- ore lavorate, assenze e orario;
+- giorni scoperti;
+- conflitti;
+- proposte in attesa.
+
+Chi vede solo sé stesso va direttamente al proprio foglio.
+
+**Foglio presenze del mese**, giorno per giorno. Ogni giorno mostra:
+- l'orario contrattuale (festività della sede escluse);
+- le ore registrate con centro, oggetto di costo, tipo d'ora e origine;
+- le assenze;
+- la differenza con l'orario.
+
+Inoltre il foglio ha:
+- i totali per tipo d'ora, per assenza e per centro, e le giornate lavorate;
+- i conflitti da risolvere;
+- le proposte da confermare;
+- lo storico delle rettifiche.
+
+**Righe di ore.**
+- **Tempo:** un blocco inizio-fine nello stesso giorno, a passi configurabili di 15, 30 o 60 minuti (predefinito 60). Tipo d'ora: ordinaria, straordinaria, notturna o festiva.
+- **Imputazione:** su un centro di costo foglia e attivo (per il vigneto, la particella) e facoltativamente su un oggetto di costo (operazione, lotto…). Si può anche ripartire lo stesso blocco su più centri.
+- **Sovrapposizioni:** niente sovrapposizioni con altre ore. Se il giorno è coperto da un'assenza, le ore sono rifiutate.
+- **Avviso:** oltre l'orario con ore ordinarie.
+
+**Controlli bloccanti su ogni riga.** Riusano il controllo di assegnabilità del blocco 2B. Bloccano:
+- permesso di soggiorno o contratto scaduti;
+- non idoneità;
+- abilitazione richiesta dall'operazione mancante o scaduta. Con una deroga la riga passa con un avviso.
+
+Le limitazioni incompatibili passano con un avviso, e il responsabile riceve una notifica.
+
+**Ore di squadra.**
+- Il caposquadra registra ore, particella e operazione per chi c'era, in una sola azione.
+- È tutto o niente: se qualcuno è bloccato non si registra nulla, e il messaggio dice chi e perché.
+
+**Righe proposte, mai inserite da sole.**
+- **Dalle prenotazioni confermate** assegnate all'operatore collegato alla persona:
+  - centro «Enoturismo — visite» (o «eventi» per gli eventi);
+  - oggetto = l'esperienza, se esiste l'oggetto di costo.
+- **Dalle fiere di cui la persona è responsabile**, una proposta per ogni giorno:
+  - centro «Fiere»;
+  - oggetto = la fiera.
+
+Si confermano o si scartano, una volta per giorno. Le operazioni di Produzione arriveranno quando quel modulo le registrerà per persona.
+
+**Stati del mese** (per dipendente): aperto → inviato → approvato.
+- **Invio:** il dipendente o il responsabile invia al responsabile (un livello più su se invia il responsabile stesso).
+- **Decisione:** chi approva può rimandare indietro con una nota, oppure approvare. Non si approva il proprio mese, e servono i conflitti risolti.
+- **Dopo l'approvazione** il mese è chiuso: le correzioni si fanno con una **rettifica**, che:
+  - ha un motivo obbligatorio;
+  - annulla righe (restano visibili, barrate) e ne aggiunge con origine «rettifica»;
+  - può annullare un'assenza del mese chiuso.
+
+**Assenze → presenze, nella stessa transazione.**
+- Quando un'assenza diventa valida (approvata, o comunicata come la malattia), si generano le righe dei giorni lavorativi.
+- Se in quei giorni c'erano già ore, le ore restano e si crea un **conflitto**, con notifica al responsabile.
+- Se l'assenza è annullata, le righe si tolgono.
+- Se il mese è approvato, approvazione e annullamento sono bloccati e serve una rettifica.
+
+**Finance.** Quando un mese è approvato o rettificato, le ore approvate per centro diventano i valori del driver «Ore lavorate» di quel mese. Se la cascata del mese è già confermata, i valori non cambiano e Finance riceve un avviso.
+
+**Export per il consulente del lavoro.** CSV con separatore «;» e virgola decimale, da aprire in Excel, con una riga per persona e giorno:
+- colonne configurabili: codice fiscale, nome, tipo di contratto, giornata lavorata (per le giornate degli OTD), ore per tipo, assenza e ore di assenza, centri;
+- solo i mesi approvati;
+- serve il livello *personale*, perché contiene il codice fiscale.
+
+**Scheda del dipendente → Presenze.** Riepilogo degli ultimi tre mesi: stato, ore ordinarie e straordinarie, assenze, giornate.
+
+**Configurazione → Presenze.** Passo degli orari, centri per le proposte (visite, eventi, fiere) e colonne dell'export.
+
+### Migrazioni
+
+| Versione | Cosa |
+|---|---|
+| `0012_timesheet` | Tabelle:<br>• `timesheet_months`<br>• `timesheet_adjustments`<br>• `timesheet_entries` (con origine, collegamento all'assenza, squadra, prenotazione o fiera di provenienza, rettifica)<br>• `timesheet_allocations`<br>• `timesheet_conflicts`<br>• `timesheet_proposal_decisions` |
+
+Ha il `down`.
+
+### Eventi di dominio
+
+| Evento | Emittente | Consumer | Effetto |
+|---|---|---|---|
+| `timesheet.month_approved` | Approvazione del mese | `finance.ore-lavorate` | Ricalcola i valori del driver «Ore lavorate» del mese dalle ore approvate per centro. Se la cascata è confermata, non scrive e avvisa Finance |
+| `timesheet.adjusted` | Rettifica | `finance.ore-lavorate-adjusted` | come sopra |
+| `absence.cancelled` | Rettifica che annulla un'assenza | *nessuno per ora* | payload: assenza, dipendente, date, rettifica |
+
+Ganci del blocco 2C: i consumer delle presenze generano e tolgono le righe di assenza **dentro** la transazione di approvazione, comunicazione o annullamento.
+
+### Logica di business (QUANDO/ALLORA) e test
+
+Tutti i test di questa sezione sono nel file `hr-timesheet`.
+
+| Regola | Test |
+|---|---|
+| QUANDO si registrano ore ALLORA orari a passi della granularità, niente turni oltre la mezzanotte, niente sovrapposizioni. La ripartizione deve fare la durata del blocco | righe |
+| QUANDO si imputano ore a un centro non foglia o disattivo ALLORA rifiuto | righe |
+| QUANDO un'assenza è approvata ALLORA si generano le righe dei giorni lavorativi (orario e festività della sede), si aggiorna il contatore e si notifica, in un'unica transazione | assenza approvata |
+| QUANDO le righe generate si sovrappongono a ore esistenti ALLORA l'approvazione procede, le righe manuali restano e si crea una segnalazione di conflitto | assenza approvata |
+| QUANDO si registrano ore su un giorno di assenza ALLORA rifiuto | assenza approvata |
+| QUANDO la generazione delle righe fallisce (mese chiuso) ALLORA l'approvazione non avviene | se l'inserimento fallisce |
+| QUANDO un'assenza approvata è annullata ALLORA si rimuovono le righe generate e si ripristina il contatore | assenza approvata |
+| QUANDO il mese è chiuso ALLORA l'annullamento è bloccato e si fa con una rettifica | mese chiuso |
+| QUANDO è comunicata una malattia con protocollo ALLORA entra subito nelle presenze | malattia |
+| QUANDO il mese è approvato ALLORA si chiude ed emette `timesheet.month_approved`. Il driver «Ore lavorate» di Finance riceve le ore per centro | mese |
+| QUANDO il mese è chiuso ALLORA le righe si correggono solo con una rettifica tracciata, che aggiorna Finance | mese |
+| QUANDO la cascata del mese è confermata ALLORA Finance non cambia e riceve un avviso | mese |
+| QUANDO ci sono conflitti tra ore e assenze ALLORA il mese non si approva finché non sono risolti | conflitti |
+| QUANDO si imputano ore a un'operazione che richiede un'abilitazione e il dipendente non ce l'ha ALLORA blocco con messaggio chiaro. Con la deroga del responsabile sicurezza passa con avviso | controlli bloccanti |
+| QUANDO un permesso di soggiorno è scaduto ALLORA segnalazione bloccante sull'inserimento ore | controlli bloccanti |
+| QUANDO il giudizio è «non idoneo» ALLORA le ore sono bloccate | controlli bloccanti |
+| QUANDO ci sono limitazioni incompatibili ALLORA avviso e notifica al responsabile | controlli bloccanti |
+| QUANDO si assegna una squadra a un'operazione che richiede un'abilitazione e qualcuno non ce l'ha ALLORA blocco con l'elenco di chi, e nessuna ora registrata | squadra |
+| QUANDO la squadra non è la sua ALLORA 403 | squadra |
+| QUANDO una prenotazione confermata è assegnata all'operatore, o la persona è responsabile di una fiera, ALLORA si propone una riga. Mai inserita da sola: si conferma o si scarta | proposte |
+| QUANDO si cerca il responsabile di una fiera ALLORA l'abbinamento per nome è unico, senza badare a ordine, maiuscole e accenti. Con gli omonimi nessun abbinamento | proposte |
+| QUANDO si esporta ALLORA solo i mesi approvati, giornate lavorate, virgola decimale. Serve il livello *personale*; il download passa da link firmato | export |
+| QUANDO un dipendente ha presenze ALLORA non si elimina | non si elimina |
+| QUANDO si elimina un centro con ore imputate ALLORA rifiuto: il centro è in uso | non si elimina |
+
+Esito: **102 test, 102 superati** (12 nuovi del blocco 2D).
+
+### Punti toccati nei moduli esistenti
+
+- **Finance:**
+  - un centro con ore imputate risulta «usato», quindi non si elimina e non diventa un aggregato;
+  - nuova funzione per scrivere i valori calcolati di un driver, che rispetta il blocco della cascata confermata.
+- **Enoturismo e Commerciale:** nessun cambiamento. Prenotazioni e fiere sono solo lette per le proposte.
+- **Permessi:** le API delle presenze sono aperte a chi ha fatto l'accesso. Ognuno registra le proprie ore, il caposquadra quelle della squadra, e i controlli li fa il modulo.
+
+### Decisioni prese in autonomia
+
+- **Responsabile delle fiere per nome.** Nelle fiere il responsabile è un testo libero, e la regola vieta nuovi collegamenti per stringa. La lettura è quindi isolata in una funzione testata, che abbina solo un nome unico. In futuro conviene un collegamento vero al dipendente nel modulo Fiere.
+- **Durata delle proposte.** Visite e eventi durano quanto l'esperienza, arrotondata al passo. Le fiere durano l'orario del giorno, 8 ore se non c'è orario, dalle 9.
+- **Tutto o niente per le squadre.** Registrare le ore solo per una parte della squadra, in silenzio, sarebbe peggio di un rifiuto chiaro.
+- **Righe di assenza senza centro di costo.** Il driver «Ore lavorate» conta solo le ore lavorate.
+- **Le assenze approvate prima di questo blocco non hanno righe.** In produzione non ce ne sono: il blocco 2C non è ancora stato pubblicato.
+- **Un mese «inviato»** lo corregge solo chi lo approva. Un mese «approvato» non si riapre: solo rettifiche.

@@ -148,6 +148,22 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
   - conflitti segnalati.
 - Fix: nell'admin dell'Enoturismo gli errori di assegnazione dell'operatore ora compaiono; prima fallivano in silenzio.
 
+**People — Fase 2, blocco 2D: presenze**
+- Pagina People → Presenze:
+  - riepilogo del mese per persona;
+  - foglio presenze giorno per giorno: ore, assenze, differenza con l'orario, totali per tipo d'ora e per centro.
+- Righe di ore:
+  - a passi configurabili;
+  - ripartizione su più centri (particelle) e oggetti di costo;
+  - niente sovrapposizioni.
+- Controlli bloccanti:
+  - permesso o contratto scaduto, non idoneità, abilitazione mancante per l'operazione (con deroga: avviso);
+  - limitazioni: avviso al responsabile.
+- Ore di squadra dal caposquadra (tutto o niente). Righe proposte da prenotazioni assegnate e fiere, da confermare.
+- Mese inviato → approvato; dopo, solo rettifiche tracciate con motivo.
+- Le assenze valide generano le righe nella stessa transazione, con conflitti segnalati se c'erano già ore.
+- Export CSV per il consulente del lavoro. Le ore approvate alimentano il driver «Ore lavorate» di Finance.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

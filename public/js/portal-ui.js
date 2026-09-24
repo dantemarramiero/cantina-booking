@@ -76,6 +76,13 @@ const UI = {
     if (el.type === 'checkbox') return el.checked;
     return el.value.trim();
   },
+  // Scarica un export attraverso un link firmato (le API di download non accettano la sessione in chiaro).
+  async download(path) {
+    try {
+      const { url } = await api('/api/admin/signed-url?path=' + encodeURIComponent(path));
+      window.location.href = url;
+    } catch (e) { alert(e.message); }
+  },
   async confirmDo(question, fn, onDone) {
     if (!confirm(question)) return;
     try { await fn(); if (onDone) await onDone(); } catch (e) { alert(e.message); }

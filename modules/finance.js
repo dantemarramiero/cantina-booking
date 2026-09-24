@@ -65,7 +65,8 @@ module.exports = function registerFinance(app, { db, authAdmin, audit, events })
       + c('SELECT COUNT(*) AS c FROM allocation_rules WHERE source_center_id = ? OR source_center_id = ?')
       + c('SELECT COUNT(*) AS c FROM allocation_rule_targets WHERE target_center_id = ? OR target_center_id = ?')
       + c('SELECT COUNT(*) AS c FROM allocation_entries WHERE source_center_id = ? OR target_center_id = ?')
-      + c('SELECT COUNT(*) AS c FROM employees WHERE cost_center_id = ? OR cost_center_id = ?');
+      + c('SELECT COUNT(*) AS c FROM employees WHERE cost_center_id = ? OR cost_center_id = ?')
+      + c('SELECT COUNT(*) AS c FROM timesheet_allocations WHERE cost_center_id = ? OR cost_center_id = ?');
   }
   // Un centro può ricevere costi (diretti, ore, quote) se è una foglia attiva, valida alla data.
   function assertImputable(id, date = null) {
@@ -545,7 +546,22 @@ module.exports = function registerFinance(app, { db, authAdmin, audit, events })
     return { success: true, run_id: runId, previous_run_id: previous, totals: result.totals };
   });
 
-  return { loadCenters, assertImputable };
+  // Valori di un driver calcolati da un altro modulo (es. ore lavorate dalle presenze approvate):
+  // sostituiscono quelli del periodo, salvo che la cascata del periodo sia confermata.
+  // values: [{ centerId, quantityMilli }]. Restituisce { locked } se non si può scrivere.
+  function setComputedDriverValues(code, period, values, source) {
+    const driver = db.prepare('SELECT * FROM allocation_drivers WHERE code = ?').get(code);
+    if (!driver) return { missing: true };
+    if (confirmedRun(period)) return { locked: true };
+    events.transaction(() => {
+      db.prepare('DELETE FROM driver_values WHERE driver_id = ? AND period = ?').run(driver.id, period);
+      const ins = db.prepare('INSERT INTO driver_values (driver_id, period, target_center_id, quantity_milli, source, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
+      for (const v of values.filter(x => x.quantityMilli > 0)) ins.run(driver.id, period, v.centerId, v.quantityMilli, source, new Date().toISOString());
+    });
+    return { written: values.length };
+  }
+
+  return { loadCenters, assertImputable, confirmedRun, setComputedDriverValues };
 };
 
 module.exports.HttpError = HttpError;

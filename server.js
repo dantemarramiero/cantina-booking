@@ -5106,6 +5106,7 @@ const secureStore = createSecureStore({ dir: path.join(DATA_DIR, 'hr-files'), ke
 const hrFile = require('./modules/hr-file')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, signer, secureStore, getSetting, setSetting, hr, finance });
 const hrSafety = require('./modules/hr-safety')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile });
 const hrAbsences = require('./modules/hr-absences')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety });
+const hrTimesheet = require('./modules/hr-timesheet')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile, hrSafety, hrAbsences, finance });
 
 // Avvio: solo quando il file è eseguito direttamente (node server.js). I test lo importano e
 // avviano l'app su una porta a caso, senza scheduler.
@@ -5122,4 +5123,4 @@ if (require.main === module) {
   scheduler.start();
 }
 
-module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, secureStore };
+module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, hrTimesheet, secureStore };
