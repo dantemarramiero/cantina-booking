@@ -2311,7 +2311,8 @@ app.get('/api/admin/bookings', authAdmin, (req, res) => {
     const like = `%${q}%`; params.push(like, like);
   }
   sql += ' ORDER BY s.date DESC, s.time DESC LIMIT 500';
-  res.json(db.prepare(sql).all(...params));
+  // People: segnala gli operatori assegnati ma assenti in quell'orario (o che non parlano la lingua).
+  res.json(hrAbsences.bookingFlags(db.prepare(sql).all(...params)));
 });
 
 app.post('/api/admin/bookings/manual', authAdmin, async (req, res) => {
@@ -2350,10 +2351,17 @@ app.patch('/api/admin/bookings/:id', authAdmin, (req, res) => {
     if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
   }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  // People: un operatore assente in quell'orario non si assegna; se non parla la lingua, avviso.
+  let warnings = [];
+  if (req.body.operator_id) {
+    const chk = hrAbsences.operatorCheck(parseInt(req.body.operator_id), parseInt(req.params.id));
+    if (chk.blocks.length) return res.status(409).json({ error: chk.blocks.join(' ') });
+    warnings = chk.warnings;
+  }
   params.push(req.params.id);
   db.prepare(`UPDATE bookings SET ${updates.join(', ')} WHERE id = ?`).run(...params);
   if (req.body.status === 'confermata') checkWineClub(db.prepare('SELECT person_id FROM bookings WHERE id = ?').get(req.params.id)?.person_id);
-  res.json({ success: true });
+  res.json({ success: true, warnings });
 });
 
 app.post('/api/admin/bookings/confirm/:id', authAdmin, async (req, res) => {
@@ -5097,6 +5105,7 @@ const hrFilesKey = resolveKey({ dataDir: DATA_DIR });
 const secureStore = createSecureStore({ dir: path.join(DATA_DIR, 'hr-files'), key: hrFilesKey.key });
 const hrFile = require('./modules/hr-file')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, signer, secureStore, getSetting, setSetting, hr, finance });
 const hrSafety = require('./modules/hr-safety')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile });
+const hrAbsences = require('./modules/hr-absences')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety });
 
 // Avvio: solo quando il file è eseguito direttamente (node server.js). I test lo importano e
 // avviano l'app su una porta a caso, senza scheduler.
@@ -5113,4 +5122,4 @@ if (require.main === module) {
   scheduler.start();
 }
 
-module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, secureStore };
+module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, secureStore };

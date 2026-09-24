@@ -6,7 +6,7 @@ Stato: **in corso, in locale** (non ancora in produzione). La fase è divisa in 
 |---|---|---|
 | 2A | Fascicolo: dati personali, rapporto di lavoro, retribuzione, competenze, documenti cifrati, scadenzario con notifiche | completato |
 | 2B | Sicurezza (D.Lgs. 81/08): formazione, requisiti per mansione, idoneità sanitaria, DPI, infortuni, deroghe | completato |
-| 2C | Assenze: richieste e approvazioni, contatori, periodi bloccati, disponibilità per l'Enoturismo | da fare |
+| 2C | Assenze: richieste e approvazioni, contatori, periodi bloccati, disponibilità per l'Enoturismo | completato |
 | 2D | Presenze: ore per squadra, proposte da prenotazioni e fiere, stati del mese, rettifiche, export, controlli bloccanti | da fare |
 | 2E | Self-service, onboarding e offboarding, dotazioni, richieste di modifica, cedolini in blocco, modello dati del recruiting | da fare |
 
@@ -291,3 +291,141 @@ Esito: **76 test, 76 superati** (11 nuovi del blocco 2B).
 - **Visita per cambio mansione solo se la nuova mansione è soggetta a sorveglianza.** Altrimenti non si crea l'attività.
 - **Deroghe:** durata massima 12 mesi, motivo obbligatorio, revocabili.
 - **Infortuni e documentazione:** livello *personale*. La documentazione sanitaria dell'infortunio va nei documenti di tipo «Documentazione infortunio», livello *sanitario*.
+
+---
+
+## 2C — Assenze
+
+### Cosa c'è
+
+**People → Assenze.** Tre viste:
+- **Da decidere**: le richieste da approvare e le comunicazioni da prendere in visione. Ognuno vede solo quelle che tocca a lui decidere.
+- **Elenco**: le assenze del mese, filtrabili per tipo e stato.
+- **Contatori**: per ogni persona il residuo di ferie, ROL ed ex festività, con goduto, pianificato e ferie arretrate.
+
+**Nuova assenza.** Si prende a giorno intero, a mezza giornata (mattina o pomeriggio) oppure a ore. Prima di inviare si vede un'anteprima con:
+- i giorni lavorativi coperti e il consumo;
+- chi deciderà;
+- gli avvisi (residuo insufficiente, periodo di blocco).
+
+**I giorni lavorativi** vengono dall'orario contrattuale e dalle festività della sede del dipendente. Senza orario si usa lun-ven, 8 ore.
+
+**I flussi:**
+- *con approvazione* (ferie, ROL, permessi…): bozza → richiesta → approvata o rifiutata, con motivo obbligatorio → (annullata);
+- *con comunicazione* (malattia, infortunio, maternità, lutto…): comunicata → presa visione. È valida subito. Per la malattia il protocollo del certificato è obbligatorio.
+
+**Chi decide:**
+- il responsabile del dipendente;
+- se a chiedere è il responsabile stesso (per sé o per un collaboratore), si sale di un livello;
+- dopo N giorni di attesa (predefinito 3) la richiesta passa al delegato. Senza delegato passa all'ufficio del personale;
+- l'ufficio del personale (livello *personale*) può sempre decidere;
+- nessuno approva la propria assenza.
+
+**I contatori** non sono memorizzati: si calcolano ogni volta dalle assenze.
+- **Maturato**: la spettanza annua, mensile (la quota matura a fine mese) o tutta a inizio anno.
+- **Riporto**: il residuo dell'anno prima. La prima volta si indica un saldo iniziale.
+- **Goduto** e **pianificato**: le assenze valide, già iniziate oppure future.
+- **In attesa**: le richieste ancora da decidere.
+- **Residuo** = riporto + maturato − goduto.
+
+Le richieste oltre il residuo sono rifiutate oppure ammesse con avviso: si sceglie in Configurazione.
+
+**Ferie arretrate:**
+- si consumano dalle più vecchie;
+- quelle di un anno vanno godute entro il 30/06 del secondo anno successivo;
+- entrano nello scadenzario.
+
+**Periodi di blocco** (es. vendemmia). Valgono per tutti, per una sede o per una squadra, e hanno due modalità:
+- *avviso*: la richiesta passa e il responsabile vede il periodo nella notifica;
+- *divieto*: la richiesta è rifiutata.
+
+Malattia e comunicazioni non sono toccate.
+
+**Sezione Assenze della scheda**: contatori dell'anno con le spettanze modificabili (livello *personale*), ferie arretrate e storico.
+
+**Enoturismo.** L'operatore è collegato al dipendente tramite l'utente del portale.
+- **Assegnare** a una prenotazione un operatore con un'assenza valida in quell'orario è rifiutato. Il messaggio dice che è assente, non il motivo.
+- **Nel menu** della prenotazione l'operatore compare come «(assente)» e non si può scegliere.
+- **Se la prenotazione è in una lingua che l'operatore non parla**, l'assegnazione passa con un avviso. Le lingue vengono dalle competenze del fascicolo.
+- **Prenotazioni già assegnate** a chi diventa assente: l'Enoturismo riceve una notifica e la prenotazione mostra il conflitto.
+- **Prenotazione manuale**: se l'operatore non si può assegnare, la prenotazione resta creata e un messaggio lo dice. Prima si rischiava di crearla due volte.
+
+**Visita di rientro.** Quando finisce un'assenza per motivi di salute di oltre 60 giorni continuativi (certificati consecutivi = un unico periodo), si crea l'attività «Visita medica di rientro». Vale per le mansioni soggette a sorveglianza sanitaria.
+
+**Infortunio → assenza.** Quando si registra un infortunio con prognosi, si crea l'assenza «Infortunio» collegata:
+- parte dal giorno dopo e dura quanto la prognosi;
+- porta il numero INAIL;
+- se cambia la prognosi, cambiano le date.
+
+### Migrazioni
+
+| Versione | Cosa |
+|---|---|
+| `0011_absences` | Tabelle:<br>• `absence_types` (+ 13 tipi)<br>• `absence_block_periods`<br>• `absences` (con il collegamento all'infortunio, univoco)<br>• `absence_allowances`<br>Colonna nuova: `hr_tasks.dedupe_key` (univoca) |
+
+Ha il `down`.
+
+### Eventi di dominio
+
+| Evento | Emittente | Consumer | Effetto |
+|---|---|---|---|
+| `absence.approved` | Approvazione di una richiesta | `enoturismo.absence-conflicts` | Notifica all'Enoturismo le prenotazioni già assegnate alla persona in quell'orario |
+| `absence.communicated` | Comunicazione (malattia, infortunio…) | `enoturismo.absence-conflicts-communicated` | come sopra |
+| `absence.cancelled` | Annullamento di un'assenza valida | *nessuno per ora* (2D) | payload: assenza, dipendente, date, tipo |
+| `incident.recorded` (del blocco 2B) | Registro infortuni | `hr-absences.incident-absence` | Crea l'assenza «Infortunio» collegata, con il numero INAIL |
+| `incident.updated` (del blocco 2B) | Registro infortuni | `hr-absences.incident-absence-update` | Aggiorna date e numero INAIL dell'assenza collegata |
+
+**Ganci nella stessa transazione.** Quando un'assenza diventa valida (approvata o comunicata) o viene annullata, il modulo chiama i ganci registrati dentro la transazione. Le presenze (2D) li useranno per generare e togliere le righe. Se un gancio rifiuta (es. mese chiuso), l'operazione non avviene.
+
+### Logica di business (QUANDO/ALLORA) e test
+
+Tutti i test di questa sezione sono nel file `hr-absences`.
+
+| Regola | Test |
+|---|---|
+| QUANDO si calcola un'assenza ALLORA contano i giorni con orario > 0 che non sono festività della sede. Mezza giornata = ½ giorno; le ore in minuti | giorni lavorativi |
+| QUANDO si chiede un'assenza ALLORA la decide il responsabile, avvisato con una notifica | richiesta → approvazione |
+| QUANDO è approvata ALLORA il contatore passa da «in attesa» a «pianificato» e il dipendente è avvisato | richiesta → approvazione |
+| QUANDO il dipendente prova ad approvare la propria assenza, o un collega prova a decidere ALLORA 403. Il rifiuto vuole un motivo | richiesta → approvazione |
+| QUANDO il richiedente è il responsabile ALLORA l'approvazione sale di un livello. Vale anche se inserisce per un collaboratore | sale di un livello |
+| QUANDO si chiede per una persona che non è sé stessi né un collaboratore ALLORA 403 | sale di un livello |
+| QUANDO passano i mesi ALLORA le ferie maturano. Il riporto è il residuo dell'anno prima | contatori |
+| QUANDO una richiesta supera il residuo ALLORA è rifiutata, oppure ammessa con avviso se configurato | contatori |
+| QUANDO restano ferie di anni passati ALLORA si consumano dalla più vecchia e scadono il 30/06 del secondo anno successivo | ferie arretrate |
+| QUANDO una richiesta cade in un periodo di blocco ALLORA avviso al responsabile, oppure divieto se il periodo lo prevede. La malattia non è toccata | periodo di blocco |
+| QUANDO è comunicata una malattia con protocollo ALLORA è subito valida (i ganci delle presenze partono) e il responsabile riceve notifica | malattia |
+| QUANDO manca il protocollo ALLORA rifiuto | malattia |
+| QUANDO una richiesta attende oltre N giorni ALLORA passa al delegato. Il job è idempotente e il delegato può decidere solo dopo il passaggio | delegato |
+| QUANDO un'assenza approvata è annullata ALLORA il contatore torna com'era e parte l'evento | annullamento |
+| QUANDO un gancio rifiuta (es. mese chiuso) ALLORA niente cambia | annullamento |
+| QUANDO l'assenza non è ancora iniziata ALLORA la annulla anche il dipendente | annullamento |
+| QUANDO due assenze si sovrappongono ALLORA rifiuto. Mattina e pomeriggio dello stesso giorno sono ammessi | sovrapposte |
+| QUANDO termina un'assenza per salute di oltre 60 giorni continuativi ALLORA si crea l'attività «visita medica di rientro», una volta sola | 60 giorni |
+| QUANDO si registra un infortunio ALLORA si crea l'assenza Infortunio collegata e il numero INAIL resta associato | infortunio |
+| QUANDO cambia la prognosi ALLORA cambiano le date dell'assenza | infortunio |
+| QUANDO un operatore ha un'assenza approvata e una prenotazione assegnata nello stesso orario ALLORA si segnala il conflitto in Enoturismo | Enoturismo |
+| QUANDO si prova ad assegnare un operatore assente ALLORA rifiuto | Enoturismo |
+| QUANDO si assegna un operatore a una prenotazione in una lingua che non parla ALLORA avviso in Enoturismo | Enoturismo |
+| QUANDO un dipendente ha assenze registrate ALLORA non si elimina | non si elimina |
+
+Esito: **90 test, 90 superati** (14 nuovi del blocco 2C).
+
+### Punti toccati nei moduli esistenti
+
+- **Enoturismo, API:**
+  - `PATCH /api/admin/bookings/:id` rifiuta un operatore assente (409) e restituisce gli avvisi sulla lingua;
+  - `GET /api/admin/bookings` aggiunge `operator_conflict` e `operator_warning`;
+  - nuova `GET /api/admin/operators/availability`.
+- **Enoturismo, admin:** la finestra della prenotazione mostra disponibilità e conflitti, e gli errori di assegnazione ora compaiono (prima fallivano in silenzio). Anche la prenotazione manuale gestisce il rifiuto dell'operatore.
+- **Permessi.** Le API delle assenze sono aperte a chi ha fatto l'accesso: ognuno chiede le proprie e il responsabile decide anche senza il workspace People. Chi vede e chi decide lo controlla il modulo.
+- **Campanella:** i link delle notifiche aprono anche la sottosezione (es. Assenze) e le pagine fuori dal portale (admin dell'Enoturismo).
+
+### Decisioni prese in autonomia
+
+- **Un'assenza conta nell'anno in cui inizia.** Una ferie a cavallo di capodanno consuma il contatore dell'anno di partenza.
+- **Il saldo iniziale vale solo per il primo anno.** Negli anni successivi il riporto si calcola sempre dall'anno prima.
+- **Mezza giornata:** mattina fino alle 13:00, pomeriggio dalle 13:00. Serve per il confronto con gli orari delle visite.
+- **Lingua:** l'avviso scatta solo se il fascicolo ha almeno una lingua. Conviene registrare anche la lingua madre (es. «it»).
+- **Visita di rientro solo per le mansioni con sorveglianza sanitaria**, come la visita per cambio mansione.
+- **L'infortunio parte dal giorno dopo l'evento.** Il giorno dell'infortunio si considera lavorato.
+- **Approvazione e comunicazione aggiornano subito il contatore**, perché è calcolato. Non c'è un saldo da tenere allineato.

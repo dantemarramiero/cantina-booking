@@ -1,5 +1,5 @@
 // Portale → People: scheda del dipendente (fascicolo), scadenzario, configurazione (mansioni, soglie, oneri).
-const HR_TABS = [['organizzazione', 'Organizzazione'], ['personali', 'Dati personali'], ['lavoro', 'Rapporto di lavoro'], ['competenze', 'Competenze'], ['sicurezza', 'Sicurezza'], ['documenti', 'Documenti'], ['scadenze', 'Scadenze']];
+const HR_TABS = [['organizzazione', 'Organizzazione'], ['personali', 'Dati personali'], ['lavoro', 'Rapporto di lavoro'], ['competenze', 'Competenze'], ['sicurezza', 'Sicurezza'], ['assenze', 'Assenze'], ['documenti', 'Documenti'], ['scadenze', 'Scadenze']];
 const HR_CONTRACT_TYPES = { OTD: 'Operaio a tempo determinato', OTI: 'Operaio a tempo indeterminato', impiegato: 'Impiegato', quadro: 'Quadro', dirigente: 'Dirigente', apprendista: 'Apprendista', stagionale: 'Stagionale', somministrato: 'Somministrato', collaboratore: 'Collaboratore' };
 const HR_ID_DOCS = { carta_identita: "Carta d'identità", passaporto: 'Passaporto', patente: 'Patente', permesso_soggiorno: 'Permesso di soggiorno' };
 const HR_SKILL_KINDS = { lingua: 'Lingue', titolo_studio: 'Titoli di studio', esperienza: 'Esperienze precedenti', qualifica: 'Qualifiche di settore', competenza: 'Competenze operative' };
@@ -41,8 +41,9 @@ async function openHrRecord(id, tab) {
     REC.jobRoles.length ? REC.jobRoles : api('/api/admin/hr/job-roles'), REC.docTypes.length ? REC.docTypes : api('/api/admin/hr/document-types'),
   ]);
   if (tok !== HR.renderTok) return;
-  Object.assign(REC, { org, file, jobRoles, docTypes, safety: null, safetyFor: null });
+  Object.assign(REC, { org, file, jobRoles, docTypes, safety: null, safetyFor: null, absences: null });
   if (REC.tab === 'sicurezza') await hrLoadSafety();
+  if (REC.tab === 'assenze') await hrLoadAbsences();
   renderHrRecord();
 }
 // La sezione sicurezza si carica solo quando la si apre: la lettura dell'idoneità viene registrata.
@@ -53,6 +54,7 @@ async function hrLoadSafety() {
 async function hrSelectTab(k) {
   REC.tab = k;
   if (k === 'sicurezza' && REC.safetyFor !== REC.id) await hrLoadSafety();
+  if (k === 'assenze' && REC.absences?.for !== REC.id) await hrLoadAbsences();
   renderHrRecord();
 }
 function renderHrRecord() {
@@ -93,6 +95,7 @@ function hrRecordTab() {
     case 'lavoro': return f.access.personale || f.access.retributivo ? hrTabWork(f) : locked('personale');
     case 'competenze': return f.access.personale ? hrTabSkills(f) : locked('personale');
     case 'sicurezza': return hrTabSafety();
+    case 'assenze': return hrTabAbsences();
     case 'documenti': return hrTabDocuments(f);
     case 'scadenze': return f.deadlines.length ? f.deadlines.map(d => hrDeadlineRow(d)).join('') : '<div class="mod-empty">Nessuna scadenza nei prossimi 12 mesi.</div>';
     default: return '';
@@ -382,7 +385,7 @@ function deleteHrDoc(id) { UI.confirmDo('Eliminare definitivamente questo docume
 
 // ── Scadenzario ────────────────────────────────────────────────────────────────
 const HR_DL_KINDS = { permesso_soggiorno: 'Permessi di soggiorno', documento_identita: "Documenti d'identità", contratto_termine: 'Contratti a termine', periodo_prova: 'Periodi di prova', documento_hr: 'Documenti HR',
-  formazione: 'Formazione', abilitazione: 'Abilitazioni', formazione_mancante: 'Formazione mancante', visita_medica: 'Visite mediche', dpi: 'DPI', attivita: 'Attività' };
+  formazione: 'Formazione', abilitazione: 'Abilitazioni', formazione_mancante: 'Formazione mancante', visita_medica: 'Visite mediche', dpi: 'DPI', attivita: 'Attività', ferie_arretrate: 'Ferie arretrate' };
 async function loadHrDeadlines() {
   const root = document.getElementById('people-scadenze-root');
   const f = HR.dlFilter || (HR.dlFilter = { within: 90, site_id: '', team_id: '', kind: '' });
@@ -409,7 +412,7 @@ async function loadHrDeadlines() {
 // ── Configurazione di People ───────────────────────────────────────────────────
 async function loadHrConfig() {
   const root = document.getElementById('people-sedi-root');
-  root.innerHTML = '<div id="hr-sites-box"></div><div id="hr-config-box"></div><div id="hr-safety-config-box"></div>';
+  root.innerHTML = '<div id="hr-sites-box"></div><div id="hr-config-box"></div><div id="hr-safety-config-box"></div><div id="hr-absence-config-box"></div>';
   await loadHrSites();
   const [roles, settings] = await Promise.all([api('/api/admin/hr/job-roles'), api('/api/admin/hr/settings'), safConfig(true)]);
   REC.jobRoles = roles;
@@ -432,6 +435,7 @@ async function loadHrConfig() {
       </div>
     </div>`;
   loadHrSafetyConfig();
+  loadHrAbsenceConfig();
 }
 async function saveHrSettings() {
   try {

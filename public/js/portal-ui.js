@@ -129,9 +129,12 @@ async function openBellItem(id) {
 }
 // Apre un link interno del portale (?workspace=…&employee=…&tab=…) senza ricaricare la pagina.
 function openPortalLink(link) {
-  const q = new URL(link, location.origin).searchParams;
+  const url = new URL(link, location.origin);
+  if (url.pathname !== '/portal.html') { location.href = url.pathname + url.search; return; } // es. l'admin dell'Enoturismo
+  const q = url.searchParams;
   const ws = q.get('workspace');
   if (ws && typeof switchWorkspace === 'function') switchWorkspace(ws);
+  if (q.get('sub') && typeof clickSidebarSub === 'function') clickSidebarSub(q.get('sub'));
   if (ws === 'people' && q.get('employee') && typeof openHrRecord === 'function') openHrRecord(parseInt(q.get('employee')), q.get('tab') || undefined);
 }
 async function markAllBellRead() {

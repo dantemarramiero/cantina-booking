@@ -129,6 +129,25 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
   - un dipendente con fascicolo non si può più eliminare, prima perdeva i dati;
   - lo scadenzario mostra le scadenze altrui solo a chi ha il livello personale o è il responsabile.
 
+**People — Fase 2, blocco 2C: assenze**
+- Pagina People → Assenze con tre viste: da decidere, elenco del mese, contatori.
+- Nuova assenza con anteprima dei giorni lavorativi, di chi decide e degli avvisi. Si prende a giorno intero, a mezza giornata o a ore.
+- Approvazione:
+  - decide il responsabile, un livello più su se a chiedere è il responsabile;
+  - dopo N giorni passa al delegato.
+- Malattia e infortunio: si comunicano e sono subito validi, poi si prendono in visione.
+- Contatori ferie, ROL ed ex festività calcolati dalle assenze:
+  - maturato, riporto, goduto, pianificato e residuo;
+  - blocco o avviso oltre il residuo;
+  - ferie arretrate nello scadenzario.
+- Periodi di blocco (es. vendemmia), con avviso o divieto.
+- Visita di rientro dopo oltre 60 giorni di assenza per salute. Infortunio registrato → assenza collegata con il numero INAIL.
+- Enoturismo:
+  - un operatore assente non si assegna a una visita;
+  - avviso se non parla la lingua della prenotazione;
+  - conflitti segnalati.
+- Fix: nell'admin dell'Enoturismo gli errori di assegnazione dell'operatore ora compaiono; prima fallivano in silenzio.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

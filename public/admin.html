@@ -1948,9 +1948,15 @@ function calRenderEvents(dayBookings, bodyHeight) {
   }).join('');
 }
 
-function openCalEventModal(bookingId) {
+async function openCalEventModal(bookingId) {
   const b = CAL_BOOKINGS_CACHE.find(x => x.id === bookingId);
   if (!b) return;
+  // Disponibilità degli operatori (assenze approvate da People, lingue parlate).
+  const avail = Object.fromEntries((await api('/api/admin/operators/availability?booking_id=' + b.id).catch(() => [])).map(a => [a.operator_id, a]));
+  const opLabel = o => {
+    const a = avail[o.id];
+    return esc(o.name) + (a?.blocks.length ? ' (assente)' : a?.warnings.length ? ' (non parla la lingua)' : '');
+  };
   const actions = [];
   if (b.status !== 'confermata') actions.push(`<button class="btn small ok" onclick="calAction(()=>confirmBooking(${b.id}))">Conferma</button>`);
   if (b.status !== 'annullata') actions.push(`<button class="btn small danger" onclick="calAction(()=>rejectBooking(${b.id}))">Annulla</button>`);
@@ -1971,9 +1977,11 @@ function openCalEventModal(bookingId) {
       <div class="field"><label>Operatore assegnato</label>
         <select onchange="calUpdateOperator(${b.id}, this.value)">
           <option value="">— Nessuno —</option>
-          ${OPERATORS.filter(o => o.active && o.portal_user_id).map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+          ${OPERATORS.filter(o => o.active && o.portal_user_id).map(o => `<option value="${o.id}" ${b.operator_id === o.id ? 'selected' : ''} ${avail[o.id]?.blocks.length && b.operator_id !== o.id ? 'disabled' : ''}>${opLabel(o)}</option>`).join('')}
         </select>
       </div>
+      ${b.operator_conflict ? `<div class="msg error">${esc(b.operator_conflict)}</div>` : ''}
+      ${b.operator_warning ? `<div class="msg" style="background:var(--warn-bg,#fbf1dc);color:var(--warn,#9a6a12)">${esc(b.operator_warning)}</div>` : ''}
       <div class="modal-actions" style="justify-content:space-between">
         <button class="btn secondary" onclick="document.getElementById('cal-event-modal').remove()">Chiudi</button>
         <div class="actions-cell">${actions.join('')}</div>
@@ -1982,8 +1990,15 @@ function openCalEventModal(bookingId) {
   document.body.appendChild(box);
 }
 async function calUpdateOperator(bookingId, operatorId) {
-  await api('/api/admin/bookings/' + bookingId, { method: 'PATCH', body: JSON.stringify({ operator_id: operatorId || '' }) });
+  try {
+    const res = await api('/api/admin/bookings/' + bookingId, { method: 'PATCH', body: JSON.stringify({ operator_id: operatorId || '' }) });
+    if (res.warnings?.length) alert(res.warnings.join('\n'));
+  } catch (e) {
+    alert(e.message); // es. operatore assente in quell'orario
+  }
+  document.getElementById('cal-event-modal')?.remove();
   await renderCalendar();
+  openCalEventModal(bookingId);
 }
 async function calAction(fn) {
   document.getElementById('cal-event-modal')?.remove();
@@ -2046,9 +2061,17 @@ async function saveManualBooking() {
   };
   try {
     const res = await api('/api/admin/bookings/manual', { method: 'POST', body: JSON.stringify(body) });
-    if (body.operator_id) await api('/api/admin/bookings/' + res.id, { method: 'PATCH', body: JSON.stringify({ operator_id: body.operator_id }) });
+    // La prenotazione ormai c'è: se l'operatore non si può assegnare (es. assente) lo si dice, senza ricrearla.
+    let opNote = null;
+    if (body.operator_id) {
+      try {
+        const upd = await api('/api/admin/bookings/' + res.id, { method: 'PATCH', body: JSON.stringify({ operator_id: body.operator_id }) });
+        if (upd.warnings?.length) opNote = upd.warnings.join('\n');
+      } catch (e) { opNote = `Prenotazione creata, ma l'operatore non è stato assegnato: ${e.message}`; }
+    }
     closeModal('manual-modal');
     renderCalendar();
+    if (opNote) alert(opNote);
   } catch (e) {
     msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
   }
