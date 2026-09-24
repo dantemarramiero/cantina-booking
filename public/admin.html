@@ -1139,12 +1139,22 @@ let ADMIN_KEY = null;
 let EXPERIENCES = [];
 let OPERATORS = [];
 
-function doLogin() {
+async function doLogin() {
   const key = document.getElementById('login-key').value.trim();
   if (!key) return;
-  ADMIN_KEY = key;
-  sessionStorage.setItem('admin_key', key);
-  boot();
+  const msg = document.getElementById('login-msg');
+  msg.innerHTML = '';
+  try {
+    const res = await fetch('/api/admin/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore');
+    document.getElementById('login-key').value = '';
+    ADMIN_KEY = data.key;
+    sessionStorage.setItem('admin_key', data.key);
+    boot();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${e.message}</div>`;
+  }
 }
 
 function showLoginForm(id) {
@@ -1199,10 +1209,23 @@ async function doResetPassword() {
     msg.innerHTML = `<div class="msg error">${e.message}</div>`;
   }
 }
-function logout() {
+async function logout() {
+  try { await api('/api/admin/logout', { method: 'POST' }); } catch {}
   sessionStorage.removeItem('admin_key');
   location.reload();
 }
+
+// Export e file: si chiede al server un link firmato che scade in pochi minuti, così la
+// chiave di accesso non finisce mai in un URL.
+async function openSignedDownload(path) {
+  try {
+    const { url } = await api('/api/admin/signed-url?path=' + encodeURIComponent(path));
+    window.location.href = url;
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
 
 function toggleSidebarCollapse() {
   const collapsed = document.querySelector('.app-shell').classList.toggle('sidebar-collapsed');
@@ -1809,7 +1832,7 @@ function calSelectedStatuses() {
 
 async function renderCalendar() {
   if (!OPERATORS.length) OPERATORS = await api('/api/admin/operators');
-  document.getElementById('cal-export-all-link').href = `/api/admin/export?key=${encodeURIComponent(ADMIN_KEY)}`;
+  document.getElementById('cal-export-all-link').onclick = e => { e.preventDefault(); openSignedDownload('/api/admin/export'); };
   const days = [];
   if (CAL_MODE === 'week') {
     const start = calStartOfWeek(CAL_ANCHOR);
@@ -2414,7 +2437,7 @@ async function deleteReview(id) {
 // ── Newsletter ────────────────────────────────────────────────────────────────
 async function loadNewsletter() {
   const rows = await api('/api/admin/newsletter');
-  document.getElementById('nl-export-link').href = `/api/admin/newsletter/export?key=${encodeURIComponent(ADMIN_KEY)}`;
+  document.getElementById('nl-export-link').onclick = e => { e.preventDefault(); openSignedDownload('/api/admin/newsletter/export'); };
   document.getElementById('newsletter-tbody').innerHTML = rows.length ? rows.map(n => `
     <tr><td>${esc(n.email)}</td><td>${n.created_at}</td>
       <td><button class="btn small danger" onclick="deleteSubscriber(${n.id})">Elimina</button></td></tr>
@@ -2451,7 +2474,7 @@ async function boot() {
   document.getElementById('app').style.display = 'block';
   const me = await api('/api/admin/me');
   if (me.permittedWorkspaces && !me.permittedWorkspaces.includes('enoturismo')) {
-    window.location.href = '/portal.html?key=' + encodeURIComponent(ADMIN_KEY);
+    window.location.href = '/portal.html';
     return;
   }
   if (me.permittedWorkspaces) {
@@ -2470,16 +2493,15 @@ document.addEventListener('click', (e) => {
   if (switcher && !switcher.contains(e.target)) document.getElementById('workspace-menu').classList.remove('open');
 });
 function switchWorkspace(ws) {
-  window.location.href = '/portal.html?key=' + encodeURIComponent(ADMIN_KEY) + '&workspace=' + ws;
+  window.location.href = '/portal.html?workspace=' + ws;
 }
 
 (function () {
   const params = new URLSearchParams(window.location.search);
   if (params.get('reset')) { showLoginForm('login-form-reset'); return; }
-  const keyFromUrl = params.get('key');
+  if (params.has('key')) { params.delete('key'); history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params : '')); }
   const keyFromSession = sessionStorage.getItem('admin_key');
-  if (keyFromUrl) { ADMIN_KEY = keyFromUrl; sessionStorage.setItem('admin_key', keyFromUrl); boot(); }
-  else if (keyFromSession) { ADMIN_KEY = keyFromSession; boot(); }
+  if (keyFromSession) { ADMIN_KEY = keyFromSession; boot(); }
 })();
 </script>
 </body>

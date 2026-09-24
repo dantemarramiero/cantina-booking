@@ -61,6 +61,29 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - Pagina anagrafica in stile Zoho CRM per ogni record: Informazioni di base, Overview (ordini/fatturato), Email (log manuale, nessuna sincronizzazione Outlook per ora), Note, Allegati, Riunioni, Compiti, Affari, Ordini
 - Fix: pagina anagrafica invisibile (mancava il posizionamento CSS), modali (riunioni/compiti/affari/email) nascosti dietro la pagina anagrafica (z-index), "Torna alla lista" che riportava al workspace sbagliato
 
+## 2026-09-24 — Anagrafiche sincronizzate, Obiettivi, Customizations, basi per People e Finance
+
+**Anagrafiche**
+- Catena di distribuzione visibile da entrambi i lati: dall'importatore o distributore vedi i "Clienti riforniti".
+- Una persona può essere referente di più aziende (clienti, importatori, agenti, fornitori), con un ruolo per ciascuna. I Fornitori usano gli stessi Contatti delle altre anagrafiche.
+- La vecchia tabella clienti B2C non viene più scritta: tutto passa da Persone.
+
+**Commerciale → Obiettivi**
+- Schermata nuova (dal progetto MyWinery): obiettivi annuali in bottiglie ed euro per cantina, area e prodotto.
+- Distribuzione mensile uniforme, stagionale (dalle vendite dell'anno prima) o manuale.
+- Copia di un anno con crescita dei volumi e aumento dei prezzi.
+
+**Impostazioni → Customizations**
+- Regole, automatismi e liste divisi per modulo.
+- Wine club automatico per soglie di spesa (negozio ed e-commerce, visite in cantina).
+- Tipologie di cliente e ruoli del contatto modificabili; giorni per "cliente fermo" e finestra delle disponibilità configurabili.
+
+**Prerequisiti per People e Finance** (vedi `docs/people-finance/`)
+- Migrazioni versionate con copia di sicurezza automatica; test automatici (`npm test`).
+- Accessi con sessioni che scadono al posto della chiave fissa. Chiave fuori dai log e dagli URL. Permessi per modulo controllati dal server. Link firmati per download ed export. Blocco dei login ripetuti.
+- Registro attività; infrastruttura per eventi di dominio, notifiche e job periodici.
+- Fix: le foto di prodotti ed esperienze ora stanno sul volume persistente (prima si perdevano a ogni deploy).
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

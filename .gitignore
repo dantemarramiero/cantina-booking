@@ -5,3 +5,5 @@ public/uploads/products/*
 !public/uploads/products/.gitkeep
 catalogs/*
 !catalogs/.gitkeep
+uploads/
+backups/

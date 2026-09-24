@@ -42,7 +42,18 @@ npm run dev               # nodemon, riavvio automatico
 npm start                 # produzione
 ```
 
-Il server crea `cantina.db` automaticamente al primo avvio (SQLite, file singolo). Le migrazioni schema sono `ALTER TABLE` additivi eseguiti a ogni avvio: non serve mai eseguire migrazioni manuali.
+Il server crea `cantina.db` automaticamente al primo avvio (SQLite, file singolo).
+
+**Schema e migrazioni.** Le tabelle storiche sono create all'avvio da `server.js` (baseline `migrations/0001`). Ogni modifica nuova passa da una migrazione versionata in `migrations/NNNN_nome.js` (`up`/`down`), applicata da sola all'avvio in una transazione, dopo aver copiato il database in `backups/` (tiene le ultime 10 copie).
+- `npm run migrate -- status`: elenco delle migrazioni applicate.
+- `npm run migrate -- down`: annulla l'ultima (con copia di sicurezza).
+
+**Test.** `npm test` avvia l'app su un database temporaneo e verifica:
+- migrazioni, accessi e permessi;
+- eventi di dominio e job;
+- gli automatismi esistenti: Persone, contatti, magazzino, wine club, obiettivi.
+
+Va lanciato prima di ogni deploy.
 
 - Sito pubblico: `http://localhost:3000`
 - Admin Enoturismo: `http://localhost:3000/admin.html`
@@ -51,10 +62,21 @@ Il server crea `cantina.db` automaticamente al primo avvio (SQLite, file singolo
 
 ## Autenticazione
 
-Due livelli, entrambi validi per `admin.html` e `portal.html`:
+Due modi di entrare, validi per `admin.html` e `portal.html`:
 
-1. **Chiave amministratore** (`ADMIN_PASSWORD`, variabile d'ambiente): accesso master, sempre valido, utile come fallback/bootstrap.
-2. **Utenti del portale** (tabella `portal_users`, gestiti da Impostazioni → Utenti del portale): username + password individuali, con **recupero password via email** (link di reset valido 1 ora). Il primo utente va creato dalla chiave amministratore.
+1. **Chiave amministratore** (`ADMIN_PASSWORD`, variabile d'ambiente): accesso master, utile come fallback e per il primo avvio.
+2. **Utenti del portale** (tabella `portal_users`, gestiti da Impostazioni → Utenti del portale): username e password individuali, con **recupero password via email** (link di reset valido 1 ora). Il primo utente va creato con la chiave amministratore.
+
+In entrambi i casi il login crea una **sessione**: il browser tiene solo un token, la chiave non viaggia più con ogni richiesta e non si accetta più negli URL (`?key=`).
+- La sessione scade dopo 12 ore senza attività e comunque dopo 7 giorni.
+- Si chiude al logout, quando l'utente viene disattivato e quando cambia la password.
+- Dopo 10 tentativi sbagliati in 15 minuti dallo stesso indirizzo il login si blocca.
+
+**Permessi per modulo** (ruoli in Impostazioni → Ruoli e permessi): sono controllati dal server su ogni API, non solo nell'interfaccia. La mappa "API → moduli che possono leggere/scrivere" è in `lib/security.js`. Gli utenti senza ruolo hanno accesso completo.
+
+**Download ed export** (CSV, allegati CRM, foto delle fiere): passano da link firmati dal server, validi pochi minuti e legati alla sessione.
+
+Accessi, modifiche a utenti, ruoli, impostazioni e Customizations finiscono nel **registro attività** (`GET /api/admin/audit-log`).
 
 Il **portale agenti** (`agent.html`) ha un sistema separato: ogni agente ha username/password propri (generati alla creazione in CRM → Agenti), sessione persistita in `localStorage`.
 
@@ -66,6 +88,8 @@ Vedi `.env.example` per l'elenco completo. Le più importanti:
 |---|---|---|
 | `ADMIN_PASSWORD` | consigliata | Chiave amministratore master |
 | `DB_PATH` | no | Path del file SQLite (in produzione: volume persistente Railway) |
+| `RAILWAY_VOLUME_MOUNT_PATH` | no | Cartella dei dati persistenti (database, allegati, cataloghi, foto in `uploads/`, copie in `backups/`). Su Railway la imposta il volume. |
+| `SIGNING_SECRET` | no | Segreto per firmare i link di download. Se manca, viene generato al primo avvio e conservato nel database. |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | no | Senza queste, il checkout pubblico usa la modalità "richiesta di prenotazione" (nessun pagamento online) |
 | `GMAIL_USER` + `GMAIL_PASS` oppure `RESEND_API_KEY` | no | Necessarie per: conferme prenotazione, avvisi scorte magazzino, **reset password utenti portale**. Senza provider configurato, le email vengono solo loggate in console. |
 

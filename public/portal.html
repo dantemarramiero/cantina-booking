@@ -2867,14 +2867,28 @@ function closeMobileSidebar() {
   document.querySelector('.sidebar-backdrop').classList.remove('open');
 }
 
-function doLogin() {
+async function doLogin() {
   const key = document.getElementById('login-key').value.trim();
   if (!key) return;
-  ADMIN_KEY = key;
-  sessionStorage.setItem('admin_key', key);
-  boot();
+  const msg = document.getElementById('login-msg');
+  msg.innerHTML = '';
+  try {
+    const res = await fetch('/api/admin/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore');
+    document.getElementById('login-key').value = '';
+    ADMIN_KEY = data.key;
+    sessionStorage.setItem('admin_key', data.key);
+    boot();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${e.message}</div>`;
+  }
 }
-function logout() { sessionStorage.removeItem('admin_key'); location.reload(); }
+async function logout() {
+  try { await api('/api/admin/logout', { method: 'POST' }); } catch {}
+  sessionStorage.removeItem('admin_key');
+  location.reload();
+}
 
 function toggleSidebarCollapse() {
   const collapsed = document.querySelector('.app-shell').classList.toggle('sidebar-collapsed');
@@ -2982,7 +2996,7 @@ document.addEventListener('click', (e) => {
 
 function switchWorkspace(ws) {
   document.getElementById('workspace-menu').classList.remove('open');
-  if (ws === 'enoturismo') { window.location.href = '/admin.html?key=' + encodeURIComponent(ADMIN_KEY); return; }
+  if (ws === 'enoturismo') { window.location.href = '/admin.html'; return; }
 
   document.querySelectorAll('#workspace-menu button').forEach(b => b.classList.toggle('active', b.dataset.ws === ws));
   document.querySelectorAll('#mobile-bottom-tabbar button').forEach(b => b.classList.toggle('active', b.dataset.ws === ws));
@@ -4438,7 +4452,7 @@ async function loadFairDetail(id) {
         <div class="fair-photo-grid" id="fair-photo-grid">
           ${f.attachments.map(a => `
             <div class="fair-photo-item">
-              <img src="/api/admin/fairs/attachments/${a.id}/view?key=${encodeURIComponent(ADMIN_KEY)}" loading="lazy">
+              <img src="${a.view_url}" loading="lazy">
               <button onclick="deleteFairPhoto(${a.id})">×</button>
             </div>
           `).join('') || ''}
@@ -5813,7 +5827,7 @@ async function loadCrmAttachments() {
       <div class="crm-item-top">
         <span class="crm-item-title">${esc(a.original_name || a.filename)}</span>
         <div class="crm-item-actions">
-          <a class="btn-outline-pill" href="/api/admin/crm/attachments/${a.id}/download?key=${encodeURIComponent(ADMIN_KEY)}" target="_blank" rel="noopener">Apri</a>
+          <a class="btn-outline-pill" href="${a.download_url}" target="_blank" rel="noopener">Apri</a>
           <button class="btn-outline-pill danger" onclick="deleteCrmAttachment(${a.id})">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
           </button>
@@ -6779,10 +6793,9 @@ async function boot() {
 (function () {
   const params = new URLSearchParams(window.location.search);
   if (params.get('reset')) { showLoginForm('login-form-reset'); return; }
-  const keyFromUrl = params.get('key');
+  if (params.has('key')) { params.delete('key'); history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params : '')); }
   const keyFromSession = sessionStorage.getItem('admin_key');
-  if (keyFromUrl) { ADMIN_KEY = keyFromUrl; sessionStorage.setItem('admin_key', keyFromUrl); boot(); }
-  else if (keyFromSession) { ADMIN_KEY = keyFromSession; boot(); }
+  if (keyFromSession) { ADMIN_KEY = keyFromSession; boot(); }
 })();
 </script>
 </body>

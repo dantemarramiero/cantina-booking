@@ -7,6 +7,12 @@ const multer  = require('multer');
 const XLSX    = require('xlsx');
 
 const { DatabaseSync } = require('node:sqlite');
+const { runMigrations } = require('./lib/migrations');
+const { createEventBus } = require('./lib/events');
+const { createScheduler } = require('./lib/scheduler');
+const { createSessions, createSigner, createLoginThrottle, canAccess, safeEqual } = require('./lib/security');
+const { createAudit } = require('./lib/audit');
+const { createNotifications } = require('./lib/notifications');
 
 const app   = express();
 const PORT  = process.env.PORT || 3000;
@@ -14,7 +20,9 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'cantina2026';
 const CANTINA_NAME    = process.env.CANTINA_NAME || 'Marramiero';
 const STRIPE_SECRET   = process.env.STRIPE_SECRET_KEY;
 const WEBHOOK_SECRET  = process.env.STRIPE_WEBHOOK_SECRET;
-const DB_PATH = process.env.DB_PATH || path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname, 'cantina.db');
+// DATA_DIR: dove vivono i dati che devono sopravvivere ai deploy (su Railway è il volume /data).
+const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
+const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'cantina.db');
 
 const stripe = STRIPE_SECRET ? require('stripe')(STRIPE_SECRET) : null;
 
@@ -1180,6 +1188,36 @@ try { db.exec('ALTER TABLE contacts ADD COLUMN migrated_person_id INTEGER'); } c
   }
 })();
 
+// ── Migrazioni versionate ─────────────────────────────────────────────────────
+// Lo schema qui sopra è quello storico (baseline 0001). Da qui in avanti ogni nuova tabella o
+// colonna passa da migrations/NNNN_nome.js; prima di applicarle si fa una copia del database.
+runMigrations(db, { dir: path.join(__dirname, 'migrations'), dbPath: DB_PATH });
+
+// ── Piattaforma: eventi, job, sessioni, registro attività, notifiche ─────────
+const events = createEventBus(db);
+const scheduler = createScheduler(db);
+const sessions = createSessions(db);
+const signer = createSigner(process.env.SIGNING_SECRET || signingSecretFromSettings());
+const loginThrottle = createLoginThrottle();
+const { audit, list: listAudit } = createAudit(db);
+const notifications = createNotifications(db);
+// Il segreto per firmare i link di download: generato al primo avvio e conservato nel database
+// (non viene mai restituito dalle API delle impostazioni).
+function signingSecretFromSettings() {
+  let secret = getSetting('signing_secret');
+  if (!secret) {
+    secret = crypto.randomBytes(32).toString('hex');
+    setSetting('signing_secret', secret);
+  }
+  return secret;
+}
+scheduler.onTick(() => events.dispatch());
+scheduler.register('sessions.cleanup', 60, () => `${sessions.cleanup()} sessioni scadute rimosse`);
+scheduler.register('housekeeping.job_runs', 24 * 60, () => {
+  const limit = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  return `${db.prepare('DELETE FROM job_runs WHERE started_at < ?').run(limit).changes} esecuzioni vecchie rimosse`;
+});
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getExperience(id) {
   return db.prepare('SELECT * FROM experiences WHERE id = ?').get(id);
@@ -1254,12 +1292,33 @@ function validateDiscount(code, amountCents) {
     : Math.min(d.value, amountCents);
   return { valid: true, discount: d, discountCents };
 }
+// Accesso al portale interno: serve una sessione valida (header x-admin-key con il token di
+// sessione) oppure, solo per scaricare file ed export, un link firmato dal server. La chiave
+// master e le chiavi fisse degli utenti non sono più accettate direttamente, né nell'URL.
+// Poi si controlla che il ruolo dell'utente abbia accesso al modulo di quell'API.
 function authAdmin(req, res, next) {
-  const pwd = req.query.key || req.headers['x-admin-key'];
-  if (pwd === ADMIN_PASSWORD) { req.isMasterKey = true; return next(); }
-  const user = pwd ? db.prepare('SELECT * FROM portal_users WHERE access_key = ? AND active = 1').get(pwd) : null;
-  if (user) { req.portalUser = user; return next(); }
-  return res.status(401).json({ error: 'Non autorizzato.' });
+  let session = null;
+  const token = req.headers['x-admin-key'];
+  if (token) session = sessions.resolve(token);
+  else if ((req.method === 'GET' || req.method === 'HEAD') && req.query.sig && signer.verify(req.path, req.query)) {
+    session = sessions.byId(parseInt(req.query.sid));
+  }
+  if (!session) return res.status(401).json({ error: 'Sessione scaduta o non valida: accedi di nuovo.' });
+  req.portalSession = session;
+  if (session.user_id == null) {
+    req.isMasterKey = true;
+  } else {
+    const user = db.prepare('SELECT * FROM portal_users WHERE id = ? AND active = 1').get(session.user_id);
+    if (!user) {
+      sessions.revokeUser(session.user_id);
+      return res.status(401).json({ error: 'Utente disattivato: accesso non più valido.' });
+    }
+    req.portalUser = user;
+  }
+  if (!canAccess(permittedWorkspacesFor(req), req.method, req.path)) {
+    return res.status(403).json({ error: 'Non hai i permessi per questa sezione.' });
+  }
+  next();
 }
 
 function permittedWorkspacesFor(req) {
@@ -1564,7 +1623,10 @@ function customerActivityStatus(lastOrderDate) {
   return 'inattivo';
 }
 
-const uploadsDir = path.join(__dirname, 'public', 'uploads', 'products');
+// Foto caricate: sul volume persistente (DATA_DIR), servite come /uploads/... Prima stavano in
+// public/uploads dentro il container e si perdevano a ogni deploy.
+const uploadsRoot = path.join(DATA_DIR, 'uploads');
+const uploadsDir = path.join(uploadsRoot, 'products');
 fs.mkdirSync(uploadsDir, { recursive: true });
 const upload = multer({
   storage: multer.diskStorage({
@@ -1575,7 +1637,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|webp|gif)$/.test(file.mimetype)),
 });
 
-const expUploadsDir = path.join(__dirname, 'public', 'uploads', 'experiences');
+const expUploadsDir = path.join(uploadsRoot, 'experiences');
 fs.mkdirSync(expUploadsDir, { recursive: true });
 const uploadExpImage = multer({
   storage: multer.diskStorage({
@@ -1702,6 +1764,7 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) =
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(uploadsRoot));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Public: config / experiences ─────────────────────────────────────────────
@@ -2726,6 +2789,8 @@ app.post('/api/admin/dashboard-widgets', authAdmin, (req, res) => {
 
 app.post('/api/admin/settings', authAdmin, (req, res) => {
   const { commercial_alert_email, procurement_alert_email, active_months_threshold, semi_active_months_threshold } = req.body || {};
+  const auditKeys = Object.keys(req.body || {}).filter(k => SETTINGS_AUDIT_KEYS.includes(k));
+  const before = Object.fromEntries(auditKeys.map(k => [k, getSetting(k)]));
   if (commercial_alert_email !== undefined) setSetting('commercial_alert_email', commercial_alert_email);
   if (procurement_alert_email !== undefined) setSetting('procurement_alert_email', procurement_alert_email);
   if (active_months_threshold !== undefined) {
@@ -2747,8 +2812,14 @@ app.post('/api/admin/settings', authAdmin, (req, res) => {
   for (const f of COMPANY_FIELDS) {
     if (req.body[f] !== undefined) setSetting(f, req.body[f].trim());
   }
+  if (auditKeys.length) audit(req, 'settings.updated', { entity: 'settings', before, after: Object.fromEntries(auditKeys.map(k => [k, getSetting(k)])) });
   res.json({ success: true });
 });
+// Le sole impostazioni che si scrivono da qui (e quindi le sole che finiscono nel registro).
+const SETTINGS_AUDIT_KEYS = [
+  'commercial_alert_email', 'procurement_alert_email', 'active_months_threshold', 'semi_active_months_threshold',
+  ...Object.keys(NUMERIC_SETTINGS), ...COMPANY_FIELDS,
+];
 
 // ── Customizations: liste modificabili ──
 app.get('/api/admin/option-lists', authAdmin, (req, res) => {
@@ -2783,6 +2854,7 @@ app.put('/api/admin/option-lists/:name', authAdmin, (req, res) => {
     }
   }
   setSetting('list_' + name, JSON.stringify(result));
+  audit(req, 'option_list.updated', { entity: 'option_list', entityId: name, before: current.map(({ key, label }) => ({ key, label })), after: result });
   res.json({ success: true });
 });
 
@@ -2814,6 +2886,7 @@ app.put('/api/admin/wine-club/rule', authAdmin, (req, res) => {
   for (const k of ['shop', 'visits']) {
     if (rule[k].enabled && !(rule[k].min_eur > 0)) return res.status(400).json({ error: 'Indica una spesa minima per ogni criterio attivo.' });
   }
+  audit(req, 'wine_club_rule.updated', { entity: 'wine_club_rule', before: getWineClubRule(), after: rule });
   setSetting('wine_club_rule', JSON.stringify(rule));
   res.json({ success: true, ...wineClubSummary(rule) });
 });
@@ -2821,7 +2894,9 @@ app.put('/api/admin/wine-club/rule', authAdmin, (req, res) => {
 app.post('/api/admin/wine-club/apply', authAdmin, (req, res) => {
   const rule = getWineClubRule();
   if (!rule.enabled) return res.status(400).json({ error: 'Attiva prima la regola automatica.' });
-  const added = joinWineClub(wineClubCandidates(rule));
+  const candidates = wineClubCandidates(rule);
+  const added = joinWineClub(candidates);
+  audit(req, 'wine_club.applied', { entity: 'wine_club_rule', after: { added, people: candidates } });
   res.json({ success: true, added, ...wineClubSummary(rule) });
 });
 
@@ -3846,7 +3921,8 @@ app.get('/api/admin/fairs/:id', authAdmin, (req, res) => {
     LEFT JOIN suppliers s ON l.entity_type = 'supplier' AND s.id = l.entity_id
     WHERE l.source_fair_id = ? ORDER BY p.name
   `).all(fair.id);
-  fair.attachments = db.prepare('SELECT * FROM fair_attachments WHERE fair_id = ? ORDER BY uploaded_at DESC').all(fair.id);
+  fair.attachments = db.prepare('SELECT * FROM fair_attachments WHERE fair_id = ? ORDER BY uploaded_at DESC').all(fair.id)
+    .map(a => ({ ...a, view_url: signer.signUrl(`/api/admin/fairs/attachments/${a.id}/view`, req.portalSession.id, 1800) }));
   res.json(fair);
 });
 
@@ -4187,7 +4263,8 @@ app.delete('/api/admin/crm/:entityType/:entityId/contacts/:personId', authAdmin,
 // Allegati
 app.get('/api/admin/crm/:entityType/:entityId/attachments', authAdmin, (req, res) => {
   if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
-  res.json(db.prepare('SELECT * FROM crm_attachments WHERE entity_type = ? AND entity_id = ? ORDER BY created_at DESC').all(req.params.entityType, req.params.entityId));
+  res.json(db.prepare('SELECT * FROM crm_attachments WHERE entity_type = ? AND entity_id = ? ORDER BY created_at DESC').all(req.params.entityType, req.params.entityId)
+    .map(a => ({ ...a, download_url: signer.signUrl(`/api/admin/crm/attachments/${a.id}/download`, req.portalSession.id, 1800) })));
 });
 app.post('/api/admin/crm/:entityType/:entityId/attachments', authAdmin, uploadCrmAttachment.single('file'), (req, res) => {
   if (!validEntityType(req.params.entityType)) return res.status(400).json({ error: 'Tipo non valido.' });
@@ -4623,6 +4700,7 @@ app.post('/api/admin/portal-users', authAdmin, (req, res) => {
     const result = db.prepare('INSERT INTO portal_users (name, email, username, password_hash, access_key, role_id) VALUES (?, ?, ?, ?, ?, ?)')
       .run(name.trim(), email.trim().toLowerCase(), username.trim(), hashPassword(password), generatePortalAccessKey(), role_id || null);
     syncOperatorForPortalUser(db.prepare('SELECT * FROM portal_users WHERE id = ?').get(result.lastInsertRowid));
+    audit(req, 'portal_user.created', { entity: 'portal_user', entityId: result.lastInsertRowid, after: portalUserPublic(result.lastInsertRowid) });
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (e) {
     res.status(400).json({ error: 'Username o email già in uso.' });
@@ -4635,9 +4713,13 @@ app.patch('/api/admin/portal-users/:id', authAdmin, (req, res) => {
   for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
   params.push(req.params.id);
+  const before = portalUserPublic(req.params.id);
   try {
     db.prepare(`UPDATE portal_users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
     syncOperatorForPortalUser(db.prepare('SELECT * FROM portal_users WHERE id = ?').get(req.params.id));
+    // Disattivato: le sue sessioni aperte finiscono subito.
+    if (req.body.active !== undefined && !req.body.active) sessions.revokeUser(parseInt(req.params.id));
+    audit(req, 'portal_user.updated', { entity: 'portal_user', entityId: req.params.id, before, after: portalUserPublic(req.params.id) });
     res.json({ success: true });
   } catch (e) {
     res.status(400).json({ error: 'Username o email già in uso.' });
@@ -4645,10 +4727,21 @@ app.patch('/api/admin/portal-users/:id', authAdmin, (req, res) => {
 });
 
 app.delete('/api/admin/portal-users/:id', authAdmin, (req, res) => {
+  const before = portalUserPublic(req.params.id);
   deactivateOperatorForPortalUser(req.params.id);
   db.prepare('DELETE FROM portal_users WHERE id = ?').run(req.params.id);
+  audit(req, 'portal_user.deleted', { entity: 'portal_user', entityId: req.params.id, before });
   res.json({ success: true });
 });
+
+// Dati di un utente adatti al registro attività (mai hash della password o chiavi).
+function portalUserPublic(id) {
+  return db.prepare('SELECT id, name, email, username, active, role_id FROM portal_users WHERE id = ?').get(id) || null;
+}
+function roleSnapshot(id) {
+  const r = db.prepare('SELECT id, name, workspaces FROM roles WHERE id = ?').get(id);
+  return r ? { ...r, workspaces: JSON.parse(r.workspaces) } : null;
+}
 
 // ── Ruoli e permessi ──────────────────────────────────────────────────────────
 app.get('/api/admin/roles', authAdmin, (req, res) => {
@@ -4659,6 +4752,7 @@ app.post('/api/admin/roles', authAdmin, (req, res) => {
   if (!name?.trim()) return res.status(400).json({ error: 'Il nome del ruolo è obbligatorio.' });
   const ws = Array.isArray(workspaces) ? workspaces.filter(w => ALL_WORKSPACES.includes(w)) : [];
   const result = db.prepare('INSERT INTO roles (name, workspaces) VALUES (?, ?)').run(name.trim(), JSON.stringify(ws));
+  audit(req, 'role.created', { entity: 'role', entityId: result.lastInsertRowid, after: roleSnapshot(result.lastInsertRowid) });
   res.json({ success: true, id: result.lastInsertRowid });
 });
 app.patch('/api/admin/roles/:id', authAdmin, (req, res) => {
@@ -4671,12 +4765,16 @@ app.patch('/api/admin/roles/:id', authAdmin, (req, res) => {
   }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
   params.push(req.params.id);
+  const before = roleSnapshot(req.params.id);
   db.prepare(`UPDATE roles SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  audit(req, 'role.updated', { entity: 'role', entityId: req.params.id, before, after: roleSnapshot(req.params.id) });
   res.json({ success: true });
 });
 app.delete('/api/admin/roles/:id', authAdmin, (req, res) => {
+  const before = roleSnapshot(req.params.id);
   db.prepare('UPDATE portal_users SET role_id = NULL WHERE role_id = ?').run(req.params.id);
   db.prepare('DELETE FROM roles WHERE id = ?').run(req.params.id);
+  audit(req, 'role.deleted', { entity: 'role', entityId: req.params.id, before });
   res.json({ success: true });
 });
 
@@ -4720,15 +4818,66 @@ app.post('/api/admin/my-profile/password', authAdmin, (req, res) => {
   if (newPassword.length < 6) return res.status(400).json({ error: 'La nuova password deve avere almeno 6 caratteri.' });
   if (!verifyPassword(currentPassword, req.portalUser.password_hash)) return res.status(400).json({ error: 'Password attuale non corretta.' });
   db.prepare('UPDATE portal_users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), req.portalUser.id);
+  sessions.revokeUser(req.portalUser.id, req.portalSession.id);
+  audit(req, 'password.changed', { entity: 'portal_user', entityId: req.portalUser.id });
   res.json({ success: true });
+});
+
+// ── Accesso: sessioni, link firmati, registro attività, notifiche ─────────────
+// Login con la chiave master: restituisce un token di sessione (la chiave non viaggia più
+// a ogni richiesta). Il campo si chiama ancora "key" per compatibilità con le pagine.
+app.post('/api/admin/session', (req, res) => {
+  if (loginThrottle.blocked(req.ip)) return res.status(429).json({ error: 'Troppi tentativi: riprova tra qualche minuto.' });
+  const key = req.body?.key;
+  if (!key || !safeEqual(key, ADMIN_PASSWORD)) {
+    loginThrottle.fail(req.ip);
+    audit({ ip: req.ip }, 'login.failed', { entity: 'session', actor: 'Chiave master' });
+    return res.status(401).json({ error: 'Chiave non valida.' });
+  }
+  loginThrottle.reset(req.ip);
+  const token = sessions.create({ userId: null, ip: req.ip, userAgent: req.headers['user-agent'] });
+  audit({ isMasterKey: true, ip: req.ip }, 'login', { entity: 'session' });
+  res.json({ success: true, key: token });
+});
+
+app.post('/api/admin/logout', authAdmin, (req, res) => {
+  sessions.revoke(req.headers['x-admin-key']);
+  res.json({ success: true });
+});
+
+// Link firmato (valido 10 minuti, legato alla sessione) per scaricare un export o un file.
+app.get('/api/admin/signed-url', authAdmin, (req, res) => {
+  const target = String(req.query.path || '');
+  if (!/^\/api\/admin\/[a-z0-9/_-]+$/i.test(target)) return res.status(400).json({ error: 'Percorso non valido.' });
+  if (!canAccess(permittedWorkspacesFor(req), 'GET', target)) return res.status(403).json({ error: 'Non hai i permessi per questa sezione.' });
+  res.json({ url: signer.signUrl(target, req.portalSession.id, 600) });
+});
+
+app.get('/api/admin/audit-log', authAdmin, (req, res) => {
+  res.json(listAudit({ entity: req.query.entity || null, entityId: req.query.entity_id ?? null, limit: req.query.limit }));
+});
+
+app.get('/api/admin/notifications', authAdmin, (req, res) => {
+  res.json(notifications.listFor(req, { unreadOnly: req.query.unread === '1' }));
+});
+app.post('/api/admin/notifications/read', authAdmin, (req, res) => {
+  res.json({ success: true, updated: notifications.markRead(req, req.body?.ids) });
 });
 
 app.post('/api/portal-users/login', (req, res) => {
   const { username, password } = req.body || {};
   if (!username?.trim() || !password) return res.status(400).json({ error: 'Inserisci username e password.' });
+  if (loginThrottle.blocked(req.ip)) return res.status(429).json({ error: 'Troppi tentativi: riprova tra qualche minuto.' });
   const user = db.prepare('SELECT * FROM portal_users WHERE username = ? AND active = 1').get(username.trim());
-  if (!user || !verifyPassword(password, user.password_hash)) return res.status(401).json({ error: 'Credenziali non valide.' });
-  res.json({ success: true, key: user.access_key });
+  if (!user || !verifyPassword(password, user.password_hash)) {
+    loginThrottle.fail(req.ip);
+    audit({ ip: req.ip }, 'login.failed', { entity: 'portal_user', actor: username.trim() });
+    return res.status(401).json({ error: 'Credenziali non valide.' });
+  }
+  loginThrottle.reset(req.ip);
+  const token = sessions.create({ userId: user.id, ip: req.ip, userAgent: req.headers['user-agent'] });
+  audit({ portalUser: user, ip: req.ip }, 'login', { entity: 'portal_user', entityId: user.id });
+  res.json({ success: true, key: token });
 });
 
 app.post('/api/portal-users/forgot-password', async (req, res) => {
@@ -4759,6 +4908,9 @@ app.post('/api/portal-users/reset-password', (req, res) => {
     return res.status(400).json({ error: 'Link scaduto o non valido. Richiedine uno nuovo.' });
   }
   db.prepare('UPDATE portal_users SET password_hash = ?, reset_token = NULL, reset_expires = NULL WHERE id = ?').run(hashPassword(password), user.id);
+  // Nuova password: le sessioni aperte con quella vecchia non valgono più.
+  sessions.revokeUser(user.id);
+  audit({ portalUser: user, ip: req.ip }, 'password.reset', { entity: 'portal_user', entityId: user.id });
   res.json({ success: true });
 });
 
@@ -4914,10 +5066,17 @@ app.delete('/api/admin/warehouse/raw/:id', authAdmin, (req, res) => {
   res.json({ success: true });
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🍷 ${CANTINA_NAME}  →  http://localhost:${PORT}`);
-  console.log(`   Admin panel      →  http://localhost:${PORT}/admin.html?key=${ADMIN_PASSWORD}`);
-  console.log(`   Stripe           →  ${stripe ? '✓ configurato' : '✗ non configurato (modalità richiesta di prenotazione)'}`);
-  const emailProvider = gmailTransporter ? `✓ Gmail (${process.env.GMAIL_USER})` : resend ? '✓ Resend' : '✗ Nessun provider email';
-  console.log(`   Email            →  ${emailProvider}\n`);
-});
+// Avvio: solo quando il file è eseguito direttamente (node server.js). I test lo importano e
+// avviano l'app su una porta a caso, senza scheduler.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`\n🍷 ${CANTINA_NAME}  →  http://localhost:${PORT}`);
+    console.log(`   Portale interno  →  http://localhost:${PORT}/portal.html`);
+    console.log(`   Stripe           →  ${stripe ? '✓ configurato' : '✗ non configurato (modalità richiesta di prenotazione)'}`);
+    const emailProvider = gmailTransporter ? `✓ Gmail (${process.env.GMAIL_USER})` : resend ? '✓ Resend' : '✗ Nessun provider email';
+    console.log(`   Email            →  ${emailProvider}\n`);
+  });
+  scheduler.start();
+}
+
+module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit };
