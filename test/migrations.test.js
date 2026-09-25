@@ -67,6 +67,30 @@ test('prima di migrare fa una copia del database', () => {
   assert.match(backups[0], /^x-\d{8}-\d{6}-before-0001\.db$/);
 });
 
+test('ricostruire una tabella con le chiavi esterne spente conserva i collegamenti; gli orfani altrove non bloccano, un collegamento rotto sì', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cantina-mig-fk-'));
+  const migDir = path.join(dir, 'migrations');
+  fs.mkdirSync(migDir);
+  const db = new DatabaseSync(path.join(dir, 'fk.db'));
+  db.exec('PRAGMA foreign_keys = ON');
+  db.exec(`CREATE TABLE p (id INTEGER PRIMARY KEY, kind TEXT CHECK (kind IN ('a')));
+    CREATE TABLE c (id INTEGER PRIMARY KEY, p_id INTEGER REFERENCES p(id) ON DELETE SET NULL);
+    CREATE TABLE x (id INTEGER PRIMARY KEY); CREATE TABLE y (id INTEGER PRIMARY KEY, x_id INTEGER REFERENCES x(id));
+    INSERT INTO p (id, kind) VALUES (1, 'a'); INSERT INTO c (p_id) VALUES (1);`);
+  db.exec('PRAGMA foreign_keys = OFF'); db.exec('INSERT INTO y (x_id) VALUES (99)'); db.exec('PRAGMA foreign_keys = ON'); // orfano storico
+  const rebuild = kinds => `module.exports = { disableForeignKeys: true, rebuilds: ['p'], up(db) { db.exec(\`
+    CREATE TABLE p_new (id INTEGER PRIMARY KEY, kind TEXT CHECK (kind IN (${kinds})));
+    INSERT INTO p_new SELECT id, kind FROM p; DROP TABLE p; ALTER TABLE p_new RENAME TO p;\`); }, down() {} };`;
+  fs.writeFileSync(path.join(migDir, '0001_ricostruisci.js'), rebuild("'a', 'b'"));
+  runMigrations(db, { dir: migDir, log: silent });
+  assert.equal(db.prepare('SELECT p_id FROM c').get().p_id, 1, 'il collegamento resta (senza ON DELETE SET NULL)');
+  assert.equal(db.prepare('PRAGMA foreign_keys').get().foreign_keys, 1, 'le chiavi esterne tornano accese');
+  db.prepare("INSERT INTO p (kind) VALUES ('b')").run();
+  fs.writeFileSync(path.join(migDir, '0002_rompe.js'), `module.exports = { disableForeignKeys: true, rebuilds: ['p'], up(db) { db.exec('DELETE FROM p WHERE id = 1'); }, down() {} };`);
+  assert.throws(() => runMigrations(db, { dir: migDir, log: silent }), /riferimenti non validi/);
+  assert.ok(db.prepare('SELECT 1 FROM p WHERE id = 1').get(), 'annullata per intero');
+});
+
 test('le migrazioni vere del progetto si applicano su un database vuoto e si annullano', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cantina-mig-real-'));
   const db = new DatabaseSync(path.join(dir, 'real.db'));

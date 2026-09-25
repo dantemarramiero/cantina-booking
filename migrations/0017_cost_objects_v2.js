@@ -34,6 +34,7 @@ function rebuild(db, types) {
 
 module.exports = {
   disableForeignKeys: true,
+  rebuilds: ['cost_objects'],
   up(db) {
     rebuild(db, TYPES_V2);
   },
