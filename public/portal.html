@@ -16,12 +16,21 @@
     --cream: #faf7f1; --cream-2: #f2ede3; --line: #e6dfd2; --line-strong: #d3cabb;
     --ink: #381112; --ink-soft: #6b6157; --ink-faint: #8d8274;
     --ok: #4a6b3c; --ok-bg: #e4ecdc; --bad: #a12f21; --bad-bg: #f6e0dc; --warn: #b0741c; --warn-bg: #f8ecd6;
-    --sidebar-w: 248px;
+    /* Token del design system usati dalla barra laterale */
+    --mw-bordeaux-900: #1e0909; --mw-bordeaux-800: #2a0d0e; --mw-bordeaux-700: #381112; --mw-bordeaux-600: #4d1a1b; --mw-bordeaux-100: #e3d2d2;
+    --mw-rame-600: #8c4a2a; --mw-rame-500: #a5623a; --mw-rame-400: #c08552; --mw-rame-200: #e4c4a6;
+    --mw-crema: #eae2ca; --mw-white: #ffffff; --mw-danger-600: #a12f21;
+    --ease-standard: cubic-bezier(.22,.61,.36,1);
+    --dur-instant: 80ms; --dur-fast: 140ms; --dur-base: 220ms; --dur-slow: 340ms;
+    --motion-hover: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+    --shadow-overlay: 0 24px 64px -20px rgba(28,24,21,.42);
+    --nv-closed: 84px; --nv-open: 280px;
     --sans: 'Nunito Sans', Avenir, 'Avenir Next', system-ui, sans-serif;
     --display: 'Bodoni Moda', Didot, serif;
     --editorial: 'Sorts Mill Goudy', 'Goudy Old Style', Georgia, serif;
     --mono: var(--sans);
   }
+  @media (prefers-reduced-motion: reduce) { :root { --dur-instant: 0ms; --dur-fast: 0ms; --dur-base: 0ms; --dur-slow: 0ms; } }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: var(--sans); background: var(--cream); color: var(--ink-soft); font-size: 14px; }
   h1 { font-family: var(--display); font-weight: 400; margin: 0; color: var(--ink); letter-spacing: -0.01em; }
@@ -36,69 +45,107 @@
   #login-screen { max-width: 340px; width: 100%; margin: 90px auto; padding: 0 16px; text-align: center; }
   #login-screen input { width: 100%; padding: 10px; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
 
-  /* App shell: sidebar + main area */
-  .app-shell { display: flex; min-height: 100vh; position: relative; }
-  .sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--bordeaux); border-right: none; display: flex; flex-direction: column; padding: 20px 14px 16px; transition: width .2s cubic-bezier(.22,.61,.36,1); }
-  .sidebar-brand-mark { display: none; width: 100%; text-align: center; font: 400 20px var(--display); color: #eae2ca; }
-  .sidebar-collapse-btn svg { transition: transform .2s ease; }
-  .app-shell.sidebar-collapsed .sidebar { width: 64px; overflow: hidden; }
-  .app-shell.sidebar-collapsed .sidebar-brand-full { display: none; }
-  .app-shell.sidebar-collapsed .sidebar-brand-mark { display: block; }
-  .app-shell.sidebar-collapsed .sidebar-section-label,
-  .app-shell.sidebar-collapsed .workspace-trigger-text,
-  .app-shell.sidebar-collapsed .workspace-chevron,
-  .app-shell.sidebar-collapsed #sidebar-user-name { display: none; }
-  .app-shell.sidebar-collapsed .sidebar-nav button,
-  .app-shell.sidebar-collapsed .sidebar-footer button,
-  .app-shell.sidebar-collapsed .sidebar-footer a,
-  .app-shell.sidebar-collapsed .workspace-trigger { font-size: 0; gap: 0; justify-content: center; }
-  .app-shell.sidebar-collapsed .sidebar-collapse-btn svg { transform: rotate(180deg); }
-  .app-shell.sidebar-collapsed .sidebar:hover {
-    width: 248px; position: absolute; top: 0; left: 0; bottom: 0; z-index: 80; overflow-y: auto;
-    box-shadow: 0 2px 6px rgba(56,17,18,.08), 0 16px 32px -18px rgba(56,17,18,.28);
-  }
-  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-brand-full { display: flex; }
-  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-brand-mark { display: none; }
-  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-section-label,
-  .app-shell.sidebar-collapsed .sidebar:hover .workspace-trigger-text,
-  .app-shell.sidebar-collapsed .sidebar:hover .workspace-chevron,
-  .app-shell.sidebar-collapsed .sidebar:hover #sidebar-user-name { display: block; }
-  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-nav button,
-  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-footer a { font-size: 13px; gap: 11px; justify-content: flex-start; }
-  .app-shell.sidebar-collapsed .sidebar:hover .sidebar-footer button { font-size: 13px; gap: 11px; justify-content: flex-start; }
-  .app-shell.sidebar-collapsed .sidebar:hover .workspace-trigger { font-size: 13px; gap: 10px; justify-content: flex-start; }
-  .sidebar-brand { display: flex; align-items: center; gap: 9px; padding: 0 6px; margin: 2px 0 22px; }
-  .sidebar-brand img { width: 118px; height: auto; opacity: .95; }
-  .sidebar-brand span { display: none; }
-  .sidebar-section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em; color: #c08552; font-weight: 600; padding: 0 10px 9px; margin-top: 9px; }
-  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
-  .sidebar-nav button { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: none; background: none; border-radius: 6px; font-size: 13px; font-weight: 400; color: #e3d2d2; text-align: left; width: 100%; }
-  .sidebar-nav button svg { width: 17px; height: 17px; flex-shrink: 0; color: currentColor; }
-  .sidebar-nav button:hover { background: rgba(234,226,202,.09); }
-  .sidebar-nav button.active { background: var(--wine); color: #fff; font-weight: 600; }
-  .sidebar-nav button.active svg { color: #fff; }
-  .sidebar-footer { margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(234,226,202,.14); display: flex; flex-direction: column; gap: 2px; }
-  .sidebar-footer a, .sidebar-footer button { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border: none; background: none; border-radius: 6px; font-size: 13px; color: #e3d2d2; text-decoration: none; width: 100%; text-align: left; }
-  .sidebar-footer svg { width: 17px; height: 17px; color: #c08552; }
-  .sidebar-footer a:hover, .sidebar-footer button:hover { background: rgba(234,226,202,.09); }
-  .sidebar-user { display: flex; align-items: center; gap: 10px; padding: 0 10px 12px; }
-  .sidebar-user-avatar { width: 28px; height: 28px; border-radius: 999px; background: var(--bordeaux-hover); color: #eae2ca; display: flex; align-items: center; justify-content: center; font: 600 11px var(--sans); flex-shrink: 0; }
-  #sidebar-user-name { font: 400 12px var(--sans); color: #e3d2d2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* App shell: barra laterale a tessere (chiusa 84px, si apre al passaggio sopra il contenuto) + area principale */
+  .app-shell { min-height: 100vh; position: relative; }
+  .main-area { margin-left: var(--nv-closed); transition: margin-left var(--dur-slow) var(--ease-standard); }
+  .app-shell.sidebar-pinned .main-area { margin-left: var(--nv-open); }
+  .sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 40; width: var(--nv-closed); display: flex; flex-direction: column; overflow: hidden;
+    background: linear-gradient(180deg, var(--mw-bordeaux-700), var(--mw-bordeaux-800)); color: var(--mw-crema); border-right: 1px solid var(--mw-bordeaux-600);
+    transition: width var(--dur-slow) var(--ease-standard), box-shadow var(--dur-slow) var(--ease-standard); }
+  .sidebar.is-open { width: var(--nv-open); }
+  .sidebar.is-open:not(.is-pinned) { box-shadow: 24px 0 48px -16px rgba(28,24,21,.55); }
+  .sidebar .nv-label { opacity: 0; transform: translateX(-6px); white-space: nowrap; pointer-events: none;
+    transition: opacity var(--dur-fast) var(--ease-standard), transform var(--dur-base) var(--ease-standard), background-color var(--dur-fast), color var(--dur-fast); }
+  .sidebar.is-open .nv-label { opacity: 1; transform: none; pointer-events: auto; transition-delay: 80ms; }
 
-  /* Workspace switcher (top-level area selector) */
-  .workspace-switcher { position: relative; margin: 2px 0 18px; }
-  .workspace-trigger { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid rgba(234,226,202,.18); background: rgba(234,226,202,.06); border-radius: 6px; cursor: pointer; text-align: left; }
-  .workspace-trigger:hover { background: rgba(234,226,202,.1); }
-  .ws-badge { width: 26px; height: 26px; border-radius: 5px; background: var(--wine); color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font: 600 11px var(--sans); }
-  .ws-badge svg { width: 15px; height: 15px; }
-  .workspace-trigger-text { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: #eae2ca; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .workspace-chevron { width: 15px; height: 15px; color: #c08552; flex-shrink: 0; }
-  .workspace-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-raised, 0 2px 6px rgba(56,17,18,.08), 0 16px 32px -18px rgba(56,17,18,.28)); padding: 5px; display: none; z-index: 30; }
-  .workspace-menu.open { display: block; }
-  .workspace-menu button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 7px 8px; border: none; background: none; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--ink); text-align: left; cursor: pointer; }
-  .workspace-menu button:hover { background: var(--gold-light); }
-  .workspace-menu button.active { background: var(--gold-light); color: var(--wine); font-weight: 600; }
-  .workspace-menu button.active .ws-badge { background: var(--wine); color: #fff; }
+  .sidebar-brand { height: 88px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding: 0 14px; border-bottom: 1px solid var(--mw-bordeaux-600); }
+  .sidebar-brand img { width: 56px; height: auto; transition: width var(--dur-slow) var(--ease-standard); }
+  .sidebar.is-open .sidebar-brand img { width: 120px; }
+
+  /* Selettore modulo */
+  .workspace-switcher { position: relative; flex: 0 0 auto; padding: 14px 14px 6px; }
+  .workspace-trigger { width: 100%; display: flex; align-items: center; gap: 12px; padding: 6px; border-radius: 14px; text-align: left; font-family: var(--sans);
+    background: rgba(0,0,0,.18); border: 1px solid var(--mw-bordeaux-600); color: var(--mw-white); transition: var(--motion-hover); }
+  .workspace-trigger:hover, .workspace-switcher.is-on .workspace-trigger { border-color: var(--mw-rame-400); background: rgba(165,98,58,.14); }
+  .workspace-trigger:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--mw-rame-400); }
+  .ws-badge { width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 11px; color: var(--mw-white);
+    background: linear-gradient(160deg, var(--mw-rame-400), var(--mw-rame-600)); box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 4px 10px -4px rgba(0,0,0,.5); }
+  .ws-badge svg { width: 22px; height: 22px; }
+  .workspace-trigger-text { display: flex; flex-direction: column; min-width: 0; font-size: 15px; font-weight: 700; }
+  .ws-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--mw-rame-200); }
+  .workspace-chevron { width: 16px; height: 16px; margin: 0 6px 0 auto; flex-shrink: 0; color: var(--mw-bordeaux-100); }
+  .workspace-menu { position: absolute; left: 14px; right: 14px; top: calc(100% + 2px); z-index: 5; padding: 6px; border-radius: 14px; display: none; flex-direction: column; gap: 2px;
+    background: var(--mw-bordeaux-900); border: 1px solid var(--mw-bordeaux-600); box-shadow: var(--shadow-overlay); }
+  .sidebar.is-open .workspace-menu.open { display: flex; }
+  .workspace-menu button { display: flex; align-items: center; gap: 12px; padding: 8px; border: none; border-radius: 10px; background: transparent; color: var(--mw-crema); text-align: left; font-family: var(--sans); }
+  .workspace-menu button:hover { background: var(--mw-bordeaux-600); }
+  .workspace-menu button.active { background: rgba(165,98,58,.18); }
+  .workspace-menu .ws-badge { width: 36px; height: 36px; border-radius: 9px; }
+  .workspace-menu .ws-badge svg { width: 18px; height: 18px; }
+  .ws-text { display: flex; flex-direction: column; min-width: 0; }
+  .ws-text b { font-size: 14px; font-weight: 600; }
+  .ws-text small { font-size: 12px; color: var(--mw-bordeaux-100); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ws-check { width: 16px; height: 16px; margin-left: auto; flex-shrink: 0; visibility: hidden; }
+  .workspace-menu button.active .ws-check { visibility: visible; }
+
+  /* Voci */
+  .nv-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 4px 14px 12px; scrollbar-width: none; }
+  .nv-scroll::-webkit-scrollbar { display: none; }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
+  .nv-group-label { position: relative; height: 20px; margin-top: 10px; display: flex; align-items: center; padding-left: 6px; font-size: 10px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--mw-rame-400); }
+  .sidebar:not(.is-open) .nv-group-label::after { content: ""; position: absolute; left: 18px; right: 18px; top: 50%; height: 1px; background: var(--mw-bordeaux-600); }
+  .sidebar-nav button, .nv-item { position: relative; width: 100%; height: 52px; flex-shrink: 0; display: flex; align-items: center; gap: 14px; padding: 0 6px; border: none; border-radius: 14px; text-align: left;
+    background: transparent; color: var(--mw-crema); font: 500 15px var(--sans); transition: background-color var(--dur-fast) var(--ease-standard); }
+  .nv-tile { position: relative; width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 11px; color: var(--mw-crema);
+    background: var(--mw-bordeaux-600); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), inset 0 -2px 0 rgba(0,0,0,.25);
+    transition: background-color var(--dur-fast) var(--ease-standard), transform var(--dur-base) var(--ease-standard), box-shadow var(--dur-base) var(--ease-standard), color var(--dur-fast); }
+  .nv-tile svg { width: 20px; height: 20px; }
+  .sidebar-nav button:hover, .nv-item:hover { background: rgba(255,255,255,.06); }
+  .sidebar-nav button:hover .nv-tile, .nv-item:hover .nv-tile { background: var(--mw-rame-500); color: var(--mw-white); transform: translateY(-2px) scale(1.06);
+    box-shadow: 0 0 0 3px rgba(192,133,82,.28), 0 8px 18px -6px rgba(165,98,58,.85), inset 0 1px 0 rgba(255,255,255,.25); }
+  .sidebar-nav button:active .nv-tile, .nv-item:active .nv-tile { transform: translateY(0) scale(.97); transition-duration: var(--dur-instant); }
+  .sidebar-nav button:focus-visible, .nv-item:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--mw-rame-400); }
+  /* Numero della scorciatoia (tasti 1–9) e freccia della voce attiva: pseudo-elemento, così il testo del pulsante resta pulito */
+  .sidebar-nav button[data-key]::after { content: attr(data-key); margin-left: auto; min-width: 22px; height: 22px; padding: 0 6px; display: grid; place-items: center; border-radius: 6px;
+    font: 600 11px var(--sans); color: var(--mw-bordeaux-100); background: rgba(0,0,0,.2); border: 1px solid var(--mw-bordeaux-600); border-bottom-width: 2px; opacity: 0; transition: opacity var(--dur-fast); }
+  .sidebar.is-open .sidebar-nav button[data-key]::after { opacity: 1; transition-delay: 80ms; }
+  /* Voce attiva (le voci del modulo cedono il posto a Impostazioni / Il mio spazio quando sono aperti quelli) */
+  .sidebar:not([data-place]) .sidebar-nav button.active, .sidebar[data-place="settings"] #settings-nav-btn, .sidebar[data-place="me"] #my-space-nav-btn {
+    background: linear-gradient(90deg, var(--mw-rame-500), var(--mw-rame-600)); color: var(--mw-white); font-weight: 700; box-shadow: 0 8px 20px -10px rgba(0,0,0,.6); }
+  .sidebar:not([data-place]) .sidebar-nav button.active .nv-tile, .sidebar[data-place="settings"] #settings-nav-btn .nv-tile, .sidebar[data-place="me"] #my-space-nav-btn .nv-tile {
+    background: var(--mw-crema); color: var(--mw-bordeaux-700); box-shadow: inset 0 -2px 0 rgba(0,0,0,.12); transform: none; }
+  .sidebar:not([data-place]) .sidebar-nav button.active::after, .sidebar[data-place="settings"] #settings-nav-btn::after, .sidebar[data-place="me"] #my-space-nav-btn::after {
+    content: ""; display: block; min-width: 16px; width: 16px; height: 16px; margin: 0 6px 0 auto; padding: 0; border: none; border-radius: 0; background: currentColor; opacity: 0;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat; }
+  .sidebar.is-open:not([data-place]) .sidebar-nav button.active::after, .sidebar.is-open[data-place="settings"] #settings-nav-btn::after, .sidebar.is-open[data-place="me"] #my-space-nav-btn::after { opacity: 1; }
+  /* Voce attiva a barra chiusa: tessera rame con anello crema + tacca sul bordo sinistro */
+  .sidebar:not(.is-open):not([data-place]) .sidebar-nav button.active, .sidebar:not(.is-open)[data-place="settings"] #settings-nav-btn, .sidebar:not(.is-open)[data-place="me"] #my-space-nav-btn { background: transparent; box-shadow: none; }
+  .sidebar:not(.is-open):not([data-place]) .sidebar-nav button.active .nv-tile, .sidebar:not(.is-open)[data-place="settings"] #settings-nav-btn .nv-tile, .sidebar:not(.is-open)[data-place="me"] #my-space-nav-btn .nv-tile {
+    background: linear-gradient(160deg, var(--mw-rame-400), var(--mw-rame-600)); color: var(--mw-white); box-shadow: 0 0 0 3px rgba(234,226,202,.9); }
+  .sidebar:not(.is-open):not([data-place]) .sidebar-nav button.active::before, .sidebar:not(.is-open)[data-place="settings"] #settings-nav-btn::before, .sidebar:not(.is-open)[data-place="me"] #my-space-nav-btn::before {
+    content: ""; position: absolute; left: -14px; top: 12px; bottom: 12px; width: 4px; border-radius: 0 4px 4px 0; background: var(--mw-crema); }
+  /* Badge notifiche sulla tessera: <span class="nv-dot">3</span> dentro .nv-tile */
+  .nv-dot { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; display: grid; place-items: center;
+    font: 700 10px/1 var(--sans); color: var(--mw-white); background: var(--mw-danger-600); border: 2px solid var(--mw-bordeaux-700); }
+
+  /* Footer: Il mio spazio, Impostazioni, utente, tieni aperta */
+  .sidebar-footer { flex: 0 0 auto; padding: 10px 14px 14px; border-top: 1px solid var(--mw-bordeaux-600); display: flex; flex-direction: column; gap: 6px; }
+  .sidebar-user { display: flex; align-items: center; gap: 12px; padding: 6px; border-radius: 14px; background: rgba(0,0,0,.18); }
+  .sidebar-user-avatar { width: 44px; height: 44px; flex: 0 0 auto; border-radius: 99px; display: grid; place-items: center; font: 700 16px var(--sans); color: var(--mw-bordeaux-700); background: var(--mw-crema); box-shadow: 0 0 0 2px var(--mw-rame-500); }
+  .sidebar-user-text { display: flex; flex-direction: column; min-width: 0; }
+  .sidebar-user-text b { font-size: 14px; color: var(--mw-white); overflow: hidden; text-overflow: ellipsis; }
+  .sidebar-user-text small { font-size: 12px; color: var(--mw-bordeaux-100); overflow: hidden; text-overflow: ellipsis; }
+  .sidebar-user-text small:empty { display: none; }
+  .sidebar-logout { margin-left: auto; width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border: none; border-radius: 10px; background: transparent; color: var(--mw-bordeaux-100); }
+  .sidebar-logout svg { width: 18px; height: 18px; }
+  .sidebar-logout:hover { background: var(--mw-danger-600); color: var(--mw-white); }
+  .sidebar-pin { height: 36px; display: flex; align-items: center; gap: 12px; padding: 0 20px; border: none; border-radius: 10px; background: transparent; color: var(--mw-bordeaux-100); font: 500 13px var(--sans); }
+  .sidebar-pin svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .sidebar-pin:hover { color: var(--mw-white); background: rgba(255,255,255,.06); }
+  .sidebar-pin[aria-pressed="true"] { color: var(--mw-rame-200); }
+  .sidebar-pin:focus-visible, .sidebar-logout:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--mw-rame-400); }
+  @media (prefers-reduced-motion: reduce) { .sidebar-nav button:hover .nv-tile, .nv-item:hover .nv-tile { transform: none; } }
 
   .ord-new-dropdown { position: relative; margin-left: auto; }
   .ord-new-menu { position: absolute; top: calc(100% + 6px); right: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(56,17,18,0.14); padding: 5px; display: none; z-index: 30; min-width: 220px; max-height: 280px; overflow-y: auto; }
@@ -107,7 +154,7 @@
   .ord-new-menu a:hover { background: #f2ede3; }
   .ord-new-menu .ord-new-empty { padding: 10px; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
 
-  .main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .main-area { min-width: 0; display: flex; flex-direction: column; min-height: 100vh; }
   .topbar { height: 64px; flex-shrink: 0; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; }
   .topbar .crumb { font-size: 14px; font-weight: 600; color: var(--ink); }
   .topbar .crumb small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -418,7 +465,7 @@
   .ob-dialog-note { margin: 10px 0 0; font-size: 13px; color: var(--ink-soft); }
   .ob-dialog .ob-text-input { width: 100%; height: 40px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 4px; font: 400 14px var(--sans); color: #2e2925; box-shadow: inset 0 1px 2px rgba(56,17,18,.05); }
   .ob-dialog .ob-text-input:focus { outline: none; border-color: var(--wine); box-shadow: 0 0 0 3px rgba(165,98,58,.32); }
-  /* Breakpoints on the space the screen actually gets (the portal sidebar takes 248px), not the viewport */
+  /* Breakpoints on the space the screen actually gets (the portal sidebar takes 84px, 280px when pinned), not the viewport */
   .ob { container-type: inline-size; }
   @container (max-width: 1040px) { .ob-months { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
   @container (max-width: 860px) {
@@ -507,6 +554,7 @@
     .prod-thumb { width: 26px !important; height: 34px !important; }
 
     .sidebar { display: none !important; }
+    .main-area, .app-shell.sidebar-pinned .main-area { margin-left: 0; }
     .mobile-settings-btn { display: flex; }
     .topbar { padding: 12px 16px; gap: 10px; justify-content: space-between; }
     main { padding: 16px 16px 88px; }
@@ -813,243 +861,215 @@
 
 <div id="app" style="display:none">
 <div class="app-shell">
-  <aside class="sidebar">
-    <div class="sidebar-brand sidebar-brand-full">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
       <img src="/img/logo-cream.png" alt="Marramiero">
     </div>
-    <div class="sidebar-brand-mark">M</div>
 
     <div class="workspace-switcher" id="workspace-switcher">
-      <button class="workspace-trigger" onclick="toggleWorkspaceMenu()">
-        <span class="ws-badge" id="workspace-trigger-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>
-        </span>
-        <span class="workspace-trigger-text" id="workspace-trigger-label">Commerciale</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="workspace-chevron"><polyline points="6 9 12 15 18 9"/></svg>
+      <button class="workspace-trigger" onclick="toggleWorkspaceMenu()" aria-haspopup="true" aria-expanded="false">
+        <span class="ws-badge" id="workspace-trigger-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg></span>
+        <span class="nv-label workspace-trigger-text"><span class="ws-eyebrow">Modulo</span><span id="workspace-trigger-label">Commerciale</span></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nv-label workspace-chevron"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
       </button>
       <div class="workspace-menu" id="workspace-menu">
         <button data-ws="enoturismo" onclick="switchWorkspace('enoturismo')">
           <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg></span>
-          Enoturismo
+          <span class="ws-text"><b>Enoturismo</b><small>Visite e degustazioni</small></span>
+          <svg class="ws-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
         <button data-ws="commerciale" class="active" onclick="switchWorkspace('commerciale')">
           <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-5 3 3 5-7"/></svg></span>
-          Commerciale
+          <span class="ws-text"><b>Commerciale</b><small>Ordini, listini, obiettivi</small></span>
+          <svg class="ws-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
         <button data-ws="produzione" onclick="switchWorkspace('produzione')">
           <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg></span>
-          Produzione
+          <span class="ws-text"><b>Produzione</b><small>Per bottiglia e per cliente</small></span>
+          <svg class="ws-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
         <button data-ws="magazzino" onclick="switchWorkspace('magazzino')">
           <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/></svg></span>
-          Magazzino
+          <span class="ws-text"><b>Magazzino</b><small>Scorte, movimenti, valore</small></span>
+          <svg class="ws-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
         <button data-ws="crm" onclick="switchWorkspace('crm')">
           <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg></span>
-          CRM
+          <span class="ws-text"><b>CRM</b><small>Contatti, clienti, fornitori</small></span>
+          <svg class="ws-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
         <button data-ws="people" onclick="switchWorkspace('people')">
           <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 16.5c.6-1.6 1.9-2.5 3.5-2.5s2.9.9 3.5 2.5"/><line x1="15" y1="10" x2="19" y2="10"/><line x1="15" y1="14" x2="18" y2="14"/></svg></span>
-          People
+          <span class="ws-text"><b>People</b><small>Dipendenti e presenze</small></span>
+          <svg class="ws-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
         <button data-ws="finance" onclick="switchWorkspace('finance')">
           <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5a4.5 4.5 0 1 0 0 7"/><line x1="7" y1="10.5" x2="13" y2="10.5"/><line x1="7" y1="13.5" x2="13" y2="13.5"/></svg></span>
-          Finance
+          <span class="ws-text"><b>Finance</b><small>Costi e ribaltamenti</small></span>
+          <svg class="ws-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
       </div>
     </div>
 
-    <div class="sidebar-section-label">Sezioni</div>
+    <div class="nv-scroll">
     <nav class="sidebar-nav" data-workspace-nav="commerciale">
+      <div class="nv-group-label"><span class="nv-label">Vendite</span></div>
       <button data-sub="com-dashboard" class="active">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-        Dashboard
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><span class="nv-label">Dashboard</span>
       </button>
       <button data-sub="com-ordini">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
-        Ordini
-      </button>
-      <button data-sub="com-import">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>
-        Importa da Excel
-      </button>
-      <button data-sub="com-prodotti">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg>
-        Bottiglie
-      </button>
-      <button data-sub="com-listini">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 12.6 12.6 20.4a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1 0-2.8L11.4 3.6a2 2 0 0 1 1.4-.6H19a2 2 0 0 1 2 2v6.6a2 2 0 0 1-.6 1.4Z"/><circle cx="15" cy="9" r="1.5"/></svg>
-        Listini
-      </button>
-      <button data-sub="com-news">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="13" y2="17"/></svg>
-        News
-      </button>
-      <button data-sub="com-catalogo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 1 4 17.5v-13Z"/><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/></svg>
-        Catalogo
-      </button>
-      <button data-sub="com-fiere">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
-        Fiere
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg></span><span class="nv-label">Ordini</span>
       </button>
       <button data-sub="com-obiettivi">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
-        Obiettivi
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></span><span class="nv-label">Obiettivi</span>
+      </button>
+      <button data-sub="com-fiere">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg></span><span class="nv-label">Fiere</span>
+      </button>
+      <div class="nv-group-label"><span class="nv-label">Prodotti</span></div>
+      <button data-sub="com-prodotti">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/><line x1="10" y1="2" x2="14" y2="2"/></svg></span><span class="nv-label">Bottiglie</span>
+      </button>
+      <button data-sub="com-listini">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 12.6 12.6 20.4a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1 0-2.8L11.4 3.6a2 2 0 0 1 1.4-.6H19a2 2 0 0 1 2 2v6.6a2 2 0 0 1-.6 1.4Z"/><circle cx="15" cy="9" r="1.5"/></svg></span><span class="nv-label">Listini</span>
+      </button>
+      <button data-sub="com-catalogo">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 1 4 17.5v-13Z"/><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/></svg></span><span class="nv-label">Catalogo</span>
+      </button>
+      <div class="nv-group-label"><span class="nv-label">Strumenti</span></div>
+      <button data-sub="com-import">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 20h16"/></svg></span><span class="nv-label">Importa da Excel</span>
+      </button>
+      <button data-sub="com-news">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="13" y2="17"/></svg></span><span class="nv-label">News</span>
       </button>
     </nav>
 
     <nav class="sidebar-nav" data-workspace-nav="produzione" style="display:none">
+      <div class="nv-group-label"><span class="nv-label">Sezioni</span></div>
       <button data-sub="prod-dashboard" class="active">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-        Dashboard
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><span class="nv-label">Dashboard</span>
       </button>
       <button data-sub="prod-riepilogo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/></svg>
-        Per bottiglia
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3.5c0 .8.3 1.5.9 2.1.9.9 1.1 2 1.1 3.4v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-9c0-1.4.2-2.5 1.1-3.4.6-.6.9-1.3.9-2.1V2Z"/></svg></span><span class="nv-label">Per bottiglia</span>
       </button>
       <button data-sub="prod-clienti">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
-        Per cliente/etichetta
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg></span><span class="nv-label">Per cliente/etichetta</span>
       </button>
       <button data-sub="prod-righe">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
-        Righe ordine
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg></span><span class="nv-label">Righe ordine</span>
       </button>
     </nav>
 
     <nav class="sidebar-nav" data-workspace-nav="magazzino" style="display:none">
+      <div class="nv-group-label"><span class="nv-label">Sezioni</span></div>
       <button data-sub="mag-dashboard" class="active">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-        Dashboard
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><span class="nv-label">Dashboard</span>
       </button>
       <button data-sub="mag-ordini">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
-        Ordini
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg></span><span class="nv-label">Ordini</span>
       </button>
       <button data-sub="mag-finiti">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/></svg>
-        Prodotti finiti
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/></svg></span><span class="nv-label">Prodotti finiti</span>
       </button>
       <button data-sub="mag-materie">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
-        Materie prime
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg></span><span class="nv-label">Materie prime</span>
       </button>
       <button data-sub="mag-registro">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12l4 4v12H4Z"/><path d="M8 10h8M8 14h8M8 18h5"/></svg>
-        Registro e valore
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12l4 4v12H4Z"/><path d="M8 10h8M8 14h8M8 18h5"/></svg></span><span class="nv-label">Registro e valore</span>
       </button>
     </nav>
 
     <nav class="sidebar-nav" data-workspace-nav="crm" style="display:none">
+      <div class="nv-group-label"><span class="nv-label">Sezioni</span></div>
       <button data-sub="crm-dashboard" class="active">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-        Dashboard
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><span class="nv-label">Dashboard</span>
       </button>
       <button data-sub="crm-persone">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"/></svg>
-        Contatti
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"/></svg></span><span class="nv-label">Contatti</span>
       </button>
       <button data-sub="crm-clienti">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
-        Clienti
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg></span><span class="nv-label">Clienti</span>
       </button>
       <button data-sub="crm-agenti">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/></svg>
-        Agenti
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/></svg></span><span class="nv-label">Agenti</span>
       </button>
       <button data-sub="crm-importatori">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M2.5 9h19M2.5 15h19M11.5 3a15 15 0 0 0 0 18M12.5 3a15 15 0 0 1 0 18"/></svg>
-        Importatori
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M2.5 9h19M2.5 15h19M11.5 3a15 15 0 0 0 0 18M12.5 3a15 15 0 0 1 0 18"/></svg></span><span class="nv-label">Importatori</span>
       </button>
       <button data-sub="crm-fornitori">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
-        Fornitori
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg></span><span class="nv-label">Fornitori</span>
       </button>
     </nav>
 
     <nav class="sidebar-nav" data-workspace-nav="people" style="display:none">
+      <div class="nv-group-label"><span class="nv-label">Sezioni</span></div>
       <button data-sub="people-dipendenti" class="active">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"/></svg>
-        Dipendenti
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"/></svg></span><span class="nv-label">Dipendenti</span>
       </button>
       <button data-sub="people-assenze">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><path d="m9.5 13.5 5 5M14.5 13.5l-5 5"/></svg>
-        Assenze
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><path d="m9.5 13.5 5 5M14.5 13.5l-5 5"/></svg></span><span class="nv-label">Assenze</span>
       </button>
       <button data-sub="people-presenze">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        Presenze
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nv-label">Presenze</span>
       </button>
       <button data-sub="people-richieste">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3Z"/><path d="M8 9h8M8 12h5"/></svg>
-        Richieste
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3Z"/><path d="M8 9h8M8 12h5"/></svg></span><span class="nv-label">Richieste</span>
       </button>
       <button data-sub="people-scadenze">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/></svg>
-        Scadenze
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/></svg></span><span class="nv-label">Scadenze</span>
       </button>
       <button data-sub="people-sicurezza">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6Z"/><path d="m9 12 2 2 4-4"/></svg>
-        Sicurezza
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6Z"/><path d="m9 12 2 2 4-4"/></svg></span><span class="nv-label">Sicurezza</span>
       </button>
       <button data-sub="people-squadre">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg>
-        Squadre
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M16 15.2c2.3.4 4 2 4 4.8"/></svg></span><span class="nv-label">Squadre</span>
       </button>
       <button data-sub="people-sedi">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="6" r="2" fill="#fff"/><circle cx="15" cy="12" r="2" fill="#fff"/><circle cx="7" cy="18" r="2" fill="#fff"/></svg>
-        Configurazione
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="6" r="2" fill="#fff"/><circle cx="15" cy="12" r="2" fill="#fff"/><circle cx="7" cy="18" r="2" fill="#fff"/></svg></span><span class="nv-label">Configurazione</span>
       </button>
     </nav>
 
     <nav class="sidebar-nav" data-workspace-nav="finance" style="display:none">
+      <div class="nv-group-label"><span class="nv-label">Sezioni</span></div>
       <button data-sub="fin-centri" class="active">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-2h12v2"/></svg>
-        Centri di costo
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-2h12v2"/></svg></span><span class="nv-label">Centri di costo</span>
       </button>
       <button data-sub="fin-regole">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10"/><path d="M4 12h7"/><path d="M4 18h4"/><path d="M15 3l4 3-4 3"/><path d="M14 13l3 3-3 3"/></svg>
-        Ribaltamenti
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10"/><path d="M4 12h7"/><path d="M4 18h4"/><path d="M15 3l4 3-4 3"/><path d="M14 13l3 3-3 3"/></svg></span><span class="nv-label">Ribaltamenti</span>
       </button>
       <button data-sub="fin-driver">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>
-        Driver
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg></span><span class="nv-label">Driver</span>
       </button>
       <button data-sub="fin-costi">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2Z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
-        Costi diretti
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2Z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/></svg></span><span class="nv-label">Costi diretti</span>
       </button>
       <button data-sub="fin-cascata">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="4" rx="1"/><rect x="8.5" y="10" width="7" height="4" rx="1"/><rect x="14" y="17" width="7" height="4" rx="1"/><path d="M6.5 7v5h2M12 14v5h2"/></svg>
-        Cascata
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="4" rx="1"/><rect x="8.5" y="10" width="7" height="4" rx="1"/><rect x="14" y="17" width="7" height="4" rx="1"/><path d="M6.5 7v5h2M12 14v5h2"/></svg></span><span class="nv-label">Cascata</span>
       </button>
       <button data-sub="fin-oggetti">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
-        Oggetti di costo
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></span><span class="nv-label">Oggetti di costo</span>
       </button>
     </nav>
+    </div>
 
     <div class="sidebar-footer">
-      <div class="sidebar-user" id="sidebar-user" style="display:none">
+      <button class="nv-item" onclick="openMySpace()" id="my-space-nav-btn">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"/></svg></span><span class="nv-label">Il mio spazio</span>
+      </button>
+      <button class="nv-item" onclick="openSettings()" id="settings-nav-btn">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3h-6l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4L4.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1L9 21h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4Z"/></svg></span><span class="nv-label">Impostazioni</span>
+      </button>
+      <div class="sidebar-user" id="sidebar-user">
         <span class="sidebar-user-avatar" id="sidebar-user-avatar"></span>
-        <span id="sidebar-user-name"></span>
+        <span class="nv-label sidebar-user-text"><b id="sidebar-user-name"></b><small id="sidebar-user-role"></small></span>
+        <button type="button" class="nv-label sidebar-logout" onclick="logout()" title="Esci" aria-label="Esci">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
       </div>
-      <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Comprimi/espandi sidebar">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
-        Comprimi
-      </button>
-      <button onclick="openMySpace()" id="my-space-nav-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"/></svg>
-        Il mio spazio
-      </button>
-      <button onclick="openSettings()" id="settings-nav-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3h-6l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4L4.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1L9 21h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4Z"/></svg>
-        Impostazioni
-      </button>
-      <button onclick="logout()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        Esci
+      <button type="button" class="sidebar-pin" id="sidebar-pin" onclick="toggleSidebarPin()" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.8a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v3.8a2 2 0 0 1-1.1 1.7l-1.8.9A2 2 0 0 0 5 15.2Z"/></svg>
+        <span class="nv-label" id="sidebar-pin-label">Tieni aperta</span>
       </button>
     </div>
   </aside>
@@ -3020,13 +3040,77 @@ async function logout() {
   location.reload();
 }
 
-function toggleSidebarCollapse() {
-  const collapsed = document.querySelector('.app-shell').classList.toggle('sidebar-collapsed');
-  localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0');
+// ── Barra laterale: chiusa a tessere, si apre al passaggio; "Tieni aperta" la fissa ──
+const SIDEBAR = { hover: false, timer: null, pinned: false };
+try { SIDEBAR.pinned = localStorage.getItem('mw-nav-pinned') === '1'; } catch {}
+
+function syncSidebar() {
+  const bar = document.getElementById('sidebar');
+  const menuOpen = document.getElementById('workspace-menu').classList.contains('open');
+  const open = SIDEBAR.pinned || SIDEBAR.hover || menuOpen;
+  bar.classList.toggle('is-open', open);
+  bar.classList.toggle('is-pinned', SIDEBAR.pinned);
+  document.querySelector('.app-shell').classList.toggle('sidebar-pinned', SIDEBAR.pinned);
+  document.getElementById('workspace-switcher').classList.toggle('is-on', menuOpen);
+  document.querySelector('.workspace-trigger').setAttribute('aria-expanded', menuOpen ? 'true' : 'false');
+  const pin = document.getElementById('sidebar-pin');
+  pin.setAttribute('aria-pressed', SIDEBAR.pinned ? 'true' : 'false');
+  document.getElementById('sidebar-pin-label').textContent = SIDEBAR.pinned ? 'Chiudi automaticamente' : 'Tieni aperta';
+  pin.title = open ? '' : 'Tieni aperta';
+  // Tooltip nativo col nome della voce solo a barra chiusa
+  bar.querySelectorAll('.sidebar-nav button, .nv-item').forEach(b => {
+    if (open) b.removeAttribute('title'); else b.title = b.querySelector('.nv-label')?.textContent.trim() || '';
+  });
 }
-if (localStorage.getItem('sidebar_collapsed') === '1') {
-  document.addEventListener('DOMContentLoaded', () => document.querySelector('.app-shell').classList.add('sidebar-collapsed'));
+
+function setSidebarHover(on, delay) {
+  clearTimeout(SIDEBAR.timer);
+  SIDEBAR.timer = setTimeout(() => {
+    SIDEBAR.hover = on;
+    if (!on) document.getElementById('workspace-menu').classList.remove('open');
+    syncSidebar();
+  }, delay);
 }
+
+function toggleSidebarPin() {
+  SIDEBAR.pinned = !SIDEBAR.pinned;
+  try { localStorage.setItem('mw-nav-pinned', SIDEBAR.pinned ? '1' : '0'); } catch {}
+  syncSidebar();
+}
+
+// Dove si trova l'utente fuori dalle voci del modulo: 'settings', 'me' o nessuno
+function setSidebarPlace(place) {
+  const bar = document.getElementById('sidebar');
+  if (place) bar.dataset.place = place; else delete bar.dataset.place;
+}
+
+(function initSidebar() {
+  const bar = document.getElementById('sidebar');
+  bar.addEventListener('mouseenter', () => setSidebarHover(true, 90));
+  bar.addEventListener('mouseleave', () => setSidebarHover(false, 220));
+  bar.addEventListener('focusin', () => setSidebarHover(true, 0));
+  bar.addEventListener('focusout', (e) => { if (!bar.contains(e.relatedTarget)) setSidebarHover(false, 220); });
+  // Numeri 1–9 per le prime nove voci di ciascun modulo
+  document.querySelectorAll('[data-workspace-nav]').forEach(nav => {
+    nav.querySelectorAll('button[data-sub]').forEach((b, i) => { if (i < 9) b.dataset.key = String(i + 1); });
+  });
+  syncSidebar();
+})();
+
+document.addEventListener('keydown', (e) => {
+  if (!/^[1-9]$/.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable) return;
+  if (document.getElementById('app').style.display === 'none') return;
+  // Niente scorciatoie con una finestra o una scheda a tutto schermo aperta sopra
+  if (document.querySelector('.modal-overlay.open')) return;
+  if (['crm-record-view', 'fair-detail-view'].some(id => document.getElementById(id)?.getClientRects().length)) return;
+  const nav = [...document.querySelectorAll('[data-workspace-nav]')].find(n => n.style.display !== 'none');
+  const btn = nav?.querySelector(`button[data-key="${e.key}"]`);
+  if (!btn) return;
+  e.preventDefault();
+  btn.click();
+});
 
 function showLoginForm(id) {
   ['login-form-user', 'login-form-master', 'login-form-forgot', 'login-form-reset'].forEach(f => document.getElementById(f).style.display = f === id ? 'block' : 'none');
@@ -3120,15 +3204,21 @@ const WORKSPACE_ICONS = {
 };
 const MODULE_TITLES = { commerciale: 'Commerciale', produzione: 'Produzione', magazzino: 'Magazzino', crm: 'CRM', people: 'People', finance: 'Finance', impostazioni: 'Impostazioni' };
 
-function toggleWorkspaceMenu() { document.getElementById('workspace-menu').classList.toggle('open'); }
+function toggleWorkspaceMenu() {
+  document.getElementById('workspace-menu').classList.toggle('open');
+  syncSidebar();
+}
 document.addEventListener('click', (e) => {
   const switcher = document.getElementById('workspace-switcher');
-  if (switcher && !switcher.contains(e.target)) document.getElementById('workspace-menu').classList.remove('open');
+  const menu = document.getElementById('workspace-menu');
+  if (switcher && !switcher.contains(e.target) && menu.classList.contains('open')) { menu.classList.remove('open'); syncSidebar(); }
 });
 
 function switchWorkspace(ws) {
   document.getElementById('workspace-menu').classList.remove('open');
+  syncSidebar();
   if (ws === 'enoturismo') { window.location.href = '/admin.html'; return; }
+  setSidebarPlace(null);
 
   document.querySelectorAll('#workspace-menu button').forEach(b => b.classList.toggle('active', b.dataset.ws === ws));
   document.querySelectorAll('#mobile-bottom-tabbar button').forEach(b => b.classList.toggle('active', b.dataset.ws === ws));
@@ -3154,6 +3244,7 @@ function openSettings() {
   document.getElementById('module-impostazioni').classList.add('active');
   document.getElementById('topbar-title').textContent = 'Impostazioni';
   document.getElementById('mobile-section-tabs').innerHTML = '';
+  setSidebarPlace('settings');
   closeSettingsPanel();
   loadSettings();
   loadPortalUsers();
@@ -3199,6 +3290,13 @@ document.querySelectorAll('[data-workspace-nav] button[data-sub]').forEach(btn =
     group.querySelectorAll('button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const moduleEl = document.getElementById('module-' + group.dataset.workspaceNav);
+    // Da Impostazioni o Il mio spazio si torna al modulo della voce
+    if (!moduleEl.classList.contains('active')) {
+      document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+      moduleEl.classList.add('active');
+      document.getElementById('topbar-title').textContent = MODULE_TITLES[group.dataset.workspaceNav];
+    }
+    setSidebarPlace(null);
     moduleEl.querySelectorAll('.subpanel').forEach(p => p.classList.remove('active'));
     document.getElementById('sub-' + btn.dataset.sub).classList.add('active');
     loadSubpanel(btn.dataset.sub);
@@ -6949,11 +7047,10 @@ async function boot() {
   PERMITTED_WORKSPACES = me.permittedWorkspaces;
   applyPermissions();
   initBell();
-  if (me.name) {
-    document.getElementById('sidebar-user').style.display = 'flex';
-    document.getElementById('sidebar-user-avatar').textContent = me.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-    document.getElementById('sidebar-user-name').textContent = me.name;
-  }
+  const userName = me.name || 'Utente';
+  document.getElementById('sidebar-user-avatar').textContent = userName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  document.getElementById('sidebar-user-name').textContent = userName;
+  document.getElementById('sidebar-user-role').textContent = me.isMaster ? 'Marramiero · Admin' : (me.roleName || '');
   const params = new URLSearchParams(window.location.search);
   if (params.get('me')) { openMySpace(); return; } // link delle notifiche del self-service
   let ws = params.get('workspace');

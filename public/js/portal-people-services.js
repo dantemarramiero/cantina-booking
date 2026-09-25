@@ -18,6 +18,7 @@ function openMySpace(tab) {
   document.getElementById('topbar-title').textContent = 'Il mio spazio';
   document.getElementById('mobile-section-tabs').innerHTML = '';
   if (typeof closeMobileSidebar === 'function') closeMobileSidebar();
+  if (typeof setSidebarPlace === 'function') setSidebarPlace('me');
   if (tab) ME.tab = tab;
   loadMySpace();
 }
