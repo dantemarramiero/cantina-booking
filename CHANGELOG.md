@@ -180,6 +180,31 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - Elenco degli stagionali con le campagne lavorate e chi richiamare.
 - Recruiting (solo modello dati): candidati con consenso privacy e cancellazione automatica, conversione in dipendente.
 
+## 2026-09-25 — Magazzino valorizzato (Fase 3)
+
+**Registro dei movimenti a costo medio ponderato** (dettagli in `docs/people-finance/04-fase-3.md`)
+- Ogni carico e scarico è un movimento che non si modifica: le correzioni sono storni. Ogni movimento porta la giacenza e il valore dopo di sé.
+- Costo medio ponderato continuo, al centesimo: quando la giacenza va a zero esce tutto il valore residuo.
+- Collegato ai flussi di sempre, nella stessa transazione:
+  - vendita in cassa;
+  - ritiro online: impegno al pagamento, scarico al ritiro;
+  - ordini B2B evasi, che ora scalano le bottiglie (solo quelli evasi dopo l'attivazione);
+  - check-in delle visite: proposta di scarico dei vini in degustazione, da confermare, a carico dell'esperienza;
+  - modifiche manuali della quantità, che diventano rettifiche con il motivo.
+- Eventi `stock.issued`, `stock.issue_reversed`, `stock.received`, `stock.adjusted` con il costo, pronti per il costo del venduto della Fase 4.
+
+**Magazzino → Registro e valore**
+- Giacenze e valore, movimenti, carichi (acquisto, produzione) e scarichi (omaggi, degustazioni, consumi), degustazioni da confermare, inventari con rettifiche.
+- Foglio Excel dei costi: si scarica, si compila e ricaricandolo valorizza la giacenza di oggi.
+- Controlli: giacenze sotto zero, articoli senza costo, righe B2B senza prodotto e differenze con le quantità di sempre. Un job notturno le confronta e avvisa il Magazzino (passo B della transizione, circa 2 settimane prima di cambiare la fonte di verità).
+
+**Cassa e CRM**
+- «Annulla» in cassa non cancella più la vendita: resta segnata come annullata, con chi, quando e il motivo, e il magazzino viene stornato. Le vendite annullate non contano per il wine club.
+- Fix:
+  - il webhook di Stripe non scala più due volte le bottiglie se lo stesso evento arriva due volte;
+  - il «Totale speso» della persona nel CRM contava anche visite non confermate e ritiri non pagati;
+  - gli errori nella modifica di prodotti finiti e materie prime ora compaiono.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

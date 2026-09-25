@@ -935,6 +935,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l5 3v-3l5 3V8l5 3v10Z"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
         Materie prime
       </button>
+      <button data-sub="mag-registro">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12l4 4v12H4Z"/><path d="M8 10h8M8 14h8M8 18h5"/></svg>
+        Registro e valore
+      </button>
     </nav>
 
     <nav class="sidebar-nav" data-workspace-nav="crm" style="display:none">
@@ -1309,6 +1313,8 @@
           <tbody id="finished-tbody"></tbody></table>
         </div>
       </div>
+
+      <div class="subpanel" id="sub-mag-registro"><div id="mag-registro-root"></div></div>
 
       <div class="subpanel" id="sub-mag-materie">
         <div class="toolbar"><button class="btn" onclick="openRawModal()">+ Nuova referenza</button></div>
@@ -2977,6 +2983,7 @@
 <script src="/js/portal-people-absences.js"></script>
 <script src="/js/portal-people-timesheet.js"></script>
 <script src="/js/portal-people-services.js"></script>
+<script src="/js/portal-stock.js"></script>
 <script>
 let ADMIN_KEY = null;
 let PRODUCTS = [];
@@ -3230,6 +3237,7 @@ function loadSubpanel(sub) {
   if (sub === 'prod-clienti') loadProductionSummary();
   if (sub === 'prod-righe') loadProductionItems();
   if (sub === 'mag-dashboard') loadMagazzinoDashboard();
+  if (sub === 'mag-registro') loadStockLedger();
   if (sub === 'crm-dashboard') loadCrmDashboard();
   if (sub === 'people-dipendenti') loadHrEmployees();
   if (sub === 'people-squadre') loadHrTeams();
@@ -5074,10 +5082,10 @@ async function renderPersonTransactions(personId) {
   `).join('') : '<tr><td colspan="4" class="empty">Nessuna visita registrata.</td></tr>';
 
   document.getElementById('ppl-sales-tbody').innerHTML = p.shopSales.length ? p.shopSales.map(s => `
-    <tr>
-      <td>${s.created_at}</td>
+    <tr style="${s.cancelled_at ? 'opacity:.55' : ''}">
+      <td>${s.created_at}${s.cancelled_at ? ' <span class="badge grey">annullata</span>' : ''}</td>
       <td>${s.items.map(it => `${it.quantity}× ${esc(it.product_name)}`).join(', ')}</td>
-      <td>€ ${fmtEuro(s.total_cents)}</td>
+      <td>${s.cancelled_at ? '<s>' : ''}€ ${fmtEuro(s.total_cents)}${s.cancelled_at ? '</s>' : ''}</td>
     </tr>
   `).join('') : '<tr><td colspan="3" class="empty">Nessun acquisto in cassa.</td></tr>';
 
@@ -5385,10 +5393,15 @@ function renderCrm2Stats() {
     ].join('');
   } else if (type === 'person') {
     el.style.display = 'flex';
-    const totalSpentCents = (d.visits || []).reduce((s, v) => s + (v.amount_cents || 0), 0)
-      + (d.shopSales || []).reduce((s, v) => s + (v.total_cents || 0), 0)
-      + (d.pickupOrders || []).reduce((s, v) => s + (v.amount_cents || 0), 0);
-    const txCount = (d.visits || []).length + (d.shopSales || []).length + (d.pickupOrders || []).length + (d.venueEvents || []).length;
+    // Contano solo le transazioni valide (come la regola del wine club): visite confermate, vendite in
+    // cassa non annullate, ritiri online pagati.
+    const visitsOk = (d.visits || []).filter(v => v.status === 'confermata');
+    const salesOk = (d.shopSales || []).filter(v => !v.cancelled_at);
+    const pickupsOk = (d.pickupOrders || []).filter(v => ['da_ritirare', 'ritirato'].includes(v.status));
+    const totalSpentCents = visitsOk.reduce((s, v) => s + (v.amount_cents || 0), 0)
+      + salesOk.reduce((s, v) => s + (v.total_cents || 0), 0)
+      + pickupsOk.reduce((s, v) => s + (v.amount_cents || 0), 0);
+    const txCount = visitsOk.length + salesOk.length + pickupsOk.length + (d.venueEvents || []).length;
     el.innerHTML = [
       crm2Stat('Totale speso', '€ ' + fmtEuro(totalSpentCents)),
       crm2Stat('Transazioni', txCount),
@@ -6277,12 +6290,19 @@ async function loadFinished() {
   `).join('') : '<tr><td colspan="7" class="empty">Nessuna bottiglia tracciata in magazzino.</td></tr>';
 }
 async function updateFinished(id, field, value) {
-  await api('/api/admin/warehouse/finished/' + id, { method: 'PATCH', body: JSON.stringify({ [field]: value }) });
+  const body = { [field]: value };
+  // La quantità scritta a mano diventa una rettifica nel registro di magazzino: serve il motivo.
+  if (field === 'quantity') {
+    const reason = prompt('Motivo della correzione (es. bottiglie rotte, conteggio fisico):', '');
+    if (reason === null) { loadFinished(); return; }
+    body.reason = reason;
+  }
+  try { await api('/api/admin/warehouse/finished/' + id, { method: 'PATCH', body: JSON.stringify(body) }); } catch (e) { alert(e.message); }
   loadFinished();
 }
 async function deleteFinished(id) {
-  if (!confirm('Rimuovere questa bottiglia dal magazzino?')) return;
-  await api('/api/admin/warehouse/finished/' + id, { method: 'DELETE' });
+  if (!confirm('Rimuovere questa bottiglia dal magazzino? Nel registro la sua giacenza va a zero.')) return;
+  try { await api('/api/admin/warehouse/finished/' + id, { method: 'DELETE' }); } catch (e) { alert(e.message); }
   loadFinished();
 }
 async function openFinishedModal() {
@@ -6325,12 +6345,18 @@ async function loadRaw() {
   `).join('') : '<tr><td colspan="8" class="empty">Nessuna referenza in magazzino.</td></tr>';
 }
 async function updateRaw(id, field, value) {
-  await api('/api/admin/warehouse/raw/' + id, { method: 'PATCH', body: JSON.stringify({ [field]: value }) });
+  const body = { [field]: value };
+  if (field === 'quantity') {
+    const reason = prompt('Motivo della correzione (es. conteggio fisico, scarto):', '');
+    if (reason === null) { loadRaw(); return; }
+    body.reason = reason;
+  }
+  try { await api('/api/admin/warehouse/raw/' + id, { method: 'PATCH', body: JSON.stringify(body) }); } catch (e) { alert(e.message); }
   loadRaw();
 }
 async function deleteRaw(id) {
   if (!confirm('Eliminare questa referenza?')) return;
-  await api('/api/admin/warehouse/raw/' + id, { method: 'DELETE' });
+  try { await api('/api/admin/warehouse/raw/' + id, { method: 'DELETE' }); } catch (e) { alert(e.message); }
   loadRaw();
 }
 function openRawModal() {

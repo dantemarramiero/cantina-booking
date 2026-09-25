@@ -2391,22 +2391,26 @@ async function registerCassaSale() {
 
 async function loadCassaSales() {
   const sales = await api('/api/admin/shop-sales');
+  // Le vendite annullate restano nell'elenco (servono ai corrispettivi), barrate.
   document.getElementById('cassa-sales-tbody').innerHTML = sales.length ? sales.map(s => `
-    <tr>
+    <tr style="${s.cancelled_at ? 'opacity:.55' : ''}">
       <td>${s.created_at}</td>
       <td>${esc(s.customer_name || '—')}</td>
       <td>${CASSA_CONTEXT_LABELS[s.sale_context] || s.sale_context}</td>
       <td>${CASSA_PAYMENT_LABELS[s.payment_method] || s.payment_method}</td>
       <td>${s.items_count}</td>
-      <td>€ ${fmtEuro(s.total_cents)}</td>
-      <td class="actions-cell"><button class="btn small danger" onclick="voidCassaSale(${s.id})">Annulla</button></td>
+      <td>${s.cancelled_at ? `<s>€ ${fmtEuro(s.total_cents)}</s>` : `€ ${fmtEuro(s.total_cents)}`}</td>
+      <td class="actions-cell">${s.cancelled_at ? `<span class="badge" title="${esc(s.cancel_reason || '')}">Annullata</span>` : `<button class="btn small danger" onclick="voidCassaSale(${s.id})">Annulla</button>`}</td>
     </tr>
   `).join('') : '<tr><td colspan="7" class="empty">Nessuna vendita registrata.</td></tr>';
 }
 
 async function voidCassaSale(id) {
-  if (!confirm('Annullare questa vendita? Le giacenze scalate verranno ripristinate.')) return;
-  await api('/api/admin/shop-sales/' + id, { method: 'DELETE' });
+  if (!confirm('Annullare questa vendita? Le giacenze scalate verranno ripristinate e la vendita resterà nell\'elenco come annullata.')) return;
+  const reason = prompt('Motivo dell\'annullamento (facoltativo):', '') ?? '';
+  try {
+    await api('/api/admin/shop-sales/' + id, { method: 'DELETE', body: JSON.stringify({ reason }) });
+  } catch (e) { alert(e.message); }
   await loadCassa();
 }
 

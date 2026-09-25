@@ -1339,6 +1339,8 @@ function accessLevelsFor(req) {
   try { levels = JSON.parse(role.access_levels || '[]'); } catch {}
   return ['base', ...levels.filter(l => l !== 'base')];
 }
+// Chi ha fatto un'azione, come testo leggibile (registri e movimenti di magazzino).
+const actorName = req => (req?.portalUser ? req.portalUser.name : req?.isMasterKey ? 'Chiave master' : 'Sistema');
 function hasAccessLevel(req, level) {
   const levels = accessLevelsFor(req);
   return levels === null || levels.includes(level);
@@ -1419,7 +1421,7 @@ function wineClubSpend(months, personId = null) {
     e[k] += r.c || 0;
     spend.set(r.person_id, e);
   });
-  add(db.prepare(`SELECT person_id, SUM(total_cents) AS c FROM shop_sales WHERE person_id IS NOT NULL AND created_at >= ?${filter} GROUP BY person_id`).all(...args), 'shop');
+  add(db.prepare(`SELECT person_id, SUM(total_cents) AS c FROM shop_sales WHERE person_id IS NOT NULL AND cancelled_at IS NULL AND created_at >= ?${filter} GROUP BY person_id`).all(...args), 'shop');
   add(db.prepare(`SELECT person_id, SUM(amount_cents) AS c FROM pickup_orders WHERE person_id IS NOT NULL AND status IN ('da_ritirare', 'ritirato') AND created_at >= ?${filter} GROUP BY person_id`).all(...args), 'shop');
   add(db.prepare(`SELECT person_id, SUM(amount_cents) AS c FROM bookings WHERE person_id IS NOT NULL AND status = 'confermata' AND created_at >= ?${filter} GROUP BY person_id`).all(...args), 'visits');
   return spend;
@@ -1756,13 +1758,17 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) =
     if (pid) {
       const orderId = parseInt(pid);
       const paymentIntentId = session.payment_intent || null;
-      db.prepare("UPDATE pickup_orders SET status = 'da_ritirare', payment_intent_id = ?, stripe_payment_status = 'paid' WHERE id = ?")
-        .run(paymentIntentId, orderId);
-      const items = db.prepare('SELECT * FROM pickup_order_items WHERE order_id = ?').all(orderId);
-      for (const it of items) if (it.product_id) adjustWarehouseStock(it.product_id, -it.quantity);
-      const order = db.prepare('SELECT * FROM pickup_orders WHERE id = ?').get(orderId);
-      checkWineClub(order?.person_id);
-      if (order) { order.items = items; sendPickupOrderEmail(order).catch(console.error); }
+      // Stripe può consegnare lo stesso evento più volte: si passa a "da ritirare" (e si impegna la merce)
+      // solo la prima volta, dall'attesa di pagamento.
+      const changed = db.prepare("UPDATE pickup_orders SET status = 'da_ritirare', payment_intent_id = ?, stripe_payment_status = 'paid' WHERE id = ? AND status = 'in_attesa_pagamento'")
+        .run(paymentIntentId, orderId).changes;
+      if (changed) {
+        stock.pickupReserved(orderId);
+        const items = db.prepare('SELECT * FROM pickup_order_items WHERE order_id = ?').all(orderId);
+        const order = db.prepare('SELECT * FROM pickup_orders WHERE id = ?').get(orderId);
+        checkWineClub(order?.person_id);
+        if (order) { order.items = items; sendPickupOrderEmail(order).catch(console.error); }
+      }
     }
   }
 
@@ -2032,7 +2038,10 @@ app.post('/api/pickup-orders/verify/:token/pickup', (req, res) => {
   if (order.status === 'in_attesa_pagamento') return res.status(409).json({ error: 'Il pagamento non risulta ancora completato.' });
   if (order.status === 'annullato') return res.status(409).json({ error: 'Questo ordine è stato annullato.' });
   if (order.status !== 'ritirato') {
-    db.prepare("UPDATE pickup_orders SET status = 'ritirato', picked_up_at = datetime('now','localtime') WHERE id = ?").run(order.id);
+    stock.tx(() => {
+      db.prepare("UPDATE pickup_orders SET status = 'ritirato', picked_up_at = datetime('now','localtime') WHERE id = ?").run(order.id);
+      stock.pickupCollected(order.id, 'Ritiro con QR');
+    });
   }
   res.json(pickupOrderPublicView(db.prepare('SELECT * FROM pickup_orders WHERE id = ?').get(order.id)));
 });
@@ -2181,9 +2190,11 @@ app.delete('/api/admin/experiences/:id/images/:imageId', authAdmin, (req, res) =
 app.put('/api/admin/experiences/:id/products', authAdmin, (req, res) => {
   const { product_ids } = req.body || {};
   if (!Array.isArray(product_ids)) return res.status(400).json({ error: 'Elenco prodotti non valido.' });
+  const perBottle = new Map(db.prepare('SELECT product_id, guests_per_bottle FROM experience_products WHERE experience_id = ?').all(req.params.id).map(x => [x.product_id, x.guests_per_bottle]));
+  const custom = new Map((req.body.guests_per_bottle && typeof req.body.guests_per_bottle === 'object' ? Object.entries(req.body.guests_per_bottle) : []).map(([k, v]) => [Number(k), Math.max(1, parseInt(v) || 6)]));
   db.prepare('DELETE FROM experience_products WHERE experience_id = ?').run(req.params.id);
-  const insert = db.prepare('INSERT OR IGNORE INTO experience_products (experience_id, product_id) VALUES (?, ?)');
-  for (const pid of product_ids) insert.run(req.params.id, pid);
+  const insert = db.prepare('INSERT OR IGNORE INTO experience_products (experience_id, product_id, guests_per_bottle) VALUES (?, ?, ?)');
+  for (const pid of product_ids) insert.run(req.params.id, pid, custom.get(Number(pid)) ?? perBottle.get(Number(pid)) ?? 6);
   res.json({ success: true });
 });
 
@@ -2418,6 +2429,8 @@ app.post('/api/admin/bookings/checkin/:id', authAdmin, (req, res) => {
   const newState = booking.checked_in ? 0 : 1;
   const now = newState ? new Date().toISOString() : null;
   db.prepare('UPDATE bookings SET checked_in = ?, checked_in_at = ? WHERE id = ?').run(newState, now, booking.id);
+  // Magazzino: al check-in si propone lo scarico dei vini in degustazione (da confermare con le quantità vere).
+  if (newState) stock.tastingProposed(booking.id); else stock.tastingWithdrawn(booking.id);
   res.json({ success: true, checked_in: newState });
 });
 
@@ -2662,30 +2675,38 @@ app.post('/api/admin/shop-sales', authAdmin, (req, res) => {
   const discount = Math.max(0, parseInt(discount_cents) || 0);
   const total = Math.max(0, itemsTotal - discount);
 
-  const saleResult = db.prepare(`
-    INSERT INTO shop_sales (customer_name, customer_email, customer_phone, person_id, sale_context, payment_method, discount_cents, total_cents, operator_id, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    customer_name?.trim() || null, emailClean, customer_phone?.trim() || null, personId,
-    context, method, discount, total, operator_id || null, notes?.trim() || null
-  );
-  const saleId = saleResult.lastInsertRowid;
-
-  const insertItem = db.prepare('INSERT INTO shop_sale_items (sale_id, product_id, product_name, quantity, unit_price_cents, line_total_cents) VALUES (?, ?, ?, ?, ?, ?)');
-  for (const it of items) {
-    insertItem.run(saleId, it.product_id || null, it.product_name.trim(), it.quantity, it.unit_price_cents || 0, it.quantity * (it.unit_price_cents || 0));
-    if (it.product_id) adjustWarehouseStock(it.product_id, -it.quantity);
-  }
+  // Vendita, righe e scarichi del magazzino (registro valorizzato) in un'unica transazione.
+  const saleId = stock.tx(() => {
+    const saleResult = db.prepare(`
+      INSERT INTO shop_sales (customer_name, customer_email, customer_phone, person_id, sale_context, payment_method, discount_cents, total_cents, operator_id, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      customer_name?.trim() || null, emailClean, customer_phone?.trim() || null, personId,
+      context, method, discount, total, operator_id || null, notes?.trim() || null
+    );
+    const id = Number(saleResult.lastInsertRowid);
+    const insertItem = db.prepare('INSERT INTO shop_sale_items (sale_id, product_id, product_name, quantity, unit_price_cents, line_total_cents) VALUES (?, ?, ?, ?, ?, ?)');
+    for (const it of items) insertItem.run(id, it.product_id || null, it.product_name.trim(), it.quantity, it.unit_price_cents || 0, it.quantity * (it.unit_price_cents || 0));
+    stock.saleIssued(id, actorName(req));
+    return id;
+  });
   checkWineClub(personId);
 
   res.json({ success: true, id: saleId });
 });
 
+// "Annulla" una vendita in cassa: la vendita resta, segnata come annullata (serve ai corrispettivi),
+// e il magazzino riceve lo storno degli scarichi. Le somme (wine club, CRM) escludono le annullate.
 app.delete('/api/admin/shop-sales/:id', authAdmin, (req, res) => {
-  const items = db.prepare('SELECT * FROM shop_sale_items WHERE sale_id = ?').all(req.params.id);
-  for (const it of items) if (it.product_id) adjustWarehouseStock(it.product_id, it.quantity);
-  db.prepare('DELETE FROM shop_sale_items WHERE sale_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM shop_sales WHERE id = ?').run(req.params.id);
+  const sale = db.prepare('SELECT * FROM shop_sales WHERE id = ?').get(req.params.id);
+  if (!sale) return res.status(404).json({ error: 'Vendita non trovata.' });
+  if (sale.cancelled_at) return res.status(409).json({ error: 'Vendita già annullata.' });
+  const reason = req.body?.reason?.trim() || null;
+  stock.tx(() => {
+    db.prepare('UPDATE shop_sales SET cancelled_at = ?, cancelled_by = ?, cancel_reason = ? WHERE id = ?').run(new Date().toISOString(), actorName(req), reason, sale.id);
+    stock.saleCancelled(sale.id, actorName(req), reason || 'Vendita annullata in cassa');
+  });
+  audit(req, 'shop_sale.cancelled', { entity: 'shop_sale', entityId: sale.id, after: { reason } });
   res.json({ success: true });
 });
 
@@ -2709,19 +2730,21 @@ app.post('/api/admin/pickup-orders/:id/pickup', authAdmin, (req, res) => {
   const order = db.prepare('SELECT * FROM pickup_orders WHERE id = ?').get(req.params.id);
   if (!order) return res.status(404).json({ error: 'Ordine non trovato.' });
   if (order.status !== 'da_ritirare') return res.status(409).json({ error: 'Solo un ordine pagato e in attesa di ritiro può essere segnato come ritirato.' });
-  db.prepare("UPDATE pickup_orders SET status = 'ritirato', picked_up_at = datetime('now','localtime') WHERE id = ?").run(order.id);
+  stock.tx(() => {
+    db.prepare("UPDATE pickup_orders SET status = 'ritirato', picked_up_at = datetime('now','localtime') WHERE id = ?").run(order.id);
+    stock.pickupCollected(order.id, actorName(req)); // scarico valorizzato al ritiro
+  });
   res.json({ success: true });
 });
 
 app.delete('/api/admin/pickup-orders/:id', authAdmin, (req, res) => {
   const order = db.prepare('SELECT * FROM pickup_orders WHERE id = ?').get(req.params.id);
   if (!order) return res.status(404).json({ error: 'Ordine non trovato.' });
-  if (order.status === 'da_ritirare') {
-    const items = db.prepare('SELECT * FROM pickup_order_items WHERE order_id = ?').all(order.id);
-    for (const it of items) if (it.product_id) adjustWarehouseStock(it.product_id, it.quantity);
-  }
-  db.prepare('DELETE FROM pickup_order_items WHERE order_id = ?').run(order.id);
-  db.prepare('DELETE FROM pickup_orders WHERE id = ?').run(order.id);
+  stock.tx(() => {
+    if (order.status === 'da_ritirare') stock.pickupReleased(order.id); // l'impegno si libera, il disponibile torna
+    db.prepare('DELETE FROM pickup_order_items WHERE order_id = ?').run(order.id);
+    db.prepare('DELETE FROM pickup_orders WHERE id = ?').run(order.id);
+  });
   res.json({ success: true });
 });
 
@@ -2962,6 +2985,9 @@ app.patch('/api/admin/products/:id', authAdmin, upload.single('image'), (req, re
 });
 
 app.delete('/api/admin/products/:id', authAdmin, (req, res) => {
+  if (stock.hasMovements({ productId: parseInt(req.params.id) })) {
+    return res.status(409).json({ error: 'Il prodotto ha movimenti di magazzino: non si elimina, disattivalo.' });
+  }
   db.prepare('DELETE FROM price_list_items WHERE product_id = ?').run(req.params.id);
   db.prepare('DELETE FROM warehouse_finished WHERE product_id = ?').run(req.params.id);
   db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
@@ -3075,7 +3101,12 @@ app.patch('/api/admin/orders/:id', authAdmin, (req, res) => {
   if (warehouse_note !== undefined) { updates.push('warehouse_note = ?'); params.push(warehouse_note || null); }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
   params.push(req.params.id);
-  db.prepare(`UPDATE orders SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  const before = db.prepare('SELECT status FROM orders WHERE id = ?').get(req.params.id);
+  // Magazzino: l'ordine che diventa "evaso" scarica le bottiglie; se torna indietro, lo scarico si storna.
+  stock.tx(() => {
+    db.prepare(`UPDATE orders SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    if (before && status !== undefined) stock.orderStatusChanged(parseInt(req.params.id), before.status, status, actorName(req));
+  });
   res.json({ success: true });
 });
 
@@ -5010,9 +5041,13 @@ app.post('/api/admin/warehouse/finished', authAdmin, async (req, res) => {
   const product = db.prepare('SELECT * FROM products WHERE id = ?').get(product_id);
   if (!product) return res.status(404).json({ error: 'Prodotto non trovato.' });
   try {
-    const result = db.prepare(`
-      INSERT INTO warehouse_finished (product_id, quantity, threshold, alert_email) VALUES (?, ?, ?, ?)
-    `).run(product_id, parseInt(quantity) || 0, parseInt(threshold) || 0, alert_email?.trim() || null);
+    const result = stock.tx(() => {
+      const ins = db.prepare(`
+        INSERT INTO warehouse_finished (product_id, quantity, threshold, alert_email) VALUES (?, ?, ?, ?)
+      `).run(product_id, parseInt(quantity) || 0, parseInt(threshold) || 0, alert_email?.trim() || null);
+      stock.opening({ productId: product.id }, parseInt(quantity) || 0, actorName(req)); // registro: apertura con la quantità iniziale
+      return ins;
+    });
     await checkStockThreshold({
       table: 'warehouse_finished', id: result.lastInsertRowid, name: product.name,
       quantity: parseInt(quantity) || 0, threshold: parseInt(threshold) || 0,
@@ -5034,8 +5069,12 @@ app.patch('/api/admin/warehouse/finished/:id', authAdmin, async (req, res) => {
   const threshold = req.body.threshold !== undefined ? parseInt(req.body.threshold) : row.threshold;
   const alertEmail = req.body.alert_email !== undefined ? (req.body.alert_email?.trim() || null) : row.alert_email;
 
-  db.prepare('UPDATE warehouse_finished SET quantity = ?, threshold = ?, alert_email = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?')
-    .run(quantity, threshold, alertEmail, row.id);
+  stock.tx(() => {
+    // Registro: la quantità scritta a mano diventa una rettifica per la differenza, con il motivo.
+    if (quantity !== row.quantity) stock.manualSet({ productId: row.product_id }, quantity, actorName(req), req.body.reason?.trim() || null);
+    db.prepare('UPDATE warehouse_finished SET quantity = ?, threshold = ?, alert_email = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?')
+      .run(quantity, threshold, alertEmail, row.id);
+  });
 
   await checkStockThreshold({
     table: 'warehouse_finished', id: row.id, name: row.product_name, quantity, threshold,
@@ -5045,7 +5084,14 @@ app.patch('/api/admin/warehouse/finished/:id', authAdmin, async (req, res) => {
 });
 
 app.delete('/api/admin/warehouse/finished/:id', authAdmin, (req, res) => {
-  db.prepare('DELETE FROM warehouse_finished WHERE id = ?').run(req.params.id);
+  const row = db.prepare('SELECT * FROM warehouse_finished WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Voce di magazzino non trovata.' });
+  stock.tx(() => {
+    // Registro: l'articolo smette di essere tracciato, la giacenza del registro va a zero.
+    const bal = stock.balance({ productId: row.product_id });
+    if (bal.qty) stock.move({ productId: row.product_id, kind: 'rettifica_inventario', qtyMilli: -bal.qty, sync: false, by: actorName(req), reason: 'Articolo non più tracciato in magazzino', label: 'Tolto dal magazzino' });
+    db.prepare('DELETE FROM warehouse_finished WHERE id = ?').run(row.id);
+  });
   res.json({ success: true });
 });
 
@@ -5057,9 +5103,13 @@ app.get('/api/admin/warehouse/raw', authAdmin, (req, res) => {
 app.post('/api/admin/warehouse/raw', authAdmin, async (req, res) => {
   const { sku, name, unit, quantity, threshold, alert_email } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'Il nome della referenza è obbligatorio.' });
-  const result = db.prepare(`
-    INSERT INTO warehouse_raw (sku, name, unit, quantity, threshold, alert_email) VALUES (?, ?, ?, ?, ?, ?)
-  `).run(sku?.trim() || null, name.trim(), unit?.trim() || 'pz', parseInt(quantity) || 0, parseInt(threshold) || 0, alert_email?.trim() || null);
+  const result = stock.tx(() => {
+    const ins = db.prepare(`
+      INSERT INTO warehouse_raw (sku, name, unit, quantity, threshold, alert_email) VALUES (?, ?, ?, ?, ?, ?)
+    `).run(sku?.trim() || null, name.trim(), unit?.trim() || 'pz', parseInt(quantity) || 0, parseInt(threshold) || 0, alert_email?.trim() || null);
+    stock.opening({ rawItemId: Number(ins.lastInsertRowid) }, parseInt(quantity) || 0, actorName(req));
+    return ins;
+  });
   await checkStockThreshold({
     table: 'warehouse_raw', id: result.lastInsertRowid, name: name.trim(),
     quantity: parseInt(quantity) || 0, threshold: parseInt(threshold) || 0,
@@ -5083,7 +5133,10 @@ app.patch('/api/admin/warehouse/raw/:id', authAdmin, async (req, res) => {
   updates.push('quantity = ?', 'threshold = ?', 'alert_email = ?', "updated_at = datetime('now','localtime')");
   params.push(quantity, threshold, alertEmail, req.params.id);
 
-  db.prepare(`UPDATE warehouse_raw SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  stock.tx(() => {
+    if (quantity !== row.quantity) stock.manualSet({ rawItemId: row.id }, quantity, actorName(req), req.body.reason?.trim() || null);
+    db.prepare(`UPDATE warehouse_raw SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  });
 
   await checkStockThreshold({
     table: 'warehouse_raw', id: row.id, name: req.body.name || row.name, quantity, threshold,
@@ -5093,6 +5146,9 @@ app.patch('/api/admin/warehouse/raw/:id', authAdmin, async (req, res) => {
 });
 
 app.delete('/api/admin/warehouse/raw/:id', authAdmin, (req, res) => {
+  if (stock.hasMovements({ rawItemId: parseInt(req.params.id) })) {
+    return res.status(409).json({ error: 'La referenza ha movimenti di magazzino: non si elimina. Porta la quantità a zero se non la usate più.' });
+  }
   db.prepare('DELETE FROM warehouse_raw WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
@@ -5108,6 +5164,15 @@ const hrSafety = require('./modules/hr-safety')(app, { db, authAdmin, audit, eve
 const hrAbsences = require('./modules/hr-absences')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety });
 const hrTimesheet = require('./modules/hr-timesheet')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile, hrSafety, hrAbsences, finance });
 const hrServices = require('./modules/hr-services')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety, hrTimesheet, secureStore });
+
+// ── Magazzino valorizzato (Fase 3) ────────────────────────────────────────────
+// Utenti da avvisare per un workspace: gli amministratori (user_id NULL) e chi ha un ruolo con quel workspace.
+function workspaceUsers(ws) {
+  const roles = db.prepare('SELECT id, workspaces FROM roles').all().filter(ro => { try { return JSON.parse(ro.workspaces).includes(ws); } catch { return false; } }).map(ro => ro.id);
+  const users = roles.length ? db.prepare(`SELECT id FROM portal_users WHERE active = 1 AND role_id IN (${roles.map(() => '?').join(',')})`).all(...roles).map(u => u.id) : [];
+  return [null, ...users];
+}
+const stock = require('./modules/stock')(app, { db, authAdmin, audit, events, notifications, scheduler, getSetting, checkStockThreshold, roleUsers: workspaceUsers });
 // People → accesso: l'offboarding concluso disattiva l'utente del portale e il suo operatore dell'Enoturismo
 // (come la disattivazione da Impostazioni → Utenti: sessioni revocate, niente cancellazioni).
 events.on('employee.offboarded', 'portal.deactivate-access', ev => {
@@ -5134,4 +5199,4 @@ if (require.main === module) {
   scheduler.start();
 }
 
-module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, hrTimesheet, hrServices, secureStore };
+module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, hrTimesheet, hrServices, stock, secureStore };

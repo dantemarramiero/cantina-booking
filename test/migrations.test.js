@@ -73,7 +73,12 @@ test('le migrazioni vere del progetto si applicano su un database vuoto e si ann
   // Le migrazioni fanno riferimento a tabelle del bootstrap storico: qui bastano versioni minime.
   db.exec(`CREATE TABLE portal_users (id INTEGER PRIMARY KEY);
     CREATE TABLE roles (id INTEGER PRIMARY KEY, workspaces TEXT NOT NULL DEFAULT '[]');
-    CREATE TABLE fairs (id INTEGER PRIMARY KEY); CREATE TABLE experiences (id INTEGER PRIMARY KEY); CREATE TABLE products (id INTEGER PRIMARY KEY);`);
+    CREATE TABLE fairs (id INTEGER PRIMARY KEY); CREATE TABLE experiences (id INTEGER PRIMARY KEY); CREATE TABLE products (id INTEGER PRIMARY KEY);
+    CREATE TABLE shop_sales (id INTEGER PRIMARY KEY); CREATE TABLE experience_products (id INTEGER PRIMARY KEY);
+    CREATE TABLE warehouse_finished (id INTEGER PRIMARY KEY, product_id INTEGER, quantity INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE warehouse_raw (id INTEGER PRIMARY KEY, quantity INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE suppliers (id INTEGER PRIMARY KEY); CREATE TABLE shop_sale_items (id INTEGER PRIMARY KEY); CREATE TABLE pickup_order_items (id INTEGER PRIMARY KEY);
+    CREATE TABLE order_items (id INTEGER PRIMARY KEY); CREATE TABLE bookings (id INTEGER PRIMARY KEY);`);
   process.env.MIGRATION_BACKUPS = 'off';
   const migDir = path.join(__dirname, '..', 'migrations');
   const applied = runMigrations(db, { dir: migDir, log: silent });
