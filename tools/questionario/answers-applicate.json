@@ -216,5 +216,19 @@
         "note": "Da progettare più avanti, separata dalle Impostazioni."
       }
     }
+  },
+  {
+    "applicate_il": "2026-09-25T13:08:14.031Z",
+    "risposte": {
+      "DP13": {
+        "decisione": "Approvata da Dante: anno solare per le applicazioni massime, annata di vendemmia per i costi di vigneto",
+        "data": "25/09/2026",
+        "note": "Da confermare con l'agronomo (VIG-11). Nel software è una soglia modificabile."
+      },
+      "VIG-11": {
+        "note": "25/09/2026: Dante approva la proposta (anno solare); resta da confermare con l'agronomo. Nel software è la soglia «Periodo delle applicazioni massime».",
+        "stato": "Chiesta"
+      }
+    }
   }
 ]

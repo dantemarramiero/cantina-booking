@@ -1,6 +1,6 @@
 # Produzione — Prerequisiti e Fase 1: anagrafiche di base
 
-Stato: **completata in locale**, in attesa della tua approvazione (la specifica chiede di fermarsi a fine fase). Non pubblicata.
+Stato: **approvata e in produzione dal 25/09/2026** (migrazioni 0015–0019, copia del database in `/data/backups/cantina-20260925-130712-before-0015.db`). Capacità e lettura dei fornitori confermate.
 
 Decisioni applicate (Fase 0, 25/09/2026): DP1–DP12, DP14, DP15, DP17. Restano:
 - **DP13** aperta (la chiedi all'agronomo);

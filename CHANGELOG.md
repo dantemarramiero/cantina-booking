@@ -221,6 +221,8 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - Audit, decisioni e piano in `docs/produzione/`.
 - Questionario per la cantina in `docs/Domande-cantina.xlsx`, aggiornabile con `tools/questionario`.
 
+**Pubblicazione del 25/09/2026 (2):** prerequisiti e Fase 1 della Produzione in produzione, migrazioni 0015–0019.
+
 **Produzione — prerequisiti e Fase 1: anagrafiche** (vedi `docs/produzione/01-prerequisiti-e-fase-1.md`)
 - **Vigneto:**
   - vigneti;
