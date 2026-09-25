@@ -72,7 +72,9 @@ In entrambi i casi il login crea una **sessione**: il browser tiene solo un toke
 - Si chiude al logout, quando l'utente viene disattivato e quando cambia la password.
 - Dopo 10 tentativi sbagliati in 15 minuti dallo stesso indirizzo il login si blocca.
 
-**Permessi per modulo** (ruoli in Impostazioni → Ruoli e permessi): sono controllati dal server su ogni API, non solo nell'interfaccia. La mappa "API → moduli che possono leggere/scrivere" è in `lib/security.js`. Gli utenti senza ruolo hanno accesso completo.
+**Permessi per modulo** (ruoli in Impostazioni → Ruoli e permessi): sono controllati dal server su ogni API, non solo nell'interfaccia. La mappa "API → moduli che possono leggere/scrivere" è in `lib/security.js`. Un utente senza ruolo non accede a nessun modulo (solo la chiave master ha accesso completo); un ruolo ancora assegnato non si cancella.
+
+**Organigramma e permessi** (in costruzione, `docs/audit_permessi.md`): catalogo dei permessi in `lib/permissions.js`, permessi effettivi e resolver `can()` / `scopeFilter()` in `lib/authz.js`. Nella Fase 1 si tengono allineati ai ruoli e il test di parità (`test/authz.test.js`) verifica che diano gli stessi accessi di `lib/security.js`.
 
 **Download ed export** (CSV, allegati CRM, foto delle fiere): passano da link firmati dal server, validi pochi minuti e legati alla sessione.
 

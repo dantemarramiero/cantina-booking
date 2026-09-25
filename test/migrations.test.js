@@ -95,8 +95,8 @@ test('le migrazioni vere del progetto si applicano su un database vuoto e si ann
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cantina-mig-real-'));
   const db = new DatabaseSync(path.join(dir, 'real.db'));
   // Le migrazioni fanno riferimento a tabelle del bootstrap storico: qui bastano versioni minime.
-  db.exec(`CREATE TABLE portal_users (id INTEGER PRIMARY KEY);
-    CREATE TABLE roles (id INTEGER PRIMARY KEY, workspaces TEXT NOT NULL DEFAULT '[]');
+  db.exec(`CREATE TABLE portal_users (id INTEGER PRIMARY KEY, name TEXT, role_id INTEGER);
+    CREATE TABLE roles (id INTEGER PRIMARY KEY, name TEXT, workspaces TEXT NOT NULL DEFAULT '[]');
     CREATE TABLE fairs (id INTEGER PRIMARY KEY); CREATE TABLE experiences (id INTEGER PRIMARY KEY); CREATE TABLE products (id INTEGER PRIMARY KEY);
     CREATE TABLE shop_sales (id INTEGER PRIMARY KEY); CREATE TABLE experience_products (id INTEGER PRIMARY KEY);
     CREATE TABLE warehouse_finished (id INTEGER PRIMARY KEY, product_id INTEGER, quantity INTEGER NOT NULL DEFAULT 0);

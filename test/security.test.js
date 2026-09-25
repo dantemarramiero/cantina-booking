@@ -70,8 +70,10 @@ test('i permessi per modulo sono controllati dal server', async () => {
   assert.equal((await as(mag.token)('DELETE', '/api/admin/orders/999999')).status !== 403, true, 'e li aggiorna dal kanban');
   assert.equal((await as(mag.token)('GET', '/api/admin/bookings')).status, 403);
 
-  const full = await createUser('completo', null);
-  assert.equal((await as(full.token)('GET', '/api/admin/customers')).status, 200, 'senza ruolo = accesso completo, come oggi');
+  // Senza ruolo = nessun modulo (decisione Q2 di docs/audit_permessi.md); restano le API di chi ha fatto l'accesso.
+  const none = await createUser('senza-ruolo', null);
+  assert.equal((await as(none.token)('GET', '/api/admin/customers')).status, 403, 'senza ruolo non si vede nessun modulo');
+  assert.equal((await as(none.token)('GET', '/api/admin/me')).status, 200, 'ma il proprio profilo sì');
 });
 
 test('ogni API del portale ha un modulo assegnato', () => {

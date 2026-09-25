@@ -8,6 +8,7 @@ const XLSX    = require('xlsx');
 
 const { DatabaseSync } = require('node:sqlite');
 const { runMigrations } = require('./lib/migrations');
+const { createAuthz } = require('./lib/authz');
 const { createEventBus } = require('./lib/events');
 const { createScheduler } = require('./lib/scheduler');
 const { createSessions, createSigner, createLoginThrottle, canAccess, safeEqual, ACCESS_LEVELS, PRD_CAPABILITIES } = require('./lib/security');
@@ -1202,6 +1203,11 @@ const signer = createSigner(process.env.SIGNING_SECRET || signingSecretFromSetti
 const loginThrottle = createLoginThrottle();
 const { audit, list: listAudit } = createAudit(db);
 const notifications = createNotifications(db);
+// Permessi effettivi (docs/audit_permessi.md, Fase 1): catalogo dal codice e ricalcolo all'avvio e ogni ora,
+// così concessioni e deleghe iniziano e scadono da sole. L'accesso lo decide ancora lib/security.js.
+const authz = createAuthz(db);
+authz.syncCatalog();
+authz.recompute();
 // Il segreto per firmare i link di download: generato al primo avvio e conservato nel database
 // (non viene mai restituito dalle API delle impostazioni).
 function signingSecretFromSettings() {
@@ -1213,6 +1219,7 @@ function signingSecretFromSettings() {
   return secret;
 }
 scheduler.onTick(() => events.dispatch());
+scheduler.register('authz.recompute', 60, () => { authz.recompute(); return 'permessi effettivi ricalcolati'; });
 scheduler.register('sessions.cleanup', 60, () => `${sessions.cleanup()} sessioni scadute rimosse`);
 scheduler.register('housekeeping.job_runs', 24 * 60, () => {
   const limit = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -1322,19 +1329,23 @@ function authAdmin(req, res, next) {
   next();
 }
 
+// null = accesso completo: solo la chiave master. Un utente senza ruolo (o con un ruolo che non esiste
+// più) non ha accesso a nessun modulo (decisione Q2 di docs/audit_permessi.md; la migrazione 0030 ha dato
+// "Accesso completo" a chi prima non aveva un ruolo).
+const roleOf = req => (req.portalUser?.role_id ? db.prepare('SELECT * FROM roles WHERE id = ?').get(req.portalUser.role_id) : null);
 function permittedWorkspacesFor(req) {
-  if (req.isMasterKey || !req.portalUser?.role_id) return null; // null = accesso completo
-  const role = db.prepare('SELECT * FROM roles WHERE id = ?').get(req.portalUser.role_id);
-  if (!role) return null;
-  try { return JSON.parse(role.workspaces); } catch { return null; }
+  if (req.isMasterKey) return null;
+  const role = roleOf(req);
+  if (!role) return [];
+  try { return JSON.parse(role.workspaces); } catch { return []; }
 }
 
 // Livelli di riservatezza dei dati HR (base, personale, retributivo, sanitario, disciplinare).
-// Come per i workspace: chiave master e utenti senza ruolo vedono tutto (null).
+// Come per i workspace: la chiave master vede tutto (null), un utente senza ruolo solo il livello "base".
 function accessLevelsFor(req) {
-  if (req.isMasterKey || !req.portalUser?.role_id) return null;
-  const role = db.prepare('SELECT access_levels FROM roles WHERE id = ?').get(req.portalUser.role_id);
-  if (!role) return null;
+  if (req.isMasterKey) return null;
+  const role = roleOf(req);
+  if (!role) return ['base'];
   let levels = [];
   try { levels = JSON.parse(role.access_levels || '[]'); } catch {}
   return ['base', ...levels.filter(l => l !== 'base')];
@@ -1349,11 +1360,11 @@ function hasWorkspace(req, workspace) {
   const permitted = permittedWorkspacesFor(req);
   return permitted === null || permitted.includes(workspace);
 }
-// Capacità dentro Produzione (enologo, cantiniere…). null = accesso completo, come per workspace e livelli.
+// Capacità dentro Produzione (enologo, cantiniere…). null = tutte (chiave master), [] = nessuna.
 function capabilitiesFor(req) {
-  if (req.isMasterKey || !req.portalUser?.role_id) return null;
-  const role = db.prepare('SELECT capabilities FROM roles WHERE id = ?').get(req.portalUser.role_id);
-  if (!role) return null;
+  if (req.isMasterKey) return null;
+  const role = roleOf(req);
+  if (!role) return [];
   try { return JSON.parse(role.capabilities || '[]'); } catch { return []; }
 }
 
@@ -4780,6 +4791,7 @@ app.post('/api/admin/portal-users', authAdmin, (req, res) => {
     const result = db.prepare('INSERT INTO portal_users (name, email, username, password_hash, access_key, role_id) VALUES (?, ?, ?, ?, ?, ?)')
       .run(name.trim(), email.trim().toLowerCase(), username.trim(), hashPassword(password), generatePortalAccessKey(), role_id || null);
     syncOperatorForPortalUser(db.prepare('SELECT * FROM portal_users WHERE id = ?').get(result.lastInsertRowid));
+    authz.syncUser(result.lastInsertRowid);
     audit(req, 'portal_user.created', { entity: 'portal_user', entityId: result.lastInsertRowid, after: portalUserPublic(result.lastInsertRowid) });
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (e) {
@@ -4797,6 +4809,7 @@ app.patch('/api/admin/portal-users/:id', authAdmin, (req, res) => {
   try {
     db.prepare(`UPDATE portal_users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
     syncOperatorForPortalUser(db.prepare('SELECT * FROM portal_users WHERE id = ?').get(req.params.id));
+    authz.syncUser(req.params.id);
     // Disattivato: le sue sessioni aperte finiscono subito.
     if (req.body.active !== undefined && !req.body.active) sessions.revokeUser(parseInt(req.params.id));
     audit(req, 'portal_user.updated', { entity: 'portal_user', entityId: req.params.id, before, after: portalUserPublic(req.params.id) });
@@ -4810,6 +4823,7 @@ app.delete('/api/admin/portal-users/:id', authAdmin, (req, res) => {
   const before = portalUserPublic(req.params.id);
   deactivateOperatorForPortalUser(req.params.id);
   db.prepare('DELETE FROM portal_users WHERE id = ?').run(req.params.id);
+  authz.invalidate(parseInt(req.params.id));
   audit(req, 'portal_user.deleted', { entity: 'portal_user', entityId: req.params.id, before });
   res.json({ success: true });
 });
@@ -4839,7 +4853,8 @@ app.post('/api/admin/roles', authAdmin, (req, res) => {
   if (!name?.trim()) return res.status(400).json({ error: 'Il nome del ruolo è obbligatorio.' });
   const ws = Array.isArray(workspaces) ? workspaces.filter(w => ALL_WORKSPACES.includes(w)) : [];
   const levels = cleanAccessLevels(access_levels);
-  const result = db.prepare('INSERT INTO roles (name, workspaces, access_levels, capabilities) VALUES (?, ?, ?, ?)').run(name.trim(), JSON.stringify(ws), JSON.stringify(levels), JSON.stringify(cleanCapabilities(capabilities)));
+  const result = db.prepare('INSERT INTO roles (name, workspaces, access_levels, capabilities, updated_at) VALUES (?, ?, ?, ?, ?)').run(name.trim(), JSON.stringify(ws), JSON.stringify(levels), JSON.stringify(cleanCapabilities(capabilities)), new Date().toISOString());
+  authz.syncRole(result.lastInsertRowid);
   audit(req, 'role.created', { entity: 'role', entityId: result.lastInsertRowid, after: roleSnapshot(result.lastInsertRowid) });
   res.json({ success: true, id: result.lastInsertRowid });
 });
@@ -4854,16 +4869,25 @@ app.patch('/api/admin/roles/:id', authAdmin, (req, res) => {
   if (access_levels !== undefined) { updates.push('access_levels = ?'); params.push(JSON.stringify(cleanAccessLevels(access_levels))); }
   if (capabilities !== undefined) { updates.push('capabilities = ?'); params.push(JSON.stringify(cleanCapabilities(capabilities))); }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  updates.push('updated_at = ?'); params.push(new Date().toISOString());
   params.push(req.params.id);
   const before = roleSnapshot(req.params.id);
   db.prepare(`UPDATE roles SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  authz.syncRole(req.params.id);
   audit(req, 'role.updated', { entity: 'role', entityId: req.params.id, before, after: roleSnapshot(req.params.id) });
   res.json({ success: true });
 });
+// Un ruolo ancora assegnato non si cancella: prima si tolgono gli utenti. Prima li si lasciava senza
+// ruolo, e "senza ruolo" voleva dire accesso completo (R1 di docs/audit_permessi.md).
 app.delete('/api/admin/roles/:id', authAdmin, (req, res) => {
+  const role = db.prepare('SELECT * FROM roles WHERE id = ?').get(req.params.id);
+  if (!role) return res.status(404).json({ error: 'Ruolo non trovato.' });
+  if (role.is_system) return res.status(409).json({ error: 'È un ruolo di sistema: non si cancella.' });
+  const users = db.prepare('SELECT name FROM portal_users WHERE role_id = ? ORDER BY name').all(role.id).map(u => u.name);
+  if (users.length) return res.status(409).json({ error: `Il ruolo è assegnato a ${users.join(', ')}: assegna loro un altro ruolo prima di cancellarlo.` });
   const before = roleSnapshot(req.params.id);
-  db.prepare('UPDATE portal_users SET role_id = NULL WHERE role_id = ?').run(req.params.id);
   db.prepare('DELETE FROM roles WHERE id = ?').run(req.params.id);
+  authz.recompute();
   audit(req, 'role.deleted', { entity: 'role', entityId: req.params.id, before });
   res.json({ success: true });
 });
@@ -4968,6 +4992,7 @@ app.post('/api/portal-users/login', (req, res) => {
   }
   loginThrottle.reset(req.ip);
   const token = sessions.create({ userId: user.id, ip: req.ip, userAgent: req.headers['user-agent'] });
+  authz.invalidate(user.id);
   audit({ portalUser: user, ip: req.ip }, 'login', { entity: 'portal_user', entityId: user.id });
   res.json({ success: true, key: token });
 });
@@ -5231,4 +5256,4 @@ if (require.main === module) {
   scheduler.start();
 }
 
-module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, hrTimesheet, hrServices, stock, prd, secureStore };
+module.exports = { app, db, authz, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, hrTimesheet, hrServices, stock, prd, secureStore };

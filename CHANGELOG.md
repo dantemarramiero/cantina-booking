@@ -247,6 +247,18 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
   - oggetti di costo per parcelle, ordini di lavoro e imbottigliamenti;
   - un test che richiede un test per ogni regola consegnata.
 
+## 2026-09-25 (2) — Organigramma e permessi, Fase 1
+
+- **Utenti senza ruolo:** non accedono più a nessun modulo (prima avevano accesso completo). Chi non aveva un ruolo ha ricevuto il ruolo di sistema **Accesso completo**, quindi nessuno ha perso accessi.
+- **Ruoli:** un ruolo ancora assegnato non si cancella più. Prima i suoi utenti restavano senza ruolo, cioè con accesso completo.
+- **Modello dati** dell'organigramma e dei permessi (migrazione `0030`):
+  - unità (con la gerarchia interrogabile), posizioni e assegnazioni; un dipendente può esserci anche senza account;
+  - catalogo dei permessi e permessi dei ruoli con ambito (tutto, unità, sottoalbero, propri, assegnati);
+  - eccezioni nominative con motivazione obbligatoria, deleghe a tempo, vincoli di separazione dei compiti.
+- **Dati sensibili** (retribuzioni, idoneità, disciplinare): non si associano più a un ruolo. Chi li aveva dal ruolo li mantiene come concessione nominativa, con la motivazione "Migrazione dal ruolo X".
+- **Permessi effettivi** ricalcolati quando cambiano ruoli o utenti, e ogni ora: concessioni e deleghe scadono da sole.
+- **Test di parità:** ogni utente × ogni API × livelli e capacità dà lo stesso esito prima e dopo la migrazione. Per ora l'accesso lo decide ancora il sistema di prima.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).
