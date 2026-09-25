@@ -10,7 +10,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { runMigrations } = require('./lib/migrations');
 const { createEventBus } = require('./lib/events');
 const { createScheduler } = require('./lib/scheduler');
-const { createSessions, createSigner, createLoginThrottle, canAccess, safeEqual, ACCESS_LEVELS } = require('./lib/security');
+const { createSessions, createSigner, createLoginThrottle, canAccess, safeEqual, ACCESS_LEVELS, PRD_CAPABILITIES } = require('./lib/security');
 const { createAudit } = require('./lib/audit');
 const { createNotifications } = require('./lib/notifications');
 const { createSecureStore, resolveKey } = require('./lib/secure-files');
@@ -1349,6 +1349,13 @@ function hasWorkspace(req, workspace) {
   const permitted = permittedWorkspacesFor(req);
   return permitted === null || permitted.includes(workspace);
 }
+// Capacità dentro Produzione (enologo, cantiniere…). null = accesso completo, come per workspace e livelli.
+function capabilitiesFor(req) {
+  if (req.isMasterKey || !req.portalUser?.role_id) return null;
+  const role = db.prepare('SELECT capabilities FROM roles WHERE id = ?').get(req.portalUser.role_id);
+  if (!role) return null;
+  try { return JSON.parse(role.capabilities || '[]'); } catch { return []; }
+}
 
 // ── ERP helpers ───────────────────────────────────────────────────────────────
 function getSetting(key, fallback = null) {
@@ -1366,6 +1373,14 @@ function getIntSetting(key, fallback) {
 const NUMERIC_SETTINGS = {
   stale_customer_days: { fallback: 60, min: 1, max: 3650, error: 'I giorni per "cliente fermo" devono essere tra 1 e 3650.' },
   slot_window_days: { fallback: 90, min: 7, max: 365, error: 'La finestra delle disponibilità deve essere tra 7 e 365 giorni.' },
+};
+// Unità a schermo della Produzione (Impostazioni → Customizations → Produzione): nel database si salva
+// sempre in ml, g e m², cambia solo come si vedono e si scrivono i numeri.
+const ENUM_SETTINGS = {
+  prd_unit_volume: { values: ['hl', 'l'], fallback: 'hl', error: 'Unità dei volumi: ettolitri o litri.' },
+  prd_unit_weight: { values: ['q', 'kg'], fallback: 'q', error: 'Unità dei pesi: quintali o chili.' },
+  prd_unit_area: { values: ['ha', 'm2'], fallback: 'ha', error: 'Unità delle superfici: ettari o metri quadrati.' },
+  prd_unit_sugar: { values: ['babo', 'brix'], fallback: 'babo', error: 'Scala degli zuccheri: °Babo o °Brix.' },
 };
 
 // ── Customizations: liste modificabili (Tipologie di cliente, Ruoli del contatto) ──
@@ -2771,6 +2786,7 @@ app.get('/api/admin/settings', authAdmin, (req, res) => {
     active_months_threshold: getSetting('active_months_threshold', '6'),
     semi_active_months_threshold: getSetting('semi_active_months_threshold', '12'),
     ...Object.fromEntries(Object.entries(NUMERIC_SETTINGS).map(([k, d]) => [k, getIntSetting(k, d.fallback)])),
+    ...Object.fromEntries(Object.entries(ENUM_SETTINGS).map(([k, d]) => [k, getSetting(k, d.fallback) || d.fallback])),
     ...company,
   });
 });
@@ -2860,6 +2876,11 @@ app.post('/api/admin/settings', authAdmin, (req, res) => {
     if (!(n >= d.min && n <= d.max)) return res.status(400).json({ error: d.error });
     setSetting(k, String(n));
   }
+  for (const [k, d] of Object.entries(ENUM_SETTINGS)) {
+    if (req.body[k] === undefined) continue;
+    if (!d.values.includes(req.body[k])) return res.status(400).json({ error: d.error });
+    setSetting(k, req.body[k]);
+  }
   for (const f of COMPANY_FIELDS) {
     if (req.body[f] !== undefined) setSetting(f, req.body[f].trim());
   }
@@ -2869,7 +2890,7 @@ app.post('/api/admin/settings', authAdmin, (req, res) => {
 // Le sole impostazioni che si scrivono da qui (e quindi le sole che finiscono nel registro).
 const SETTINGS_AUDIT_KEYS = [
   'commercial_alert_email', 'procurement_alert_email', 'active_months_threshold', 'semi_active_months_threshold',
-  ...Object.keys(NUMERIC_SETTINGS), ...COMPANY_FIELDS,
+  ...Object.keys(NUMERIC_SETTINGS), ...Object.keys(ENUM_SETTINGS), ...COMPANY_FIELDS,
 ];
 
 // ── Customizations: liste modificabili ──
@@ -4798,29 +4819,32 @@ function portalUserPublic(id) {
   return db.prepare('SELECT id, name, email, username, active, role_id FROM portal_users WHERE id = ?').get(id) || null;
 }
 function roleSnapshot(id) {
-  const r = db.prepare('SELECT id, name, workspaces, access_levels FROM roles WHERE id = ?').get(id);
-  return r ? { ...r, workspaces: JSON.parse(r.workspaces), access_levels: JSON.parse(r.access_levels || '[]') } : null;
+  const r = db.prepare('SELECT id, name, workspaces, access_levels, capabilities FROM roles WHERE id = ?').get(id);
+  return r ? { ...r, workspaces: JSON.parse(r.workspaces), access_levels: JSON.parse(r.access_levels || '[]'), capabilities: JSON.parse(r.capabilities || '[]') } : null;
 }
 // "base" non si salva: ce l'hanno tutti.
 function cleanAccessLevels(levels) {
   return Array.isArray(levels) ? [...new Set(levels.filter(l => ACCESS_LEVELS.includes(l) && l !== 'base'))] : [];
 }
+function cleanCapabilities(caps) {
+  return Array.isArray(caps) ? [...new Set(caps.filter(c => PRD_CAPABILITIES.includes(c)))] : [];
+}
 
 // ── Ruoli e permessi ──────────────────────────────────────────────────────────
 app.get('/api/admin/roles', authAdmin, (req, res) => {
-  res.json(db.prepare('SELECT * FROM roles ORDER BY name').all().map(r => ({ ...r, workspaces: JSON.parse(r.workspaces), access_levels: JSON.parse(r.access_levels || '[]') })));
+  res.json(db.prepare('SELECT * FROM roles ORDER BY name').all().map(r => ({ ...r, workspaces: JSON.parse(r.workspaces), access_levels: JSON.parse(r.access_levels || '[]'), capabilities: JSON.parse(r.capabilities || '[]') })));
 });
 app.post('/api/admin/roles', authAdmin, (req, res) => {
-  const { name, workspaces, access_levels } = req.body || {};
+  const { name, workspaces, access_levels, capabilities } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'Il nome del ruolo è obbligatorio.' });
   const ws = Array.isArray(workspaces) ? workspaces.filter(w => ALL_WORKSPACES.includes(w)) : [];
   const levels = cleanAccessLevels(access_levels);
-  const result = db.prepare('INSERT INTO roles (name, workspaces, access_levels) VALUES (?, ?, ?)').run(name.trim(), JSON.stringify(ws), JSON.stringify(levels));
+  const result = db.prepare('INSERT INTO roles (name, workspaces, access_levels, capabilities) VALUES (?, ?, ?, ?)').run(name.trim(), JSON.stringify(ws), JSON.stringify(levels), JSON.stringify(cleanCapabilities(capabilities)));
   audit(req, 'role.created', { entity: 'role', entityId: result.lastInsertRowid, after: roleSnapshot(result.lastInsertRowid) });
   res.json({ success: true, id: result.lastInsertRowid });
 });
 app.patch('/api/admin/roles/:id', authAdmin, (req, res) => {
-  const { name, workspaces, access_levels } = req.body || {};
+  const { name, workspaces, access_levels, capabilities } = req.body || {};
   const updates = [], params = [];
   if (name !== undefined) { updates.push('name = ?'); params.push(name.trim()); }
   if (workspaces !== undefined) {
@@ -4828,6 +4852,7 @@ app.patch('/api/admin/roles/:id', authAdmin, (req, res) => {
     updates.push('workspaces = ?'); params.push(JSON.stringify(ws));
   }
   if (access_levels !== undefined) { updates.push('access_levels = ?'); params.push(JSON.stringify(cleanAccessLevels(access_levels))); }
+  if (capabilities !== undefined) { updates.push('capabilities = ?'); params.push(JSON.stringify(cleanCapabilities(capabilities))); }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
   params.push(req.params.id);
   const before = roleSnapshot(req.params.id);
@@ -4851,6 +4876,7 @@ app.get('/api/admin/me', authAdmin, (req, res) => {
     roleName: req.portalUser?.role_id ? db.prepare('SELECT name FROM roles WHERE id = ?').get(req.portalUser.role_id)?.name : null,
     permittedWorkspaces, // null = accesso completo a tutti i workspace
     accessLevels: accessLevelsFor(req), // null = tutti i livelli di riservatezza
+    capabilities: capabilitiesFor(req), // Produzione; null = tutte
   });
 });
 
@@ -5177,6 +5203,8 @@ function workspaceUsers(ws) {
   return [null, ...users];
 }
 const stock = require('./modules/stock')(app, { db, authAdmin, audit, events, notifications, scheduler, getSetting, checkStockThreshold, roleUsers: workspaceUsers });
+// Produzione (docs/produzione): anagrafiche della Fase 1; capacità per ruolo dentro il workspace.
+const prd = require('./modules/prd')(app, { db, authAdmin, audit, events, notifications, scheduler, getSetting, capabilitiesFor, stock });
 // People → accesso: l'offboarding concluso disattiva l'utente del portale e il suo operatore dell'Enoturismo
 // (come la disattivazione da Impostazioni → Utenti: sessioni revocate, niente cancellazioni).
 events.on('employee.offboarded', 'portal.deactivate-access', ev => {
@@ -5203,4 +5231,4 @@ if (require.main === module) {
   scheduler.start();
 }
 
-module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, hrTimesheet, hrServices, stock, secureStore };
+module.exports = { app, db, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, hrTimesheet, hrServices, stock, prd, secureStore };

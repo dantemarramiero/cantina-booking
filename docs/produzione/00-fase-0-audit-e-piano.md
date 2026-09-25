@@ -1,6 +1,6 @@
 # Produzione — Fase 0: audit e piano
 
-Stato: **decisioni prese il 25/09/2026**, domande aperte raccolte nel questionario per la cantina (`docs/Domande-cantina.xlsx`). In questa fase non si modificano né il codice né lo schema.
+Stato: **decisioni prese il 25/09/2026**, domande aperte raccolte nel questionario per la cantina (`docs/Domande-cantina.xlsx`). In questa fase non si modificano né il codice né lo schema. Seguito: prerequisiti e Fase 1 in [`01-prerequisiti-e-fase-1.md`](01-prerequisiti-e-fase-1.md).
 
 **Decisioni del 25/09/2026:**
 - **Approvate:** DP1–DP12, DP14, DP15.

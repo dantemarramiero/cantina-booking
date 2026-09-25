@@ -7,6 +7,8 @@ const { parseDecimal, formatDecimal, PPM } = require('../lib/money');
 const { PERIOD, DATE } = require('../lib/calendar');
 
 const OBJECT_TYPES = ['annata', 'lotto', 'sku', 'operazione', 'esperienza', 'fiera', 'progetto', 'evento'];
+// Oggetti di costo che crea la Produzione (parcelle, ordini di lavoro, imbottigliamenti): non si inseriscono a mano.
+const PRODUCTION_OBJECT_TYPES = ['parcella', 'ordine_lavoro', 'imbottigliamento'];
 const NATURES = ['personale', 'materie', 'servizi', 'utenze', 'ammortamenti', 'altro'];
 const BASE = '/api/admin/finance';
 
@@ -160,6 +162,7 @@ module.exports = function registerFinance(app, { db, authAdmin, audit, events })
       vintage: pick('vintage', intOrNull),
       notes: pick('notes', v => (String(v).trim() || null)),
     };
+    if (PRODUCTION_OBJECT_TYPES.includes(f.type)) throw new HttpError(400, 'Parcelle, ordini di lavoro e imbottigliamenti come oggetti di costo li crea la Produzione.');
     if (!OBJECT_TYPES.includes(f.type)) throw new HttpError(400, 'Tipo di oggetto di costo non valido.');
     if (!f.code || !f.name) throw new HttpError(400, 'Codice e nome sono obbligatori.');
     if (!['aperto', 'chiuso'].includes(f.status)) throw new HttpError(400, 'Stato non valido.');

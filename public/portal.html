@@ -946,7 +946,7 @@
     </nav>
 
     <nav class="sidebar-nav" data-workspace-nav="produzione" style="display:none">
-      <div class="nv-group-label"><span class="nv-label">Sezioni</span></div>
+      <div class="nv-group-label"><span class="nv-label">Ordini</span></div>
       <button data-sub="prod-dashboard" class="active">
         <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><span class="nv-label">Dashboard</span>
       </button>
@@ -958,6 +958,24 @@
       </button>
       <button data-sub="prod-righe">
         <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg></span><span class="nv-label">Righe ordine</span>
+      </button>
+      <div class="nv-group-label"><span class="nv-label">Vigneto</span></div>
+      <button data-sub="prd-vigneti">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="14" r="2.2"/><circle cx="14" cy="14" r="2.2"/><circle cx="11.5" cy="18" r="2.2"/><circle cx="11.5" cy="10" r="2.2"/><path d="M11.5 7.8V4c2 0 3.5 1 4 2.5"/></svg></span><span class="nv-label">Vigneti e parcelle</span>
+      </button>
+      <button data-sub="prd-mezzi">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="3"/><circle cx="18" cy="18" r="2"/><path d="M4 14V8h7l3 4h5v6"/><path d="M11 8V5"/></svg></span><span class="nv-label">Mezzi e fitofarmaci</span>
+      </button>
+      <div class="nv-group-label"><span class="nv-label">Cantina</span></div>
+      <button data-sub="prd-vasi">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="7" ry="8"/><path d="M5.5 9h13M5.5 15h13"/></svg></span><span class="nv-label">Vasi e barrique</span>
+      </button>
+      <button data-sub="prd-protocolli">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6v3H9z"/><path d="M7 5H5v16h14V5h-2"/><path d="M8 11h8M8 15h8M8 19h5"/></svg></span><span class="nv-label">Protocolli</span>
+      </button>
+      <div class="nv-group-label"><span class="nv-label">Configurazione</span></div>
+      <button data-sub="prd-config">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></span><span class="nv-label">Denominazioni e soglie</span>
       </button>
     </nav>
 
@@ -1297,6 +1315,13 @@
           <tbody id="prod-items-tbody"></tbody></table>
         </div>
       </div>
+
+      <!-- Produzione, Fase 1: anagrafiche (public/js/portal-prd*.js) -->
+      <div class="subpanel" id="sub-prd-vigneti"><div id="prd-vigneti-root"></div></div>
+      <div class="subpanel" id="sub-prd-mezzi"><div id="prd-mezzi-root"></div></div>
+      <div class="subpanel" id="sub-prd-vasi"><div id="prd-vasi-root"></div></div>
+      <div class="subpanel" id="sub-prd-protocolli"><div id="prd-protocolli-root"></div></div>
+      <div class="subpanel" id="sub-prd-config"><div id="prd-config-root"></div></div>
     </div>
 
     <!-- ═══ MAGAZZINO ═══ -->
@@ -1797,9 +1822,25 @@
               <section class="cz-module" data-cz-module="produzione">
                 <h3 class="cz-module-title">Produzione</h3>
                 <div class="cz-group">
+                  <div class="cz-group-title">Definizioni<span>come il software mostra i numeri</span></div>
+                  <div class="cz-block">
+                    <div class="cz-block-title">Unità di misura a schermo</div>
+                    <p class="cz-block-desc">Come si vedono e si scrivono volumi, pesi, superfici e zuccheri. Nel database i valori restano sempre precisi (millilitri, grammi, metri quadrati): cambiare unità non modifica nessun dato.</p>
+                    <div class="cz-where"><b>Dove agisce:</b> Produzione → vigneti, parcelle, vasi e, più avanti, conferimenti e analisi</div>
+                    <div class="cz-controls">
+                      <div class="cz-inline">Volumi <select id="prd-unit-volume"><option value="hl">ettolitri (hl)</option><option value="l">litri (L)</option></select>
+                        · pesi <select id="prd-unit-weight"><option value="q">quintali (q)</option><option value="kg">chili (kg)</option></select>
+                        · superfici <select id="prd-unit-area"><option value="ha">ettari (ha)</option><option value="m2">metri quadrati (m²)</option></select>
+                        · zuccheri <select id="prd-unit-sugar"><option value="babo">°Babo</option><option value="brix">°Brix</option></select></div>
+                      <div class="cz-actions"><button class="btn small" onclick="savePrdUnits()">Salva</button></div>
+                      <div id="prd-units-msg" class="cz-msg"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="cz-group">
                   <div class="cz-group-title">Automatismi<span>cosa succede da solo</span></div>
                   <div class="cz-block">
-                    <div class="cz-block-top"><div class="cz-block-title">Stati delle righe di produzione</div><span class="badge grey">Manuale</span></div>
+                    <div class="cz-block-top"><div class="cz-block-title">Stati delle righe d'ordine</div><span class="badge grey">Manuale</span></div>
                     <p class="cz-block-desc">Da produrre → In produzione → Completato si cambiano a mano su ogni riga. Per ora in questo modulo non ci sono automatismi.</p>
                     <div class="cz-where"><b>Dove agisce:</b> Produzione → Righe ordine</div>
                   </div>
@@ -3004,6 +3045,11 @@
 <script src="/js/portal-people-timesheet.js"></script>
 <script src="/js/portal-people-services.js"></script>
 <script src="/js/portal-stock.js"></script>
+<script src="/js/vendor/qrcode-generator.js"></script>
+<script src="/js/prd-i18n.js"></script>
+<script src="/js/portal-prd.js"></script>
+<script src="/js/portal-prd-vineyard.js"></script>
+<script src="/js/portal-prd-cellar.js"></script>
 <script>
 let ADMIN_KEY = null;
 let PRODUCTS = [];
@@ -3334,6 +3380,7 @@ function loadSubpanel(sub) {
   if (sub === 'prod-riepilogo') loadProductionSummary();
   if (sub === 'prod-clienti') loadProductionSummary();
   if (sub === 'prod-righe') loadProductionItems();
+  if (sub.startsWith('prd-')) loadPrd(sub);
   if (sub === 'mag-dashboard') loadMagazzinoDashboard();
   if (sub === 'mag-registro') loadStockLedger();
   if (sub === 'crm-dashboard') loadCrmDashboard();
@@ -6530,7 +6577,24 @@ async function loadCustomizations() {
     const n = document.querySelectorAll(`.cz-module[data-cz-module="${b.dataset.cz}"] .cz-block`).length;
     b.querySelector('span').textContent = n;
   });
-  await Promise.all([loadWineClubRule(), loadOptionLists().then(renderCzLists)]);
+  await Promise.all([loadWineClubRule(), loadOptionLists().then(renderCzLists), loadPrdUnits()]);
+}
+
+// Produzione: unità a schermo (i dati restano in ml, g, m²).
+const PRD_UNIT_KEYS = { volume: 'prd_unit_volume', weight: 'prd_unit_weight', area: 'prd_unit_area', sugar: 'prd_unit_sugar' };
+async function loadPrdUnits() {
+  const s = await api('/api/admin/settings');
+  for (const [k, key] of Object.entries(PRD_UNIT_KEYS)) document.getElementById(`prd-unit-${k}`).value = s[key];
+}
+async function savePrdUnits() {
+  const msg = document.getElementById('prd-units-msg');
+  try {
+    await api('/api/admin/settings', { method: 'POST', body: JSON.stringify(Object.fromEntries(Object.entries(PRD_UNIT_KEYS).map(([k, key]) => [key, document.getElementById(`prd-unit-${k}`).value]))) });
+    if (typeof PRD !== 'undefined') PRD.catalog = null;
+    msg.innerHTML = '<div class="msg success">Salvato.</div>';
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">${esc(e.message)}</div>`;
+  }
 }
 
 async function saveNumericSetting(key, inputId, msgId) {
@@ -6787,13 +6851,14 @@ async function loadRolesMatrix() {
   if (!roles.length) { box.innerHTML = '<div class="list-empty">Nessun ruolo. Senza un ruolo assegnato, un utente ha accesso completo.</div>'; return; }
   box.innerHTML = `
     <table class="roles-matrix-table">
-      <thead><tr><th>Ruolo</th>${ALL_WORKSPACES.map(w => `<th>${esc(WORKSPACE_LABELS[w])}</th>`).join('')}<th title="Oltre ai dati di base, quali dati HR riservati vede">Dati HR riservati</th><th></th></tr></thead>
+      <thead><tr><th>Ruolo</th>${ALL_WORKSPACES.map(w => `<th>${esc(WORKSPACE_LABELS[w])}</th>`).join('')}<th title="Oltre ai dati di base, quali dati HR riservati vede">Dati HR riservati</th><th title="Cosa può scrivere in Produzione: senza capacità si consulta soltanto">Capacità in Produzione</th><th></th></tr></thead>
       <tbody>
         ${roles.map(r => `
           <tr>
             <td class="roles-matrix-name">${esc(r.name)}</td>
             ${ALL_WORKSPACES.map(w => `<td style="text-align:center"><input type="checkbox" ${r.workspaces.includes(w) ? 'checked' : ''} onchange="toggleRolePermission(${r.id}, '${w}', this.checked)"></td>`).join('')}
             <td style="white-space:nowrap">${HR_ACCESS_LEVELS.map(([l, label]) => `<label style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;font-size:11.5px;text-transform:none;letter-spacing:0;font-weight:400"><input type="checkbox" ${(r.access_levels || []).includes(l) ? 'checked' : ''} onchange="toggleRoleAccessLevel(${r.id}, '${l}', this.checked)">${label}</label>`).join('')}</td>
+            <td style="min-width:260px">${PRD_ROLE_CAPABILITIES.map(([c, label]) => `<label style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;font-size:11.5px;text-transform:none;letter-spacing:0;font-weight:400"><input type="checkbox" ${(r.capabilities || []).includes(c) ? 'checked' : ''} ${r.workspaces.includes('produzione') ? '' : 'disabled title="Serve il workspace Produzione"'} onchange="toggleRoleCapability(${r.id}, '${c}', this.checked)">${label}</label>`).join('')}</td>
             <td><button class="btn-outline-pill danger" onclick="deleteRole(${r.id})">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
             </button></td>
@@ -6828,6 +6893,7 @@ async function toggleRolePermission(roleId, workspace, checked) {
   const workspaces = new Set(role.workspaces);
   if (checked) workspaces.add(workspace); else workspaces.delete(workspace);
   await api('/api/admin/roles/' + roleId, { method: 'PATCH', body: JSON.stringify({ workspaces: [...workspaces] }) });
+  if (workspace === 'produzione') loadRolesMatrix(); // abilita o spegne le capacità in Produzione
 }
 
 // Livelli di riservatezza dei dati HR (People). "Base" ce l'hanno tutti.
@@ -6838,6 +6904,16 @@ async function toggleRoleAccessLevel(roleId, level, checked) {
   const levels = new Set(role.access_levels || []);
   if (checked) levels.add(level); else levels.delete(level);
   await api('/api/admin/roles/' + roleId, { method: 'PATCH', body: JSON.stringify({ access_levels: [...levels] }) });
+}
+
+// Capacità dentro Produzione: chi ha il workspace ma nessuna capacità consulta soltanto.
+const PRD_ROLE_CAPABILITIES = [['enologo', 'Enologo'], ['cantiniere', 'Cantiniere'], ['capo_squadra', 'Capo squadra'], ['agronomo', 'Agronomo'], ['responsabile_qualita', 'Resp. qualità'], ['sola_lettura', 'Sola lettura']];
+async function toggleRoleCapability(roleId, cap, checked) {
+  const roles = await api('/api/admin/roles');
+  const role = roles.find(r => r.id === roleId);
+  const caps = new Set(role.capabilities || []);
+  if (checked) caps.add(cap); else caps.delete(cap);
+  try { await api('/api/admin/roles/' + roleId, { method: 'PATCH', body: JSON.stringify({ capabilities: [...caps] }) }); } catch (e) { alert(e.message); }
 }
 
 async function deleteRole(id) {
@@ -7061,6 +7137,8 @@ async function boot() {
     switchWorkspace(ws);
     if (params.get('sub')) clickSidebarSub(params.get('sub'));
     if (ws === 'people' && params.get('employee')) openHrRecord(parseInt(params.get('employee')), params.get('tab') || undefined);
+    // Codice QR di un vaso: apre la scheda del vaso in Produzione → Vasi.
+    if (ws === 'produzione' && params.get('vessel')) { clickSidebarSub('prd-vasi'); prdOpenVessel(null, { byToken: params.get('vessel') }).catch(e => alert(e.message)); }
   } else {
     renderMobileSectionTabs('commerciale');
     await loadDashboard();

@@ -144,6 +144,7 @@ function openPortalLink(link) {
   if (ws && typeof switchWorkspace === 'function') switchWorkspace(ws);
   if (q.get('sub') && typeof clickSidebarSub === 'function') clickSidebarSub(q.get('sub'));
   if (ws === 'people' && q.get('employee') && typeof openHrRecord === 'function') openHrRecord(parseInt(q.get('employee')), q.get('tab') || undefined);
+  if (ws === 'produzione' && q.get('vessel') && typeof prdOpenVessel === 'function') prdOpenVessel(null, { byToken: q.get('vessel') }).catch(e => alert(e.message));
 }
 async function markAllBellRead() {
   await api('/api/admin/notifications/read', { method: 'POST', body: JSON.stringify({}) }).catch(() => {});

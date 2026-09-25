@@ -221,6 +221,30 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - Audit, decisioni e piano in `docs/produzione/`.
 - Questionario per la cantina in `docs/Domande-cantina.xlsx`, aggiornabile con `tools/questionario`.
 
+**Produzione — prerequisiti e Fase 1: anagrafiche** (vedi `docs/produzione/01-prerequisiti-e-fase-1.md`)
+- **Vigneto:**
+  - vigneti;
+  - parcelle con particelle catastali, unità vitate e idoneità alle denominazioni. La superficie vitata non supera mai quella della particella;
+  - attrezzature con la scadenza del controllo funzionale;
+  - fitofarmaci con dose massima, carenza e rientro.
+- **Cantina:**
+  - luoghi e vasi con il codice QR, che dal telefono apre la scheda del vaso, e le etichette da stampare;
+  - barrique con tonnelleria, rovere, tostatura, costo e passaggi;
+  - protocolli di vinificazione modificabili (5 di partenza).
+- **Configurazione:**
+  - vitigni;
+  - denominazioni con le regole di disciplinare a validità;
+  - parametri di analisi, stabilimenti, campagne;
+  - mappa delle operazioni SIAN;
+  - 22 soglie normative «da validare».
+- **Permessi:** capacità per ruolo dentro Produzione (enologo, cantiniere, capo squadra, agronomo, responsabile qualità, sola lettura), in Impostazioni → Ruoli.
+- **Unità a schermo** in Impostazioni → Customizations → Produzione (hl/L, q/kg, ha/m², °Babo/°Brix).
+- **Infrastruttura:**
+  - gli eventi portano la versione e l'autore;
+  - date operative in ora italiana;
+  - oggetti di costo per parcelle, ordini di lavoro e imbottigliamenti;
+  - un test che richiede un test per ogni regola consegnata.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

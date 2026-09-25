@@ -1,6 +1,8 @@
 // Portale → Finance (Fase 1): centri di costo, oggetti di costo, ribaltamenti, driver, costi diretti, cascata.
 const FIN_LEVELS = { 1: 'Generali', 2: 'Ausiliari', 3: 'Produttivi', 4: 'Commerciali' };
 const FIN_OBJECT_TYPES = { annata: 'Annata', lotto: 'Lotto di vino', sku: 'Bottiglia (SKU)', operazione: 'Operazione colturale', esperienza: 'Esperienza', fiera: 'Fiera', progetto: 'Progetto / contributo', evento: 'Evento' };
+// Creati dalla Produzione: si vedono negli elenchi, non si inseriscono da qui.
+const FIN_PRODUCTION_OBJECT_TYPES = { parcella: 'Parcella di vigneto', ordine_lavoro: 'Ordine di lavoro', imbottigliamento: 'Imbottigliamento' };
 const FIN_NATURES = { personale: 'Personale', materie: 'Materie', servizi: 'Servizi', utenze: 'Utenze', ammortamenti: 'Ammortamenti', altro: 'Altro' };
 const FIN = { centers: [], objects: [], drivers: [], period: UI.thisMonth() };
 
@@ -112,7 +114,7 @@ async function loadFinObjects() {
     <div class="list-toolbar">
       <div class="list-toolbar-title"><h3>Oggetti di costo</h3><p class="mod-intro">Ciò di cui vuoi conoscere il costo pieno: annate, lotti, bottiglie, esperienze, fiere, progetti. Ricevono costi diretti e quote dai centri produttivi e commerciali.</p></div>
       <div class="list-spacer"></div>
-      <div class="mod-toolbar-fields"><select id="fin-obj-type" onchange="loadFinObjects()">${UI.options(Object.entries(FIN_OBJECT_TYPES).map(([id, name]) => ({ id, name })), filter, { empty: 'Tutti i tipi' })}</select></div>
+      <div class="mod-toolbar-fields"><select id="fin-obj-type" onchange="loadFinObjects()">${UI.options(Object.entries({ ...FIN_OBJECT_TYPES, ...FIN_PRODUCTION_OBJECT_TYPES }).map(([id, name]) => ({ id, name })), filter, { empty: 'Tutti i tipi' })}</select></div>
       <button class="btn-generate" onclick="openFinObjectModal()">${UI.icon.plus} Nuovo oggetto</button>
     </div>
     ${shown.map(o => {
@@ -120,7 +122,7 @@ async function loadFinObjects() {
       return `<div class="mod-row">
         <div class="mod-row-main">
           <div class="mod-row-title"><span class="mod-code">${esc(o.code)}</span>${esc(o.name)}</div>
-          <div class="mod-row-sub">${esc(FIN_OBJECT_TYPES[o.type])}${link ? ' · ' + esc(link) : ''}</div>
+          <div class="mod-row-sub">${esc(FIN_OBJECT_TYPES[o.type] || FIN_PRODUCTION_OBJECT_TYPES[o.type] || o.type)}${link ? ' · ' + esc(link) : ''}</div>
         </div>
         <span class="badge ${o.status === 'aperto' ? 'green' : 'grey'}">${o.status === 'aperto' ? 'Aperto' : 'Chiuso'}</span>
         <div class="mod-row-actions">

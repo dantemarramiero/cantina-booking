@@ -1,6 +1,6 @@
 # Produzione — regole di business (QUANDO/ALLORA) e test
 
-Stato: **catalogo iniziale** (Fase 0). Nessuna regola è ancora implementata.
+Stato: Fase 1 consegnata (PRD-A01…A05, 25/09/2026); le altre fasi da fare.
 
 - Ogni regola avrà almeno un test di integrazione, con l'ID nel nome: `test('PRD-C01 …')`.
 - Un test automatico controllerà che ogni regola di una fase consegnata abbia il suo test.
@@ -37,13 +37,15 @@ Legenda dei file di test previsti:
 
 ## Fase 1 — Anagrafiche
 
-| ID | Regola | Note |
-|---|---|---|
-| PRD-A01 | QUANDO si crea o modifica una parcella ALLORA la somma delle superfici vitate sulla stessa particella catastale non supera la superficie della particella; altrimenti rifiuto | Serve l'elenco delle particelle con la superficie (DP14) |
-| PRD-A02 | QUANDO si archivia una parcella con interventi o conferimenti nella campagna aperta ALLORA rifiuto | «Campagna aperta» = non chiusa; in vendemmia possono esserlo due |
-| PRD-A03 | QUANDO si crea un vaso ALLORA codice univoco, capacità > 0, codice QR generato; un vaso con contenuto non si dismette | — |
-| PRD-A04 | QUANDO si dismette una barrique ALLORA deve essere vuota e la sua storia dei passaggi si chiude | — |
-| PRD-A05 | QUANDO una regola di disciplinare è scaduta ALLORA non vale per le operazioni con data successiva, ma resta valida per lo storico | — |
+Consegnata il 25/09/2026 in locale. Test in `test/prd-anagrafiche.test.js`: **tutti superati**.
+
+| ID | Regola | Test | Note |
+|---|---|---|---|
+| PRD-A01 | QUANDO si crea o modifica una parcella ALLORA la somma delle superfici vitate sulla stessa particella catastale non supera la superficie della particella; altrimenti rifiuto | ✓ creazione e modifica; superficie ridotta; archiviate e riattivate | Particelle con superficie e collegamento parcella ↔ particella (DP14) |
+| PRD-A02 | QUANDO si archivia una parcella con interventi o conferimenti nella campagna aperta ALLORA rifiuto | ✓ con un controllo simulato | Gli interventi (Fase 2) e i conferimenti (Fase 3) si agganciano a registerParcelArchiveGuard |
+| PRD-A03 | QUANDO si crea un vaso ALLORA codice univoco, capacità > 0, codice QR generato; un vaso con contenuto non si dismette | ✓ | Il contenuto dei vasi lo scriverà il giornale di cantina (Fase 3); oggi «pieno» è lo stato in_use, non impostabile a mano |
+| PRD-A04 | QUANDO si dismette una barrique ALLORA deve essere vuota e la sua storia dei passaggi si chiude | ✓ | L'occupazione dei legni (Fase 5) si aggancia a registerBarrelRetireHook |
+| PRD-A05 | QUANDO una regola di disciplinare è scaduta ALLORA non vale per le operazioni con data successiva, ma resta valida per lo storico | ✓ anche per menzione | — |
 
 ## Fase 2 — Vigneto
 
