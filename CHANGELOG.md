@@ -247,6 +247,20 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
   - oggetti di costo per parcelle, ordini di lavoro e imbottigliamenti;
   - un test che richiede un test per ogni regola consegnata.
 
+**Produzione — Fase 2: vigneto** (vedi `docs/produzione/02-fase-2.md`; in locale, da approvare)
+- **Interventi e trattamenti:**
+  - interventi su più parcelle, con esecutori e attrezzature: bozza, conferma, storno con motivo e «ripeti»;
+  - trattamenti con uno o più prodotti e tutti i controlli di legge (PRD-V01…V11): patentino e limitazioni del medico bloccanti da People, dose massima, applicazioni massime, biologico, carenza e rientro, registrazione tardiva, irroratrice non controllata.
+- **Stato delle parcelle oggi:** carenza, rientro, ultimo trattamento e interventi pianificati.
+- **Registro dei trattamenti:** CSV e stampa.
+- **Analisi:**
+  - analisi di maturazione, anche importate dal laboratorio (tutto o niente);
+  - curve per annata;
+  - previsione di vendemmia per destinazione, modificabile a mano.
+- **Pagina da campo** `/campo.html` per telefono e tablet: funziona anche senza rete; le bozze partono al ritorno della rete e quelle rifiutate si correggono o si scartano.
+- **Presenze:** l'intervento confermato propone la riga agli esecutori, con l'oggetto di costo della parcella per annata. Nuovo «Centro per le ore di vigneto».
+- **Magazzino:** il fitofarmaco gestito a magazzino si scarica per parcella; lo storno lo rimette.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

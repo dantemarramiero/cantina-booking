@@ -154,8 +154,9 @@ Finance compensa **esattamente** l'effetto registrato per l'evento originale: no
 
 | Evento | Quando | Consumer → effetto | Contenuto essenziale |
 |---|---|---|---|
-| `parcel.intervention_confirmed` | conferma di un intervento in vigneto | Dashboard; Finance solo per materiali non passati dal magazzino | intervento, tipo, parcelle con superficie, esecutori, mezzi |
-| `phyto.treatment_confirmed` | conferma di un trattamento | Produzione (carenza e rientro), Compliance (quaderno), Magazzino (scarico del fitofarmaco se gestito a magazzino) | parcelle, prodotto con n. di registrazione, dose, quantità, fine carenza, fine rientro |
+| `parcel.intervention_confirmed` (Fase 2) | conferma di un intervento in vigneto, trattamenti compresi | Dashboard e Finance: nessun consumer per ora | `operation_id`/`intervention_id`, `type`, `work_date`, `effective_at`, `harvest_year`, `parcels: [{ parcel_id, area_m2, cost_object_id }]` (oggetto di costo della parcella per annata), `workers: [{ employee_id, minutes }]` (minuti stimati; le ore vere sono nelle presenze), `equipment_ids` |
+| `phyto.treatment_confirmed` (Fase 2) | conferma di un trattamento, insieme al precedente | **Magazzino** `magazzino.scarico-fitofarmaci`: scarico `consumo_produzione` per parcella, in proporzione alla superficie, con l'oggetto di costo della parcella; solo se il prodotto è un articolo di magazzino in g o ml. Compliance (quaderno, Fase 7): da fare | i campi del precedente, più `ended_at`, `target_pest`, `preharvest_ends_on`, `reentry_ends_at`, `products: [{ phyto_product_id, registration_number, dose_per_ha_e4, total_quantity_e4, dose_unit }]`. Carenza e rientro li calcola la conferma, non un consumer |
+| `parcel.intervention_reversed`, `phyto.treatment_reversed` (Fase 2) | storno di un intervento confermato (PRD-V11) | **Magazzino** `magazzino.storno-fitofarmaci`: storna gli scarichi del trattamento | `operation_id`/`intervention_id`, `reversed_event_type`, `reason` |
 | `harvest.delivery_confirmed` | conferma di un conferimento | Produzione (lotto uva), Finance (kg per parcella) | parcella, annata agraria, squadra, peso netto, lotto |
 | `lot.addition_confirmed` | aggiunta enologica | Magazzino (scarico → `stock.issued` con l'oggetto di costo del lotto), e-label (bozza ingredienti) | lotto, prodotto, lotto del materiale, quantità, dose per hl |
 | `lot.analysis_recorded` | nuova analisi su un lotto, vaso o catasta | Allarmi (limiti, fermentazioni), imbottigliamento (prerequisiti) | soggetto, parametri, fuori soglia |
@@ -174,5 +175,5 @@ Finance compensa **esattamente** l'effetto registrato per l'evento originale: no
 ## 5. Idempotenza e storni
 
 - Un consumer che riceve due volte lo stesso evento non duplica nulla: vincolo unico `(consumer, event_id)` già in `event_consumptions`, più l'operazione idempotente del consumer (PRD-F01).
-- Gli scarichi di magazzino generati da Produzione hanno una chiave d'idempotenza legata alla riga d'origine (es. `aggiunta:<id>`), come quelli della Fase 3.
+- Gli scarichi di magazzino generati da Produzione hanno una chiave d'idempotenza legata alla riga d'origine (es. `aggiunta:<id>`), come quelli della Fase 3. Per i trattamenti: `fito:<intervento>:<prodotto>:<parcella>`.
 - Uno storno non cancella l'evento originale: ne emette uno nuovo (`lot.reversed`, `stock.issue_reversed`).

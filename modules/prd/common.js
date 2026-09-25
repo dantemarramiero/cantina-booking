@@ -15,6 +15,7 @@ const CAN = {
   cellar: ['enologo'],
   protocols: ['enologo'],
   compliance: ['enologo', 'responsabile_qualita'],
+  analyses: ['agronomo', 'enologo', 'responsabile_qualita'],
 };
 
 function createCommon({ db, audit, events, capabilitiesFor }) {

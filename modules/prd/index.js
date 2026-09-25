@@ -22,5 +22,14 @@ module.exports = function registerProduction(app, deps) {
   const cfg = require('./config')(r, deps, c);
   const vineyard = require('./vineyard')(r, deps, c, cfg);
   const cellar = require('./cellar')(r, deps, c, cfg);
-  return { ...cfg, ...vineyard, ...cellar, can: c.can };
+  // Fase 2 — vigneto: interventi, trattamenti, analisi, previsioni.
+  const interventions = require('./interventions')(r, deps, c, cfg);
+  const analyses = require('./analyses')(r, deps, c, cfg, interventions);
+  // PRD-A02: una parcella con interventi confermati in una campagna non ancora chiusa non si archivia.
+  vineyard.registerParcelArchiveGuard(p => {
+    const n = deps.db.prepare(`SELECT COUNT(DISTINCT i.id) AS c FROM parcel_interventions i JOIN parcel_intervention_parcels ip ON ip.intervention_id = i.id
+      JOIN wine_campaigns w ON w.id = i.campaign_id WHERE ip.parcel_id = ? AND i.status = 'confirmed' AND w.closed_at IS NULL`).get(p.id).c;
+    return n ? `ha ${n} ${n === 1 ? 'intervento' : 'interventi'} nella campagna aperta` : null;
+  });
+  return { ...cfg, ...vineyard, ...cellar, ...interventions, ...analyses, can: c.can };
 };

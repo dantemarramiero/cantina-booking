@@ -1,6 +1,6 @@
 # Produzione — regole di business (QUANDO/ALLORA) e test
 
-Stato: Fase 1 consegnata (PRD-A01…A05, 25/09/2026); le altre fasi da fare.
+Stato: Fasi 1 e 2 consegnate (PRD-A01…A05, PRD-V01…V11, 25/09/2026); le altre fasi da fare.
 
 - Ogni regola avrà almeno un test di integrazione, con l'ID nel nome: `test('PRD-C01 …')`.
 - Un test automatico controllerà che ogni regola di una fase consegnata abbia il suo test.
@@ -42,26 +42,28 @@ Consegnata il 25/09/2026 in locale. Test in `test/prd-anagrafiche.test.js`: **tu
 | ID | Regola | Test | Note |
 |---|---|---|---|
 | PRD-A01 | QUANDO si crea o modifica una parcella ALLORA la somma delle superfici vitate sulla stessa particella catastale non supera la superficie della particella; altrimenti rifiuto | ✓ creazione e modifica; superficie ridotta; archiviate e riattivate | Particelle con superficie e collegamento parcella ↔ particella (DP14) |
-| PRD-A02 | QUANDO si archivia una parcella con interventi o conferimenti nella campagna aperta ALLORA rifiuto | ✓ con un controllo simulato | Gli interventi (Fase 2) e i conferimenti (Fase 3) si agganciano a registerParcelArchiveGuard |
+| PRD-A02 | QUANDO si archivia una parcella con interventi o conferimenti nella campagna aperta ALLORA rifiuto | ✓ con un controllo simulato; dalla Fase 2 con interventi veri (`prd-vigneto`) | Gli interventi (Fase 2) sono agganciati a registerParcelArchiveGuard; i conferimenti (Fase 3) si agganceranno lì |
 | PRD-A03 | QUANDO si crea un vaso ALLORA codice univoco, capacità > 0, codice QR generato; un vaso con contenuto non si dismette | ✓ | Il contenuto dei vasi lo scriverà il giornale di cantina (Fase 3); oggi «pieno» è lo stato in_use, non impostabile a mano |
 | PRD-A04 | QUANDO si dismette una barrique ALLORA deve essere vuota e la sua storia dei passaggi si chiude | ✓ | L'occupazione dei legni (Fase 5) si aggancia a registerBarrelRetireHook |
 | PRD-A05 | QUANDO una regola di disciplinare è scaduta ALLORA non vale per le operazioni con data successiva, ma resta valida per lo storico | ✓ anche per menzione | — |
 
 ## Fase 2 — Vigneto
 
-| ID | Regola | Note |
-|---|---|---|
-| PRD-V01 | QUANDO si conferma un trattamento ALLORA sono obbligatori: parcella, data/ora, prodotto con n. di registrazione, avversità, dose/ha, quantità totale, superficie trattata, esecutore, attrezzatura; ne manca uno → rifiuto | — |
-| PRD-V02 | QUANDO l'esecutore non ha un patentino fitosanitario valido alla data (People) ALLORA non può essere esecutore | Controllo **bloccante senza deroghe** (vedi mappa integrazioni, `assignmentCheck`) |
-| PRD-V03 | QUANDO la dose/ha supera la massima del prodotto ALLORA rifiuto | Dose massima dall'anagrafica del prodotto |
-| PRD-V04 | QUANDO le applicazioni del prodotto superano il massimo configurato ALLORA rifiuto | Conteggio **per anno solare**, non per campagna (DP13) |
-| PRD-V05 | QUANDO la parcella è bio o in conversione e il prodotto non è ammesso in bio ALLORA rifiuto | — |
-| PRD-V06 | QUANDO si conferma un trattamento ALLORA fine carenza = data + giorni di carenza, fine rientro = fine trattamento + ore di rientro; con più trattamenti vale la data più lontana | Date in ora italiana (DP6) |
-| PRD-V07 | QUANDO si pianifica un intervento manuale durante il tempo di rientro ALLORA avviso bloccante che richiede conferma esplicita con motivazione (DPI), tracciata | — |
-| PRD-V08 | QUANDO un trattamento è registrato oltre N giorni dall'esecuzione ALLORA è segnalato come registrazione tardiva | config: N = 30 |
-| PRD-V09 | QUANDO l'attrezzatura ha il controllo funzionale scaduto ALLORA si conferma, ma resta segnalato come non conforme | — |
-| PRD-V10 | QUANDO un'idoneità contiene la limitazione «no esposizione fitofarmaci» ALLORA la persona non può essere esecutore | Limitazione collegata all'operazione «Trattamento fitosanitario»; oggi in People è solo un avviso: serve la modalità bloccante |
-| PRD-V11 | QUANDO un intervento confermato va corretto ALLORA storno e nuovo intervento; lo storno di un trattamento ricalcola carenza e rientro | — |
+Consegnata il 25/09/2026 in locale. Test in `test/prd-vigneto.test.js`: **tutti superati**.
+
+| ID | Regola | Test | Note |
+|---|---|---|---|
+| PRD-V01 | QUANDO si conferma un trattamento ALLORA sono obbligatori: parcella, data/ora, prodotto con n. di registrazione, avversità, dose/ha, quantità totale, superficie trattata, esecutore, attrezzatura; ne manca uno → rifiuto | ✓ la bozza incompleta si salva, la conferma elenca tutto ciò che manca; senza dose e quantità rifiuto; completo si conferma e non si modifica più | Un trattamento può avere più prodotti (miscela in botte): dose e quantità servono per ogni prodotto |
+| PRD-V02 | QUANDO l'esecutore non ha un patentino fitosanitario valido alla data (People) ALLORA non può essere esecutore | ✓ senza patentino rifiutato, anche con una deroga del responsabile sicurezza e anche se in People si toglie il collegamento; senza l'operazione `OP-TRATT-FITO` rifiuto; con il patentino valido sì | Controllo **bloccante senza deroghe**: `assignmentCheck(…, { strict: true, requiredTrainingCodes: ['fitosanitari'] })` sull'operazione «Trattamento fitosanitario» (`OP-TRATT-FITO`) |
+| PRD-V03 | QUANDO la dose/ha supera la massima del prodotto ALLORA rifiuto | ✓ 2,5 kg/ha con massima 2 rifiutata | Dose massima dall'anagrafica del prodotto, nella stessa unità |
+| PRD-V04 | QUANDO le applicazioni del prodotto superano il massimo configurato ALLORA rifiuto | ✓ la terza applicazione con massimo 2 è rifiutata; l'anno dopo si riparte; si conta per parcella | Contano solo i trattamenti confermati (non le bozze, né gli stornati, né una bozza cambiata di tipo). Periodo configurabile (DP13, `phyto_applications_period`): **anno solare** di partenza, oppure annata agraria o campagna. Da confermare con l'agronomo (VIG-11) |
+| PRD-V05 | QUANDO la parcella è bio o in conversione e il prodotto non è ammesso in bio ALLORA rifiuto | ✓ parcella in conversione: prodotto non ammesso rifiutato, ammesso sì | Se la parcella non lo dice, vale lo stato bio del vigneto |
+| PRD-V06 | QUANDO si conferma un trattamento ALLORA fine carenza = data + giorni di carenza, fine rientro = fine trattamento + ore di rientro; con più trattamenti vale la data più lontana | ✓ date calcolate; in miscela decide il prodotto con la carenza più lunga; sulla parcella vale la data più lontana | Date in ora italiana (DP6). Lo stato si calcola dai trattamenti confermati, non si salva a parte |
+| PRD-V07 | QUANDO si pianifica un intervento manuale durante il tempo di rientro ALLORA avviso bloccante che richiede conferma esplicita con motivazione (DPI), tracciata | ✓ senza motivo rifiuto; con il motivo si salva, resta nell'intervento e si conferma; il lavoro fatto prima del trattamento non è nel rientro; finito il rientro non serve | Vale per gli interventi a mano, non per i trattamenti. Contano i trattamenti già iniziati all'ora del lavoro |
+| PRD-V08 | QUANDO un trattamento è registrato oltre N giorni dall'esecuzione ALLORA è segnalato come registrazione tardiva | ✓ 40 giorni dopo è tardiva, 2 giorni dopo no | config: N = 30 (`phyto_late_registration_days`). Esce nel registro |
+| PRD-V09 | QUANDO l'attrezzatura ha il controllo funzionale scaduto ALLORA si conferma, ma resta segnalato come non conforme | ✓ controllo del 2022: confermato ma non conforme; del 2025: conforme | Scadenza calcolata con `equipment_inspection_valid_months` (36, da validare). Esce nel registro |
+| PRD-V10 | QUANDO un'idoneità contiene la limitazione «no esposizione fitofarmaci» ALLORA la persona non può essere esecutore | ✓ anche con il patentino valido; la consultazione dell'idoneità resta nel registro degli accessi anche se la conferma è rifiutata | La limitazione del medico sull'operazione «Trattamento fitosanitario» qui blocca; nel resto di People resta un avviso |
+| PRD-V11 | QUANDO un intervento confermato va corretto ALLORA storno e nuovo intervento; lo storno di un trattamento ricalcola carenza e rientro | ✓ senza motivo rifiuto; stornato, la carenza torna quella del trattamento rimasto; non si storna due volte; esce dal registro; evento di storno emesso. Lo scarico di magazzino si storna (test del magazzino) | Un confermato non si modifica né si elimina; una bozza sì |
 
 ## Fase 3 — Vendemmia, conferimenti, lotti
 

@@ -40,6 +40,7 @@ const normName = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/
 module.exports = function registerHrTimesheet(app, deps) {
   const { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile, hrSafety, hrAbsences, finance } = deps;
   const r = createRouter(app, '/api/admin/hr', authAdmin);
+  const proposalSources = []; // fonti di righe proposte registrate da altri moduli (registerProposalSource)
   const { actor, isSelf, isManagerOf, viewerEmployee } = hrFile;
 
   const employee = id => {
@@ -67,6 +68,7 @@ module.exports = function registerHrTimesheet(app, deps) {
     return {
       granularity: [15, 30, 60].includes(g) ? g : 60,
       booking_center: getSetting('timesheet_booking_center', 'C05'), event_center: getSetting('timesheet_event_center', 'C06'), fair_center: getSetting('timesheet_fair_center', 'C08'),
+      vineyard_center: getSetting('timesheet_vineyard_center', 'P101'), // ore degli interventi in vigneto (Produzione)
       export_columns: Array.isArray(cols) && cols.filter(c => EXPORT_COLUMNS[c]).length ? cols.filter(c => EXPORT_COLUMNS[c]) : DEFAULT_EXPORT,
     };
   }
@@ -78,7 +80,7 @@ module.exports = function registerHrTimesheet(app, deps) {
       if (![15, 30, 60].includes(Number(b.granularity))) throw new HttpError(400, 'Passo: 15, 30 o 60 minuti.');
       setSetting('timesheet_granularity', String(Number(b.granularity)));
     }
-    for (const k of ['booking_center', 'event_center', 'fair_center']) {
+    for (const k of ['booking_center', 'event_center', 'fair_center', 'vineyard_center']) {
       if (b[k] === undefined) continue;
       const c = db.prepare('SELECT c.* FROM cost_centers c WHERE c.code = ? AND '+LEAF_SQL).get(String(b[k]).trim());
       if (!c) throw new HttpError(400, `Centro «${b[k]}» non trovato o non è una foglia.`);
@@ -350,7 +352,21 @@ module.exports = function registerHrTimesheet(app, deps) {
           label: `Fiera «${fair.name}»${fair.location ? ` (${fair.location})` : ''}` });
       }
     }
-    // Le operazioni di Produzione si aggiungeranno quando il modulo le registrerà per persona.
+    // Fonti registrate da altri moduli (Produzione: interventi in vigneto). Ogni fonte dà inizio e fine in
+    // minuti, il centro (per codice o come impostazione delle presenze) e l'oggetto di costo; qui si arrotondano come le altre proposte.
+    for (const src of proposalSources) {
+      for (const u of src.used(e)) decided.add(`${src.name}:${u.source_id}:${u.work_date}`);
+      for (const p of src.list(e, first, last)) {
+        if (decided.has(`${src.name}:${p.source_id}:${p.work_date}`)) continue;
+        const start = Math.floor(p.start_min / g) * g;
+        const end = round(p.end_min);
+        const center = centerByCode(p.center_key ? s[p.center_key] : p.center_code);
+        const object = p.cost_object_id ? db.prepare("SELECT id, code, name FROM cost_objects WHERE id = ? AND status = 'aperto'").get(p.cost_object_id) : null;
+        out.push({ source: src.name, source_id: p.source_id, work_date: p.work_date, start_time: fromMin(start), end_time: fromMin(Math.max(end, start + g)), hour_type: 'ordinaria',
+          cost_center_id: center?.id ?? null, cost_center: center ? `${center.code} ${center.name}` : null, cost_object_id: object?.id ?? null, cost_object: object ? `${object.code} ${object.name}` : null,
+          label: p.label });
+      }
+    }
     return out.sort((a, b) => a.work_date.localeCompare(b.work_date) || a.start_time.localeCompare(b.start_time));
   }
   function findProposal(e, b) {
@@ -371,6 +387,7 @@ module.exports = function registerHrTimesheet(app, deps) {
       const eid = insertEntry(req, e, f, { origin: 'proposta', source_booking_id: p.source === 'prenotazione' ? p.source_id : null, source_fair_id: p.source === 'fiera' ? p.source_id : null });
       db.prepare('INSERT INTO timesheet_proposal_decisions (employee_id, source, source_id, work_date, decision, entry_id, decided_at, decided_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
         .run(e.id, p.source, p.source_id, p.work_date, 'accettata', eid, now(), actor(req));
+      for (const src of proposalSources) if (src.name === p.source && src.onAccept) src.onAccept(eid, p);
       notifyLimitations(e, warnings, eid);
       return eid;
     });
@@ -662,5 +679,9 @@ module.exports = function registerHrTimesheet(app, deps) {
   // Un dipendente con presenze registrate non si elimina.
   hr.registerDeleteGuard(id => (db.prepare('SELECT COUNT(*) AS c FROM timesheet_entries WHERE employee_id = ?').get(id).c ? 'presenze registrate' : null));
 
-  return { monthView, proposals, matchEmployeeByName, exportRows, syncHoursDriver, monthStatus };
+  // Fonte di proposte di un altro modulo: { name, list(e, first, last) → [{ source_id, work_date, start_min, end_min,
+  // center_code oppure center_key (un centro delle impostazioni, es. vineyard_center), cost_object_id, label }],
+  // used(e) → [{ source_id, work_date }], onAccept(entryId, proposta) }.
+  const registerProposalSource = src => proposalSources.push(src);
+  return { monthView, proposals, matchEmployeeByName, exportRows, syncHoursDriver, monthStatus, registerProposalSource };
 };

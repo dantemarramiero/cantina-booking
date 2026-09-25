@@ -288,6 +288,10 @@ async function loadHrTimesheetConfig() {
         <div class="field"><label>Centro per gli eventi</label>${centerSel('event_center', s.event_center)}</div>
         <div class="field"><label>Centro per le fiere</label>${centerSel('fair_center', s.fair_center)}</div>
       </div>
+      <div class="field-row">
+        <div class="field"><label>Centro per le ore di vigneto</label>${centerSel('vineyard_center', s.vineyard_center)}</div>
+        <div class="field"></div>
+      </div>
       <div class="field"><label>Colonne dell'export</label><div class="mod-checklist">${Object.entries(s.available_columns).map(([k, l]) => `<label><input type="checkbox" data-col="${k}" ${s.export_columns.includes(k) ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div></div>
       <button class="btn small" onclick="saveTsSettings()">Salva</button><div id="ts-set-msg"></div>
     </div>
@@ -298,6 +302,7 @@ async function saveTsSettings() {
     await api('/api/admin/hr/timesheet/settings', { method: 'PUT', body: JSON.stringify({
       granularity: Number(document.getElementById('ts-set-granularity').value),
       booking_center: document.getElementById('ts-set-booking_center').value, event_center: document.getElementById('ts-set-event_center').value, fair_center: document.getElementById('ts-set-fair_center').value,
+      vineyard_center: document.getElementById('ts-set-vineyard_center').value,
       export_columns: [...document.querySelectorAll('#hr-timesheet-config-box [data-col]:checked')].map(c => c.dataset.col),
     }) });
     TS.options = null;

@@ -5204,7 +5204,7 @@ function workspaceUsers(ws) {
 }
 const stock = require('./modules/stock')(app, { db, authAdmin, audit, events, notifications, scheduler, getSetting, checkStockThreshold, roleUsers: workspaceUsers });
 // Produzione (docs/produzione): anagrafiche della Fase 1; capacità per ruolo dentro il workspace.
-const prd = require('./modules/prd')(app, { db, authAdmin, audit, events, notifications, scheduler, getSetting, capabilitiesFor, stock });
+const prd = require('./modules/prd')(app, { db, authAdmin, audit, events, notifications, scheduler, getSetting, capabilitiesFor, stock, hrSafety, hrTimesheet });
 // People → accesso: l'offboarding concluso disattiva l'utente del portale e il suo operatore dell'Enoturismo
 // (come la disattivazione da Impostazioni → Utenti: sessioni revocate, niente cancellazioni).
 events.on('employee.offboarded', 'portal.deactivate-access', ev => {

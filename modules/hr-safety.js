@@ -217,25 +217,34 @@ module.exports = function registerHrSafety(app, deps) {
     return db.prepare(`SELECT * FROM safety_waivers WHERE employee_id = ? AND training_type_id = ? AND revoked_at IS NULL AND valid_from <= ? AND valid_to >= ?
       AND (cost_object_id IS NULL OR cost_object_id = ?) ORDER BY valid_to DESC LIMIT 1`).get(employeeId, typeId, date, date, costObjectId ?? -1) || null;
   }
-  function assignmentCheck(employeeId, { date = today(), costObjectId = null, jobRoleId = null, req = null } = {}) {
+  // strict: per le abilitazioni di legge (patentino fitosanitario, spazi confinati) una deroga non vale e
+  // una limitazione del giudizio collegata all'operazione blocca invece di avvisare (Produzione, PRD-V02/V10).
+  // requiredTrainingCodes: abilitazioni richieste comunque, anche se il collegamento all'operazione cambia.
+  function assignmentCheck(employeeId, { date = today(), costObjectId = null, jobRoleId = null, req = null, strict = false, requiredTrainingCodes = [] } = {}) {
     const e = employee(employeeId);
     const blocks = hrFile.blockingIssues(e.id, date).map(m => `${fullName(e)}: ${m}.`);
     const warnings = [];
     const waivers = [];
     const op = costObjectId ? operation(costObjectId) : null;
-    if (op) {
-      const required = db.prepare('SELECT t.* FROM operation_trainings ot JOIN training_types t ON t.id = ot.training_type_id WHERE ot.cost_object_id = ? AND t.active = 1').all(op.id);
+    const required = op ? db.prepare('SELECT t.* FROM operation_trainings ot JOIN training_types t ON t.id = ot.training_type_id WHERE ot.cost_object_id = ? AND t.active = 1').all(op.id) : [];
+    for (const code of requiredTrainingCodes) {
+      const t = db.prepare('SELECT * FROM training_types WHERE code = ?').get(code);
+      if (!t) blocks.push(`${fullName(e)}: manca il tipo di formazione «${code}» richiesto per legge.`);
+      else if (!required.some(x => x.id === t.id)) required.push(t);
+    }
+    if (op || required.length) {
+      const opName = op ? op.name : 'questa attività';
       for (const t of required) {
         const rec = latestTraining(e.id, t.id, date);
         if (validAt(rec, date)) continue;
-        const w = activeWaiver(e.id, t.id, op.id, date);
+        const w = strict ? null : activeWaiver(e.id, t.id, op?.id ?? null, date);
         if (w) {
           waivers.push(w.id);
-          warnings.push(`${fullName(e)} lavora su «${op.name}» con una deroga del responsabile sicurezza per «${t.name}» fino al ${itDate(w.valid_to)}: ${w.reason}`);
+          warnings.push(`${fullName(e)} lavora su «${opName}» con una deroga del responsabile sicurezza per «${t.name}» fino al ${itDate(w.valid_to)}: ${w.reason}`);
         } else {
           blocks.push(rec
-            ? `${fullName(e)}: l'abilitazione «${t.name}» richiesta per «${op.name}» è scaduta il ${itDate(rec.expires_on)}.`
-            : `${fullName(e)}: manca l'abilitazione «${t.name}» richiesta per «${op.name}».`);
+            ? `${fullName(e)}: l'abilitazione «${t.name}» richiesta per «${opName}» è scaduta il ${itDate(rec.expires_on)}.`
+            : `${fullName(e)}: manca l'abilitazione «${t.name}» richiesta per «${opName}».`);
         }
       }
     }
@@ -249,7 +258,7 @@ module.exports = function registerHrSafety(app, deps) {
       const hit = restrictionsOf(v.id).filter(x => (op && x.cost_object_id === op.id) || (jobRoleId && x.job_role_id === Number(jobRoleId)));
       if (hit.length) {
         fitnessUsed = true;
-        warnings.push(`${fullName(e)} ha limitazioni incompatibili con ${hit.map(x => `«${x.cost_object_name || x.job_role_name}»`).join(', ')}${v.limitations ? `: ${v.limitations}` : ''}.`);
+        (strict ? blocks : warnings).push(`${fullName(e)} ha limitazioni incompatibili con ${hit.map(x => `«${x.cost_object_name || x.job_role_name}»`).join(', ')}${v.limitations ? `: ${v.limitations}` : ''}.`);
       }
     } else if (state === 'da_rivalutare') {
       fitnessUsed = true;
