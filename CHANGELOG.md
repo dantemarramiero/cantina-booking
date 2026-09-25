@@ -215,6 +215,8 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - **Documenti HR:** chi non ha il workspace People scarica solo i propri documenti, anche se il suo ruolo ha livelli di accesso.
 - **Richieste di modifica:** approvando nuovi contatti di emergenza, quelli di prima restano visibili nel confronto.
 
+**Pubblicazione del 25/09/2026:** blocco 2E (con le correzioni), Fase 3 del magazzino e nuova sidebar in produzione. Migrazioni 0013 e 0014 applicate, precedute dalla copia automatica del database.
+
 **Produzione — Fase 0 (solo documentazione)**
 - Audit, decisioni e piano in `docs/produzione/`.
 - Questionario per la cantina in `docs/Domande-cantina.xlsx`, aggiornabile con `tools/questionario`.

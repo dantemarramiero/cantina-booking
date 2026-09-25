@@ -1,6 +1,6 @@
 # People e Finance — Fase 3: Magazzino, movimenti valorizzati
 
-Stato: **completata, in locale** (in attesa di conferma per la pubblicazione). Design proposto e confermato il 25/09/2026. Della transizione in tre passi (§ 4) sono pronti i passi A e B; il passo C si fa dopo il periodo di verifica.
+Stato: **completata, in produzione dal 25/09/2026** (migrazione 0014 applicata, copia del database in `/data/backups/cantina-20260925-102131-before-0013.db`). Design proposto e confermato il 25/09/2026. Della transizione in tre passi (§ 4) sono pronti i passi A e B; il passo C si fa dopo il periodo di verifica.
 
 Serve alla contabilità analitica (Fase 4) per due cose: il **costo del venduto** e il **valore delle rimanenze**.
 
@@ -208,7 +208,7 @@ Prese da me, come proposto:
 
 ### Cosa serve ancora da voi
 
-1. **Pubblicazione:** il blocco 2E e la Fase 3 sono in locale. Si pubblicano solo quando lo chiedete.
+1. **Pubblicazione:** fatta il 25/09/2026, insieme al blocco 2E. Il magazzino in produzione era vuoto, quindi il registro parte senza movimenti di apertura.
 2. **Foglio dei costi:** dopo la pubblicazione, scaricatelo da Magazzino → Registro e valore → Foglio dei costi, compilate il costo per bottiglia (per etichetta e annata) e delle materie prime e ricaricatelo. Fino ad allora il costo del venduto è zero e i margini non sono affidabili.
 3. **Cambiamento visibile per il magazzino:** dalla pubblicazione gli ordini B2B evasi scalano le bottiglie. Conviene avvisare chi evade gli ordini.
 4. **Righe d'ordine senza prodotto** (import da Excel): vanno abbinate a un prodotto perché escano dal magazzino. Le trovate in Controlli.

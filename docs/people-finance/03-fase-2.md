@@ -1,6 +1,6 @@
 # People e Finance — Fase 2: People
 
-Stato: **completata**. I blocchi 2A–2D sono in produzione dal 24/09/2026; il 2E è in locale, in attesa di conferma. La fase è divisa in blocchi:
+Stato: **completata**. I blocchi 2A–2D sono in produzione dal 24/09/2026, il 2E dal 25/09/2026. La fase è divisa in blocchi:
 
 | Blocco | Contenuto | Stato |
 |---|---|---|
@@ -8,7 +8,7 @@ Stato: **completata**. I blocchi 2A–2D sono in produzione dal 24/09/2026; il 2
 | 2B | Sicurezza (D.Lgs. 81/08): formazione, requisiti per mansione, idoneità sanitaria, DPI, infortuni, deroghe | in produzione |
 | 2C | Assenze: richieste e approvazioni, contatori, periodi bloccati, disponibilità per l'Enoturismo | in produzione |
 | 2D | Presenze: ore per squadra, proposte da prenotazioni e fiere, stati del mese, rettifiche, export, controlli bloccanti | in produzione |
-| 2E | Self-service, onboarding e offboarding, dotazioni, richieste di modifica, cedolini in blocco, modello dati del recruiting | completato, in locale |
+| 2E | Self-service, onboarding e offboarding, dotazioni, richieste di modifica, cedolini in blocco, modello dati del recruiting | in produzione |
 
 Valutazione e disciplinare sono rimandati, come concordato.
 
