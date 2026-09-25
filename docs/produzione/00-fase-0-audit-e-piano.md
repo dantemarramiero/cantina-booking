@@ -1,6 +1,29 @@
 # Produzione — Fase 0: audit e piano
 
-Stato: **in attesa di decisioni**. In questa fase non si modificano né il codice né lo schema.
+Stato: **decisioni prese il 25/09/2026**, domande aperte raccolte nel questionario per la cantina (`docs/Domande-cantina.xlsx`). In questa fase non si modificano né il codice né lo schema.
+
+**Decisioni del 25/09/2026:**
+- **Approvate:** DP1–DP12, DP14, DP15.
+- **Aperta:** DP13 (annata agraria o campagna per il vigneto). Dante la chiede all'agronomo (domanda VIG-11).
+- **Rimandata:** DP16 (apertura della cantina), che fa parte della procedura di onboarding (DP18).
+- **Nuove, su richiesta di Dante:**
+  - **DP17 — Unità di misura personalizzabili in Impostazioni** (volumi, pesi, zuccheri). Valori di partenza: ettolitri e quintali; la scala degli zuccheri (°Babo o °Brix) è da chiedere all'enologo. Nel database si salva sempre in ml e g.
+  - **DP18 — Onboarding come procedura a parte**, separata dalle Impostazioni: modelli Excel standard che la cantina compila. Da progettare più avanti. Gli elenchi di dati (vigneti e parcelle, vasi, barrique, vini in cantina, fitofarmaci, materiali, etichette) si raccolgono lì, non nel questionario.
+
+**Risposte già date:**
+- biologico: **in parte**;
+- metodo classico: **sì**;
+- imbottigliamento: **linea nostra**;
+- laboratorio: **interno ed esterno**;
+- dispositivi: **un po' di tutto** (iPad, tablet Android, smartphone aziendali e personali), quindi le schermate di campo devono funzionare anche su iPhone e iPad;
+- vendemmia 2026: **in corso**;
+- contrassegni di Stato: **sì, almeno un vino**;
+- enologo: **interno, con consulenti esterni**.
+
+Da chiedere in cantina:
+- chi tiene il registro SIAN, stabilimenti ICQRF, regime, deposito fiscale;
+- lo stato d'ordine che vale come «confermato»;
+- i dettagli delle risposte parziali.
 
 Base dell'audit:
 - repository `cantina-booking` al commit `262b909` (locale);

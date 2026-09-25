@@ -1,0 +1,11 @@
+{
+  "name": "questionario-cantina",
+  "private": true,
+  "description": "Genera e aggiorna docs/Domande-cantina.xlsx conservando le risposte già scritte nel file",
+  "scripts": {
+    "genera": "node genera.js"
+  },
+  "dependencies": {
+    "exceljs": "4.4.0"
+  }
+}

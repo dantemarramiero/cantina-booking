@@ -1,0 +1,220 @@
+[
+  {
+    "applicate_il": "2026-09-25T10:03:23.048Z",
+    "risposte": {
+      "SIA-01": {
+        "note": "25/09/2026: Dante non lo sa, da chiedere in amministrazione.",
+        "stato": "Da chiedere"
+      },
+      "SIA-03": {
+        "note": "25/09/2026: Dante non lo sa, da chiedere in amministrazione.",
+        "stato": "Da chiedere"
+      },
+      "SIA-04": {
+        "note": "25/09/2026: Dante non lo sa, da chiedere al consulente.",
+        "stato": "Da chiedere"
+      },
+      "SIA-05": {
+        "note": "25/09/2026: Dante non lo sa, da chiedere in amministrazione.",
+        "stato": "Da chiedere"
+      },
+      "VIG-04": {
+        "risposta": "In parte: alcuni vigneti sono biologici (certificati o in conversione).",
+        "da": "Dante Marramiero",
+        "data": "25/09/2026",
+        "stato": "Da chiarire",
+        "note": "Indicare quali vigneti, se certificati o in conversione, e l'ente certificatore."
+      },
+      "SPU-01": {
+        "risposta": "Sì.",
+        "da": "Dante Marramiero",
+        "data": "25/09/2026",
+        "stato": "Da chiarire",
+        "note": "Indicare quanti tiraggi all'anno e quante bottiglie."
+      },
+      "IMB-01": {
+        "risposta": "Linea di imbottigliamento nostra.",
+        "da": "Dante Marramiero",
+        "data": "25/09/2026",
+        "stato": "Risposta data"
+      },
+      "CAN-09": {
+        "risposta": "Entrambi: laboratorio interno ed esterno.",
+        "da": "Dante Marramiero",
+        "data": "25/09/2026",
+        "stato": "Da chiarire",
+        "note": "Indicare il laboratorio esterno e il formato dei referti (PDF, CSV)."
+      },
+      "AZ-05": {
+        "risposta": "Le unità si scelgono in Impostazioni. Valori di partenza: ettolitri e quintali.",
+        "da": "Dante Marramiero",
+        "data": "25/09/2026",
+        "stato": "Da chiarire",
+        "note": "Manca la scala degli zuccheri: °Babo o °Brix? (da chiedere all'enologo)"
+      },
+      "AZ-03": {
+        "risposta": "Un po' di tutto: iPad, tablet Android, smartphone aziendali e personali.",
+        "da": "Dante Marramiero",
+        "data": "25/09/2026",
+        "stato": "Risposta data"
+      },
+      "AZ-02": {
+        "risposta": "Enologo interno; ci sono anche consulenti esterni.",
+        "da": "Dante Marramiero",
+        "data": "25/09/2026",
+        "stato": "Da chiarire",
+        "note": "I consulenti esterni devono entrare nel portale? Per quali aree?"
+      },
+      "VEN-01": {
+        "risposta": "In corso (al 25/09/2026).",
+        "da": "Dante Marramiero",
+        "data": "25/09/2026",
+        "stato": "Risposta data"
+      },
+      "DEN-01": {
+        "risposta": "Montepulciano d'Abruzzo DOC, Trebbiano d'Abruzzo DOC, Cerasuolo d'Abruzzo DOC, Abruzzo DOC / IGT e altre.",
+        "da": "Dante Marramiero",
+        "data": "25/09/2026",
+        "stato": "Nell'onboarding",
+        "note": "L'elenco completo, con i vini, si raccoglie nell'onboarding."
+      },
+      "DEN-02": {
+        "risposta": "Sì.",
+        "da": "Dante Marramiero",
+        "data": "25/09/2026",
+        "stato": "Da chiarire",
+        "note": "Indicare quali denominazioni, chi fornisce le fascette e come si registrano le serie usate e distrutte."
+      },
+      "VIG-11": {
+        "note": "25/09/2026: Dante lo chiede all'agronomo (è la decisione DP13).",
+        "stato": "Chiesta"
+      },
+      "COM-01": {
+        "note": "25/09/2026: Dante non lo sa, da chiedere al commerciale.",
+        "stato": "Da chiedere"
+      },
+      "VIG-01": {
+        "stato": "Nell'onboarding",
+        "note": "Elenco di vigneti e parcelle con il modello dell'onboarding."
+      },
+      "VIG-08": {
+        "stato": "Nell'onboarding",
+        "note": "Elenco delle attrezzature con il modello dell'onboarding."
+      },
+      "VIG-09": {
+        "stato": "Nell'onboarding",
+        "note": "Elenco dei fitofarmaci con il modello dell'onboarding."
+      },
+      "VIG-15": {
+        "stato": "Nell'onboarding",
+        "note": "Elenco dei concimi con il modello dell'onboarding."
+      },
+      "CAN-02": {
+        "stato": "Nell'onboarding",
+        "note": "Elenco dei vasi con il modello dell'onboarding."
+      },
+      "CAN-03": {
+        "stato": "Nell'onboarding",
+        "note": "Elenco di barrique e legni con il modello dell'onboarding."
+      },
+      "CAN-05": {
+        "stato": "Nell'onboarding",
+        "note": "Vini in cantina con il modello dell'onboarding (decisione DP16 rimandata all'onboarding)."
+      },
+      "MAG-01": {
+        "stato": "Nell'onboarding",
+        "note": "Elenco delle materie prime con il modello dell'onboarding."
+      },
+      "MAG-03": {
+        "stato": "Nell'onboarding",
+        "note": "Giacenze di bottiglie con il modello dell'onboarding."
+      },
+      "DEN-05": {
+        "stato": "Nell'onboarding",
+        "note": "Elenco delle etichette con il modello dell'onboarding."
+      },
+      "IMB-03": {
+        "stato": "Nell'onboarding",
+        "note": "Distinte dei materiali con il modello dell'onboarding."
+      },
+      "DP1": {
+        "decisione": "Approvata",
+        "data": "25/09/2026"
+      },
+      "DP2": {
+        "decisione": "Approvata",
+        "data": "25/09/2026"
+      },
+      "DP3": {
+        "decisione": "Approvata",
+        "data": "25/09/2026"
+      },
+      "DP4": {
+        "decisione": "Approvata",
+        "data": "25/09/2026"
+      },
+      "DP5": {
+        "decisione": "Approvata",
+        "data": "25/09/2026"
+      },
+      "DP6": {
+        "decisione": "Approvata",
+        "data": "25/09/2026"
+      },
+      "DP7": {
+        "decisione": "Approvata",
+        "data": "25/09/2026"
+      },
+      "DP8": {
+        "decisione": "Approvata",
+        "data": "25/09/2026"
+      },
+      "DP9": {
+        "decisione": "Approvata",
+        "data": "25/09/2026",
+        "note": "Deve funzionare su tutti i dispositivi: iPad, tablet Android, smartphone aziendali e personali (AZ-03)."
+      },
+      "DP10": {
+        "decisione": "Approvata",
+        "data": "25/09/2026"
+      },
+      "DP11": {
+        "decisione": "Approvata",
+        "data": "25/09/2026",
+        "note": "La numerazione attuale è da raccogliere (CAN-04, IMB-02)."
+      },
+      "DP12": {
+        "decisione": "Approvata",
+        "data": "25/09/2026"
+      },
+      "DP13": {
+        "decisione": "Aperta: Dante la chiede all'agronomo",
+        "data": "25/09/2026",
+        "note": "Domanda VIG-11."
+      },
+      "DP14": {
+        "decisione": "Approvata",
+        "data": "25/09/2026"
+      },
+      "DP15": {
+        "decisione": "Approvata",
+        "data": "25/09/2026"
+      },
+      "DP16": {
+        "decisione": "Rimandata all'onboarding",
+        "data": "25/09/2026",
+        "note": "Si decide con la procedura di onboarding (DP18)."
+      },
+      "DP17": {
+        "decisione": "Richiesta di Dante",
+        "data": "25/09/2026",
+        "note": "Partenza: ettolitri e quintali; scala degli zuccheri da definire (AZ-05)."
+      },
+      "DP18": {
+        "decisione": "Richiesta di Dante",
+        "data": "25/09/2026",
+        "note": "Da progettare più avanti, separata dalle Impostazioni."
+      }
+    }
+  }
+]
