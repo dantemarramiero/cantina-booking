@@ -16,7 +16,9 @@ const ASSET_KINDS = { chiavi: 'Chiavi', badge: 'Badge', telefono: 'Telefono', pc
 // Dati che il dipendente può chiedere di cambiare dal self-service (anagrafica e codice fiscale no: servono documenti).
 const SELF_FIELDS = ['iban', 'residence_address', 'residence_postal_code', 'residence_city', 'residence_province', 'domicile', 'personal_email', 'personal_phone', 'size_shirt', 'size_pants', 'size_shoes'];
 const CANDIDATE_STATUSES = ['nuovo', 'in_valutazione', 'colloquio', 'offerta', 'assunto', 'scartato', 'ritirato'];
-const CF = /[A-Z]{6}\d{2}[A-EHLMPR-T]\d{2}[A-Z]\d{3}[A-Z]/g;
+// Codice fiscale di persona fisica, anche omocodico (lettere al posto delle cifre), non attaccato
+// ad altre lettere o cifre: dentro «X1RSSMRA80A01H501UZZ» non c'è nessun codice.
+const CF = /(?<![A-Z0-9])[A-Z]{6}[0-9LMNP-V]{2}[ABCDEHLMPRST][0-9LMNP-V]{2}[A-Z][0-9LMNP-V]{3}[A-Z](?![A-Z0-9])/g;
 const SEASONAL = ['stagionale', 'OTD'];
 const today = () => new Date().toISOString().slice(0, 10);
 const now = () => new Date().toISOString();
@@ -29,6 +31,7 @@ module.exports = function registerHrServices(app, deps) {
   const r = createRouter(app, '/api/admin/hr', authAdmin);
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 300 } });
   const { actor, isSelf, isManagerOf, viewerEmployee } = hrFile;
+  const contactsOf = employeeId => db.prepare('SELECT name, relationship, phone FROM emergency_contacts WHERE employee_id = ? ORDER BY sort_order, id').all(employeeId).map(x => ({ ...x }));
 
   const employee = id => {
     const e = db.prepare('SELECT * FROM employees WHERE id = ?').get(id);
@@ -141,10 +144,10 @@ module.exports = function registerHrServices(app, deps) {
       .map(c => {
         const changes = JSON.parse(c.changes);
         // In attesa: i valori di oggi. Approvata: quelli di prima, salvati all'approvazione. Altrimenti niente confronto.
-        if (c.status !== 'richiesta') return { ...c, changes, current: changes.previous || null };
+        if (c.status !== 'richiesta') return { ...c, changes, current: changes.previous || null, current_contacts: changes.previous_contacts };
         const current = db.prepare('SELECT * FROM employee_personal WHERE employee_id = ?').get(c.employee_id) || {};
         return { ...c, changes, current: Object.fromEntries(Object.keys(changes.fields || {}).map(k => [k, current[k] ?? null])),
-          current_contacts: changes.emergency_contacts ? db.prepare('SELECT name, relationship, phone FROM emergency_contacts WHERE employee_id = ? ORDER BY sort_order, id').all(c.employee_id) : undefined };
+          current_contacts: changes.emergency_contacts ? contactsOf(c.employee_id) : undefined };
       });
   });
   r.post('/change-requests/:id/approve', req => {
@@ -158,10 +161,12 @@ module.exports = function registerHrServices(app, deps) {
     const f = hrFile.validatePersonal(changes.fields || {});
     const before = db.prepare('SELECT * FROM employee_personal WHERE employee_id = ?').get(e.id) || {};
     const previous = Object.fromEntries(Object.keys(f).map(k => [k, before[k] ?? null]));
+    // I contatti di emergenza si sostituiscono in blocco: si conservano quelli di prima per il confronto.
+    const previousContacts = changes.emergency_contacts ? contactsOf(e.id) : undefined;
     events.transaction(() => {
       hrFile.savePersonal(e.id, f, changes.emergency_contacts);
       db.prepare("UPDATE personal_change_requests SET status = 'approvata', changes = ?, decided_at = ?, decided_by = ?, decision_note = ? WHERE id = ?")
-        .run(JSON.stringify({ ...changes, previous }), now(), actor(req), text(req.body?.note), c.id);
+        .run(JSON.stringify({ ...changes, previous, previous_contacts: previousContacts }), now(), actor(req), text(req.body?.note), c.id);
       notifyAll([userOfEmployee(e.id)].filter(Boolean), { kind: 'hr.change_request.decided', title: 'I tuoi dati sono stati aggiornati', body: `Approvato da ${actor(req)}.`, link: '/portal.html?me=1', dedupeKey: `change-request:${c.id}:decided` });
     });
     audit(req, 'change_request.approved', { entity: 'employee', entityId: e.id, after: { request_id: c.id, fields: Object.keys(f), emergency_contacts: !!changes.emergency_contacts } });
@@ -321,8 +326,8 @@ module.exports = function registerHrServices(app, deps) {
   });
 
   // ── Caricamento in blocco di cedolini e CU ──────────────────────────────────
-  // Il codice fiscale si cerca nel nome del file e, se non c'è, nel testo del PDF (anche nei flussi
-  // compressi). Un file si abbina solo se trova un unico codice fiscale di un dipendente.
+  // Il codice fiscale si cerca nel nome del file e nel testo del PDF (anche nei flussi compressi).
+  // Le regole di abbinamento sono in matchFile.
   function textsOf(buffer) {
     const raw = buffer.toString('latin1');
     const out = [raw];
@@ -338,16 +343,35 @@ module.exports = function registerHrServices(app, deps) {
     return out;
   }
   const employeeByCf = cf => db.prepare('SELECT e.* FROM employee_personal p JOIN employees e ON e.id = p.employee_id WHERE p.fiscal_code = ?').get(cf) || null;
+  const codesIn = s => [...new Set(String(s).toUpperCase().match(CF) || [])];
+  // Il codice fiscale dell'azienda (per una ditta individuale è quello del titolare, stampato su ogni CU
+  // come sostituto d'imposta) non indica di chi è il documento.
+  const employerCodes = () => new Set([getSetting('company_fiscal_code', '')].map(v => String(v || '').toUpperCase().replace(/\s/g, '')).filter(Boolean));
+  // Un file si abbina solo quando non c'è ambiguità: un cedolino attaccato alla persona sbagliata è una
+  // violazione della riservatezza, un file non abbinato si carica a mano dalla scheda.
+  //   - codice nel nome del file: deve essere di un dipendente e, se il testo si legge, comparire anche nel
+  //     documento, che non deve contenere i codici di altri dipendenti;
+  //   - senza codice nel nome: il documento deve contenere un solo codice fiscale di persona. Familiari a
+  //     carico, più cedolini nello stesso PDF o colleghi senza codice registrato lo rendono non abbinabile.
   function matchFile(file) {
-    const fromName = [...new Set((file.originalname.toUpperCase().match(CF) || []))];
+    const skip = employerCodes();
+    const fromName = codesIn(file.originalname).filter(c => !skip.has(c));
+    const inText = [...new Set(textsOf(file.buffer).flatMap(codesIn))].filter(c => !skip.has(c));
+    if (fromName.length > 1) return { reason: 'Nel nome del file ci sono più codici fiscali: caricalo dalla scheda del dipendente.' };
     if (fromName.length === 1) {
-      const e = employeeByCf(fromName[0]);
-      return e ? { e, by: 'nome del file' } : { reason: `Il codice fiscale ${fromName[0]} del nome del file non è di nessun dipendente.` };
+      const cf = fromName[0];
+      const e = employeeByCf(cf);
+      if (!e) return { reason: `Il codice fiscale ${cf} del nome del file non è di nessun dipendente.` };
+      if (inText.length && !inText.includes(cf)) return { reason: `Il codice fiscale del nome del file (${cf}) non compare nel documento: controlla il file.` };
+      if (inText.some(c => c !== cf && employeeByCf(c))) return { reason: 'Il documento contiene anche i codici fiscali di altri dipendenti: caricalo dalla scheda del dipendente.' };
+      return { e, by: 'nome del file' };
     }
-    const found = [...new Set(textsOf(file.buffer).flatMap(t => t.toUpperCase().match(CF) || []))].filter(employeeByCf);
-    if (found.length === 1) return { e: employeeByCf(found[0]), by: 'contenuto' };
-    if (found.length > 1) return { reason: 'Nel file ci sono i codici fiscali di più dipendenti: caricalo a mano.' };
-    return { reason: 'Nessun codice fiscale di un dipendente nel nome o nel testo del file.' };
+    if (inText.length > 1) return { reason: 'Nel documento ci sono più codici fiscali (familiari a carico, più cedolini o colleghi): caricalo dalla scheda del dipendente.' };
+    if (inText.length === 1) {
+      const e = employeeByCf(inText[0]);
+      return e ? { e, by: 'contenuto' } : { reason: `Il codice fiscale ${inText[0]} del documento non è di nessun dipendente.` };
+    }
+    return { reason: 'Nessun codice fiscale nel nome o nel testo del file.' };
   }
   r.post('/documents/bulk', upload.array('files', 300), req => {
     const b = req.body || {};

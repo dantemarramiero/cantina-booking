@@ -1345,6 +1345,10 @@ function hasAccessLevel(req, level) {
   const levels = accessLevelsFor(req);
   return levels === null || levels.includes(level);
 }
+function hasWorkspace(req, workspace) {
+  const permitted = permittedWorkspacesFor(req);
+  return permitted === null || permitted.includes(workspace);
+}
 
 // ── ERP helpers ───────────────────────────────────────────────────────────────
 function getSetting(key, fallback = null) {
@@ -5159,7 +5163,7 @@ const hr = require('./modules/hr')(app, { db, authAdmin, audit, hasAccessLevel, 
 // Archivio cifrato dei documenti HR sul volume persistente (chiave in HR_FILES_KEY).
 const hrFilesKey = resolveKey({ dataDir: DATA_DIR });
 const secureStore = createSecureStore({ dir: path.join(DATA_DIR, 'hr-files'), key: hrFilesKey.key });
-const hrFile = require('./modules/hr-file')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, signer, secureStore, getSetting, setSetting, hr, finance });
+const hrFile = require('./modules/hr-file')(app, { db, authAdmin, audit, events, hasAccessLevel, hasWorkspace, notifications, scheduler, signer, secureStore, getSetting, setSetting, hr, finance });
 const hrSafety = require('./modules/hr-safety')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile });
 const hrAbsences = require('./modules/hr-absences')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety });
 const hrTimesheet = require('./modules/hr-timesheet')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile, hrSafety, hrAbsences, finance });

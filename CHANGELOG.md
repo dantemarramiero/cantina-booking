@@ -205,6 +205,20 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
   - il «Totale speso» della persona nel CRM contava anche visite non confermate e ritiri non pagati;
   - gli errori nella modifica di prodotti finiti e materie prime ora compaiono.
 
+**People — correzioni al blocco 2E prima della pubblicazione**
+- **Cedolini in blocco:** un file si abbina solo quando non c'è ambiguità.
+  - Il codice fiscale nel nome del file deve comparire anche nel documento.
+  - Il documento non deve contenere i codici di altri dipendenti.
+  - Il codice dell'azienda (per una ditta individuale, quello del titolare) non conta.
+  - Prima una CU con un familiare a carico, o un PDF con più cedolini, poteva finire alla persona sbagliata.
+- Codici fiscali omocodici accettati.
+- **Documenti HR:** chi non ha il workspace People scarica solo i propri documenti, anche se il suo ruolo ha livelli di accesso.
+- **Richieste di modifica:** approvando nuovi contatti di emergenza, quelli di prima restano visibili nel confronto.
+
+**Produzione — Fase 0 (solo documentazione)**
+- Audit, decisioni e piano in `docs/produzione/`.
+- Questionario per la cantina in `docs/Domande-cantina.xlsx`, aggiornabile con `tools/questionario`.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

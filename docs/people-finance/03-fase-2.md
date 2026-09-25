@@ -609,8 +609,13 @@ Esito: **102 test, 102 superati** (12 nuovi del blocco 2D).
 
 **People → Dipendenti → Carica cedolini.**
 - Caricamento in blocco di cedolini o CU.
-- Ogni file si abbina al dipendente con il codice fiscale nel **nome del file** o, se manca, nel **testo del PDF**, leggendo anche i flussi compressi.
-- Si abbina solo se il codice fiscale è unico e appartiene a un dipendente. I file non abbinati o già caricati restano fuori, con il motivo.
+- Ogni file si abbina al dipendente con il codice fiscale nel **nome del file** o nel **testo del PDF**, leggendo anche i flussi compressi. Si accettano anche i codici omocodici.
+- Si abbina solo quando non c'è ambiguità (corretto il 25/09, prima della pubblicazione):
+  - se il codice è nel nome del file, deve essere di un dipendente e comparire anche nel documento, quando il testo si legge;
+  - il documento non deve contenere i codici di altri dipendenti;
+  - senza codice nel nome, il documento deve contenere un solo codice fiscale di persona. Il codice dell'azienda (per una ditta individuale, quello del titolare) non conta.
+  - Una CU con familiari a carico, un PDF con più cedolini o un collega senza codice registrato restano quindi **da abbinare**: si caricano dalla scheda del dipendente.
+- I file non abbinati o già caricati restano fuori, con il motivo.
 - I dipendenti ricevono una notifica.
 
 **People → Dipendenti → Stagionali.** Per chi ha avuto contratti stagionali o a termine: le campagne lavorate (dal-al, mansione) e se è da richiamare.
@@ -664,12 +669,21 @@ Tutti i test di questa sezione sono nel file `hr-services`.
 
 Esito: **111 test, 111 superati** (9 nuovi del blocco 2E).
 
+Revisione prima della pubblicazione (25/09/2026): 3 test in più, 12 per il blocco 2E, in `hr-services`.
+
+| Regola | Test |
+|---|---|
+| QUANDO un file di cedolini è ambiguo (familiari a carico, più cedolini, nome e contenuto discordi, codici di altri dipendenti) ALLORA non si abbina a nessuno; il codice dell'azienda non conta; i codici omocodici si accettano | abbinamenti ambigui |
+| QUANDO un utente senza il workspace People chiede un documento HR ALLORA ottiene solo i propri documenti visibili al dipendente, anche se il suo ruolo ha i livelli di accesso | download senza People |
+| QUANDO si approva una modifica dei contatti di emergenza ALLORA restano quelli di prima per il confronto | contatti di emergenza |
+
 ### Punti toccati nei moduli esistenti
 
 - **Menu del portale:** nuova voce «Il mio spazio», per tutti.
 - **Permessi:**
   - self-service aperto a chi ha fatto l'accesso;
-  - il download dei documenti HR passa dai link firmati anche senza il workspace People. Il controllo di livello e di visibilità resta sul server.
+  - il download dei documenti HR passa dai link firmati anche senza il workspace People. Il controllo di livello e di visibilità resta sul server;
+  - senza il workspace People si scaricano solo i **propri** documenti visibili al dipendente, anche se il ruolo ha livelli di accesso (corretto il 25/09).
 - **Utenti del portale:** l'offboarding li disattiva con la stessa logica di Impostazioni → Utenti (sessioni revocate, operatore disattivato).
 
 ### Decisioni prese in autonomia

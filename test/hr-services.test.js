@@ -156,6 +156,82 @@ test('cedolini in blocco: abbinati per codice fiscale nel nome o nel testo del P
   assert.equal((await upload('/api/admin/hr/documents/bulk', { type_code: 'cedolino' }, [files[0]], noLevel.token)).status, 403, 'il cedolino è retributivo');
 });
 
+test('cedolini in blocco: nessun abbinamento se è ambiguo (familiari a carico, più cedolini, nome e contenuto discordi); codice del titolare escluso, omocodia accettata', async () => {
+  const g = await emp('Giuseppe', 'Verdi');
+  const l = await emp('Laura', 'Bianchi');
+  const o = await emp('Omar', 'Omocodia');
+  const boss = await emp('Titolare', 'Ditta');
+  const GIUSEPPE = 'VRDGPP75C10G482K', LAURA = 'BNCLRA82D50G482W', MARIO = 'RSSMRA70E15G482T', OMAR = 'SNTLCU80A01G48NQ', OWNER = 'MRRDNT60H01G482R';
+  await t.api('PUT', `/api/admin/hr/employees/${g}/personal`, { fiscal_code: GIUSEPPE });
+  await t.api('PUT', `/api/admin/hr/employees/${l}/personal`, { fiscal_code: LAURA });
+  assert.equal((await t.api('PUT', `/api/admin/hr/employees/${o}/personal`, { fiscal_code: OMAR })).status, 200, 'il codice omocodico è valido');
+  await t.api('PUT', `/api/admin/hr/employees/${boss}/personal`, { fiscal_code: OWNER });
+  // Ditta individuale: il codice fiscale dell'azienda è quello del titolare, stampato su ogni CU.
+  t.db.prepare("INSERT INTO settings (key, value) VALUES ('company_fiscal_code', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(OWNER);
+  const pdf = (...cfs) => Buffer.concat([Buffer.from('%PDF-1.4\n1 0 obj <</Filter /FlateDecode>>\nstream\n'),
+    zlib.deflateSync(Buffer.from(cfs.map(cf => `BT (Codice fiscale: ${cf}) Tj ET`).join('\n'))), Buffer.from('\nendstream\nendobj\n%%EOF')]);
+  const files = [
+    ['cu-mario.pdf', pdf(OWNER, MARIO, LAURA)], // CU di Mario (codice non registrato) con Laura familiare a carico
+    ['cu-mario-senza-titolare.pdf', pdf(MARIO, LAURA)], // prima andava a Laura: l'unico codice di un dipendente
+    ['cedolini-settembre.pdf', pdf(GIUSEPPE, MARIO, 'ZZZZZZ80A01G482Z')], // più cedolini nello stesso PDF
+    ['cu-giuseppe.pdf', pdf(OWNER, GIUSEPPE)], // il codice del titolare non conta
+    [`X1${GIUSEPPE}ZZ.pdf`, Buffer.from('%PDF-1.4 niente')], // codice attaccato ad altri caratteri: non è un codice
+    [`cedolino_${GIUSEPPE}.pdf`, pdf(LAURA)], // nome e contenuto discordi
+    [`cedolino_${GIUSEPPE}_bis.pdf`, pdf(GIUSEPPE, LAURA)], // contiene anche un'altra dipendente
+    [`cedolino_${OMAR}.pdf`, pdf(OMAR)],
+    [`cu_${GIUSEPPE}_2025.pdf`, pdf(OWNER, GIUSEPPE, MARIO)], // familiare a carico non dipendente: il nome conferma
+  ];
+  const res = await upload('/api/admin/hr/documents/bulk', { type_code: 'cedolino', title: 'Prova abbinamenti' }, files);
+  assert.equal(res.status, 200, JSON.stringify(res.data));
+  assert.deepEqual(res.data.stored.map(s => [s.file, s.employee_name, s.matched_by]), [
+    ['cu-giuseppe.pdf', 'Giuseppe Verdi', 'contenuto'],
+    [`cedolino_${OMAR}.pdf`, 'Omar Omocodia', 'nome del file'],
+    [`cu_${GIUSEPPE}_2025.pdf`, 'Giuseppe Verdi', 'nome del file'],
+  ]);
+  const why = Object.fromEntries(res.data.unmatched.map(u => [u.file, u.reason]));
+  assert.match(why['cu-mario.pdf'], /più codici fiscali/);
+  assert.match(why['cu-mario-senza-titolare.pdf'], /più codici fiscali/);
+  assert.match(why['cedolini-settembre.pdf'], /più codici fiscali/);
+  assert.match(why[`X1${GIUSEPPE}ZZ.pdf`], /Nessun codice fiscale/);
+  assert.match(why[`cedolino_${GIUSEPPE}.pdf`], /non compare nel documento/);
+  assert.match(why[`cedolino_${GIUSEPPE}_bis.pdf`], /altri dipendenti/);
+  assert.equal(t.db.prepare("SELECT COUNT(*) AS c FROM hr_documents WHERE employee_id IN (?, ?) AND title = 'Prova abbinamenti'").get(l, boss).c, 0, 'né Laura né il titolare ricevono documenti non loro');
+  t.db.prepare("DELETE FROM settings WHERE key = 'company_fiscal_code'").run();
+});
+
+test('documenti: senza il workspace People si scaricano solo i propri, anche se il ruolo ha i livelli', async () => {
+  const owner = await person('Sara');
+  const nosy = await person('Ugo', { workspaces: ['enoturismo'], levels: ['personale', 'retributivo'] });
+  const baseType = t.db.prepare("SELECT code FROM hr_document_types WHERE level = 'base' ORDER BY code LIMIT 1").get().code;
+  const ids = [];
+  for (const [type, body] of [['cedolino', 'CEDOLINO-SARA'], [baseType, 'BASE-SARA']]) {
+    const fd = new FormData();
+    fd.append('type_code', type);
+    fd.append('file', new Blob([body], { type: 'application/pdf' }), `${type}.pdf`);
+    const up = await fetch(`${t.base}/api/admin/hr/employees/${owner.id}/documents`, { method: 'POST', headers: { 'x-admin-key': t.token }, body: fd });
+    assert.equal(up.status, 200, await up.text());
+    ids.push(t.db.prepare('SELECT id FROM hr_documents WHERE employee_id = ? AND type_code = ?').get(owner.id, type).id);
+  }
+  for (const id of ids) {
+    const signed = await nosy.call('GET', '/api/admin/signed-url?path=' + encodeURIComponent(`/api/admin/hr/documents/${id}/download`));
+    assert.equal((await fetch(t.base + signed.data.url)).status, 403, `documento ${id}: i livelli del ruolo valgono solo con il workspace People`);
+    assert.equal((await nosy.call('GET', `/api/admin/hr/documents/${id}/download`)).status, 403, 'anche con la sessione, senza link firmato');
+  }
+  const own = await owner.call('GET', '/api/admin/signed-url?path=' + encodeURIComponent(`/api/admin/hr/documents/${ids[0]}/download`));
+  assert.equal(await (await fetch(t.base + own.data.url)).text(), 'CEDOLINO-SARA', 'i propri cedolini sì');
+});
+
+test('richieste di modifica: approvando i contatti di emergenza restano quelli di prima per il confronto', async () => {
+  const p = await person('Rita');
+  await t.api('PUT', `/api/admin/hr/employees/${p.id}/personal`, { emergency_contacts: [{ name: 'Marco', relationship: 'fratello', phone: '3330000001' }] });
+  const req = await p.call('POST', '/api/admin/hr/me/change-requests', { emergency_contacts: [{ name: 'Elisa', relationship: 'madre', phone: '3330000002' }] });
+  assert.equal(req.status, 200, JSON.stringify(req.data));
+  assert.equal((await t.api('POST', `/api/admin/hr/change-requests/${req.data.id}/approve`)).status, 200);
+  const decided = (await t.api('GET', '/api/admin/hr/change-requests')).data.find(c => c.id === req.data.id);
+  assert.deepEqual(decided.current_contacts, [{ name: 'Marco', relationship: 'fratello', phone: '3330000001' }]);
+  assert.equal(t.db.prepare('SELECT name FROM emergency_contacts WHERE employee_id = ?').get(p.id).name, 'Elisa');
+});
+
 test('stagionali: campagne lavorate e indicazione da richiamare', async () => {
   const s = await emp('Samir', 'Stagione');
   await t.api('POST', `/api/admin/hr/employees/${s}/contracts`, { effective_from: '2025-09-01', contract_type: 'stagionale', hire_date: '2025-09-01', end_date: '2025-10-31', job_role_id: t.db.prepare("SELECT id FROM job_roles WHERE code = 'operaio_agricolo'").get().id });

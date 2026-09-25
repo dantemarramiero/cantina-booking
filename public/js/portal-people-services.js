@@ -112,7 +112,7 @@ async function loadHrChangeRequests() {
     ${rows.map(c => `<div class="mod-row">
       <div class="mod-row-main"><div class="mod-row-title">${esc(c.employee_name)} <span style="font-weight:400;color:var(--ink-soft)">· ${new Date(c.requested_at).toLocaleDateString('it-IT')}</span></div>
         <div class="mod-row-sub">${Object.entries(c.changes.fields || {}).map(([k, v]) => `${esc(SVC_FIELDS[k] || k)}: ${c.current ? `<s>${esc(c.current[k] || '—')}</s> → ` : ''}<b>${esc(v || '—')}</b>`).join('<br>')}
-          ${c.changes.emergency_contacts ? `<br>Contatti di emergenza → ${c.changes.emergency_contacts.map(x => `${esc(x.name)} ${esc(x.phone)}`).join(', ')}` : ''}${c.note ? `<br><i>${esc(c.note)}</i>` : ''}${c.decision_note ? `<br>${esc(c.decision_note)}` : ''}</div></div>
+          ${c.changes.emergency_contacts ? `<br>Contatti di emergenza: ${c.current_contacts ? `<s>${c.current_contacts.map(x => `${esc(x.name)} ${esc(x.phone)}`).join(', ') || '—'}</s> → ` : ''}<b>${c.changes.emergency_contacts.map(x => `${esc(x.name)} ${esc(x.phone)}`).join(', ') || '—'}</b>` : ''}${c.note ? `<br><i>${esc(c.note)}</i>` : ''}${c.decision_note ? `<br>${esc(c.decision_note)}` : ''}</div></div>
       <span class="badge ${SVC_REQ[c.status][0]}">${SVC_REQ[c.status][1]}</span>
       ${c.status === 'richiesta' ? `<div class="mod-row-actions"><button class="btn small" onclick="decideChangeRequest(${c.id}, true)">Approva</button><button class="btn secondary small" onclick="decideChangeRequest(${c.id}, false)">Non accogliere</button></div>` : ''}
     </div>`).join('') || '<div class="mod-empty">Nessuna richiesta.</div>'}
