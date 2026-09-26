@@ -332,3 +332,42 @@ test('promemoria: al primo avvio non si avvisa per il passato', () => {
   assert.equal(t.db.prepare("SELECT value FROM settings WHERE key = 'timesheet_reminders_since'").get().value, '2029-03-05');
   assert.equal(t.db.prepare("SELECT COUNT(*) AS c FROM notifications WHERE kind LIKE 'hr.timesheet.%'").get().c, before, "né ieri né febbraio: prima dell'avvio");
 });
+
+test('utenza e scheda: niente doppioni per email, niente collegamento a una scheda non attiva', async () => {
+  const hrEmp = await emp('Nadia', 'Doppione', { work_email: 'nadia.doppione@x.it' });
+  const dup = await t.api('POST', '/api/admin/portal-users', { name: 'Nadia Doppione', email: 'Nadia.Doppione@x.it', username: 'nadia-dup', password: 'password-lunga', employee: { mode: 'create' } });
+  assert.equal(dup.status, 409);
+  assert.match(dup.data.error, /Esiste già la scheda di Nadia Doppione/);
+  assert.ok(!t.db.prepare("SELECT 1 FROM portal_users WHERE username = 'nadia-dup'").get(), 'utenza non creata');
+  assert.equal(t.db.prepare("SELECT COUNT(*) AS c FROM employees WHERE lower(work_email) = 'nadia.doppione@x.it'").get().c, 1);
+  const ok = await t.api('POST', '/api/admin/portal-users', { name: 'Nadia Doppione', email: 'nadia.doppione@x.it', username: 'nadia-ok', password: 'password-lunga', employee: { mode: 'existing', employee_id: hrEmp } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+
+  const gone = await emp('Ugo', 'Uscito', { active: 0 });
+  const r = await t.api('POST', '/api/admin/portal-users', { name: 'Ugo Uscito', email: 'ugo.uscito@x.it', username: 'ugo-out', password: 'password-lunga', employee: { mode: 'existing', employee_id: gone } });
+  assert.equal(r.status, 409);
+  assert.match(r.data.error, /non è attivo/);
+});
+
+test('promemoria: non prima dell\'assunzione, non dopo la cessazione, non con una richiesta di assenza in attesa', async () => {
+  t.db.prepare("INSERT INTO settings (key, value) VALUES ('timesheet_reminders_since', '2028-01-01') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run();
+  const kind = 'hr.timesheet.missing-day';
+  const count = u => t.db.prepare('SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND kind = ?').get(u, kind).c;
+  const nuovo = await person('Nino', { last: 'Neoassunto' });
+  t.db.prepare("UPDATE employees SET created_at = '2028-09-06T10:00:00.000Z' WHERE id = ?").run(nuovo.id); // scheda creata il 6
+  const now = new Date().toISOString();
+  const contract = (id, hire, end) => t.db.prepare(`INSERT INTO employment_contracts (employee_id, version, effective_from, contract_type, hire_date, end_date, created_at) VALUES (?, 1, ?, 'OTD', ?, ?, ?)`).run(id, hire, hire, end, now);
+  const finito = await person('Fabio', { last: 'Cessato' });
+  contract(finito.id, '2028-01-10', '2028-09-01');
+  const ferie = await person('Flora', { last: 'Ferie' });
+  t.db.prepare(`INSERT INTO absences (employee_id, absence_type_id, start_date, end_date, part, amount, work_minutes, status, created_at, updated_at) VALUES (?, ?, '2028-09-05', '2028-09-08', 'giorno', 4000, 1920, 'richiesta', ?, ?)`).run(ferie.id, typeId('ferie'), now, now);
+  const controllo = await person('Carlo', { last: 'Controllo' });
+
+  t.hrTimesheet.sendReminders(new Date('2028-09-06T08:00:00Z')); // ieri: martedì 5 settembre 2028
+  assert.equal(count(nuovo.userId), 0, 'il 5 la scheda non esisteva');
+  assert.equal(count(finito.userId), 0, 'contratto finito il 1°');
+  assert.equal(count(ferie.userId), 0, 'ferie chieste, in attesa di decisione');
+  assert.equal(count(controllo.userId), 1, 'chi era in servizio senza ore riceve l\'avviso');
+  t.hrTimesheet.sendReminders(new Date('2028-09-07T08:00:00Z'));
+  assert.equal(count(nuovo.userId), 1, 'dal primo giorno di servizio sì');
+});

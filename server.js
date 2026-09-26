@@ -4774,7 +4774,7 @@ app.get('/api/admin/portal-users', authAdmin, (req, res) => {
 
 // Schede dipendente attive ancora senza utenza, per collegarle da Impostazioni → Utenti (senza il workspace People).
 app.get('/api/admin/portal-users/employee-options', authAdmin, (req, res) => {
-  res.json(db.prepare("SELECT id, first_name || ' ' || last_name AS name, portal_user_id FROM employees WHERE active = 1 ORDER BY last_name, first_name").all());
+  res.json(db.prepare("SELECT id, first_name || ' ' || last_name AS name, work_email, portal_user_id FROM employees WHERE active = 1 ORDER BY last_name, first_name").all());
 });
 
 // Scheda dipendente dell'utenza (Timesheet): body.employee = { mode: 'create' | 'existing' | 'none', employee_id }.

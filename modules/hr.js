@@ -224,6 +224,7 @@ module.exports = function registerHr(app, { db, authAdmin, audit, hasAccessLevel
     if (mode === 'existing') {
       const e = employee(choice.employee_id);
       if (current?.id === e.id) return e.id;
+      if (!e.active) throw new HttpError(409, `${fullName(e)} non è attivo: la sua scheda non si collega a un'utenza.`);
       if (e.portal_user_id && e.portal_user_id !== user.id) throw new HttpError(409, `${fullName(e)} è già collegato a un'altra utenza.`);
       if (current) db.prepare('UPDATE employees SET portal_user_id = NULL, updated_at = ? WHERE id = ?').run(now(), current.id);
       db.prepare('UPDATE employees SET portal_user_id = ?, updated_at = ? WHERE id = ?').run(user.id, now(), e.id);
@@ -232,6 +233,9 @@ module.exports = function registerHr(app, { db, authAdmin, audit, hasAccessLevel
     }
     if (mode === 'create') {
       if (current) return current.id;
+      // Niente doppioni: se la persona ha già una scheda (stessa email di lavoro, senza utenza) si collega quella.
+      const same = user.email ? db.prepare('SELECT * FROM employees WHERE active = 1 AND portal_user_id IS NULL AND lower(work_email) = lower(?)').get(user.email) : null;
+      if (same) throw new HttpError(409, `Esiste già la scheda di ${fullName(same)} con l'email ${user.email}: collegala invece di crearne una nuova.`);
       const parts = String(choice.first_name ?? '').trim() ? [choice.first_name, choice.last_name] : String(user.name || '').trim().split(/\s+(.+)/);
       const f = employeeFields({ first_name: parts[0], last_name: parts[1] || parts[0], work_email: user.email, portal_user_id: user.id, site_id: mainSiteId() });
       const id = Number(db.prepare(`INSERT INTO employees (first_name, last_name, work_email, portal_user_id, site_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)`)

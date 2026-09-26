@@ -690,6 +690,17 @@ module.exports = function registerHrTimesheet(app, deps) {
   // un avviso a chi non ha ancora inviato il mese. Dal 3 del mese, al responsabile, l'elenco di chi
   // non ha inviato il mese prima. Le notifiche hanno una chiave: il job gira ogni ora senza doppioni.
   // Senza orario contrattuale vale quello standard (dal lunedì al venerdì), come nel foglio del mese.
+  // In servizio quel giorno: dopo la creazione della scheda e dentro il contratto (assunzione, scadenza,
+  // cessazione dell'ultima versione in vigore). Senza contratto registrato conta solo la creazione.
+  function inServiceOn(e, d) {
+    if (d < romeDateTime(new Date(e.created_at)).slice(0, 10)) return false;
+    const c = db.prepare('SELECT hire_date, end_date, termination_date FROM employment_contracts WHERE employee_id = ? AND effective_from <= ? ORDER BY effective_from DESC, version DESC LIMIT 1').get(e.id, d);
+    if (!c) return true;
+    if (c.hire_date && d < c.hire_date) return false;
+    const until = [c.end_date, c.termination_date].filter(Boolean).sort()[0];
+    return !until || d <= until;
+  }
+  const pendingAbsenceOn = (e, d) => !!db.prepare("SELECT 1 FROM absences WHERE employee_id = ? AND status IN ('bozza', 'richiesta') AND start_date <= ? AND end_date >= ?").get(e.id, d, d);
   function sendReminders(at = new Date()) {
     const nowRome = romeDateTime(at), todayRome = nowRome.slice(0, 10), hour = Number(nowRome.slice(11, 13));
     // Si parte dalla prima esecuzione: niente avvisi per giorni e mesi di quando il Timesheet non c'era.
@@ -701,7 +712,7 @@ module.exports = function registerHrTimesheet(app, deps) {
     const yesterday = addDays(todayRome, -1), yPeriod = yesterday.slice(0, 7);
     if (hour >= 9 && yesterday >= since) {
       for (const e of people) {
-        if (monthStatus(e.id, yPeriod) !== 'aperto') continue;
+        if (monthStatus(e.id, yPeriod) !== 'aperto' || !inServiceOn(e, yesterday) || pendingAbsenceOn(e, yesterday)) continue;
         if (hr.calendar(Number(yesterday.slice(0, 4)), e.site_id).some(h => h.date === yesterday)) continue;
         const scheduled = scheduledMinutes(e, yesterday);
         if (!scheduled) continue;
@@ -715,7 +726,7 @@ module.exports = function registerHrTimesheet(app, deps) {
     const period = todayRome.slice(0, 7);
     if (todayRome === lastDay(period) && hour >= 15) {
       for (const e of people) {
-        if (monthStatus(e.id, period) !== 'aperto') continue;
+        if (monthStatus(e.id, period) !== 'aperto' || !inServiceOn(e, todayRome)) continue;
         send([e.portal_user_id], { kind: 'hr.timesheet.submit-reminder', title: `Timesheet di ${monthLabel(period)}: controllalo e invialo al responsabile`, dedupeKey: `ts-submit:${e.id}:${period}` });
       }
     }
@@ -724,7 +735,7 @@ module.exports = function registerHrTimesheet(app, deps) {
       if (prev < since.slice(0, 7)) return sent;
       const late = new Map(); // utente del responsabile → nomi
       for (const e of people) {
-        if (monthStatus(e.id, prev) !== 'aperto') continue;
+        if (monthStatus(e.id, prev) !== 'aperto' || !inServiceOn(e, lastDay(prev))) continue;
         for (const u of managerUsers(e)) late.set(u, [...(late.get(u) || []), fullName(e)]);
         send([e.portal_user_id], { kind: 'hr.timesheet.submit-reminder', title: `Timesheet di ${monthLabel(prev)} non ancora inviato`, body: 'Controllalo e invialo al responsabile.', dedupeKey: `ts-late-self:${e.id}:${prev}` });
       }

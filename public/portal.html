@@ -6775,10 +6775,10 @@ async function loadPortalUsers() {
       <div class="list-row-icon">${esc(u.name).charAt(0).toUpperCase()}</div>
       <div class="list-row-body">
         <div class="list-row-title">${esc(u.name)}</div>
-        <div class="list-row-sub">${esc(u.username)} · ${esc(u.email)} · ${esc(u.role_name) || 'Accesso completo'} · ${u.employee_id ? `scheda dipendente: ${esc(u.employee_name)}` : 'nessuna scheda dipendente'}</div>
+        <div class="list-row-sub">${esc(u.username)} · ${esc(u.email)} · ${esc(u.role_name) || 'Accesso completo'} · ${u.employee_id ? `scheda dipendente: ${esc(u.employee_name)}${u.employee_active ? '' : ' (non attiva)'}` : 'nessuna scheda dipendente'}</div>
       </div>
       <div class="list-row-meta">
-        ${u.employee_id ? '' : '<span class="badge yellow" title="Senza scheda dipendente non vede il Timesheet">Senza scheda</span>'}
+        ${u.employee_id && u.employee_active ? '' : `<span class="badge yellow" title="Senza una scheda dipendente attiva non vede il Timesheet">${u.employee_id ? 'Scheda non attiva' : 'Senza scheda'}</span>`}
         <span class="badge ${u.active ? 'green' : 'grey'}">${u.active ? 'Attivo' : 'Disattivo'}</span>
         <button class="btn-outline-pill" onclick='openPortalUserModal(${JSON.stringify(u)})'>Modifica</button>
         <button class="btn-outline-pill" onclick="togglePortalUserActive(${u.id}, ${u.active ? 0 : 1})">${u.active ? 'Disattiva' : 'Attiva'}</button>
@@ -6790,6 +6790,7 @@ async function loadPortalUsers() {
   `).join('') : '<div class="list-empty">Nessun utente. Creane uno per dare accesso al gestionale.</div>';
 }
 
+let PU_FREE_EMPLOYEES = []; // schede dipendente collegabili, per la finestra dell'utenza
 async function openPortalUserModal(u) {
   document.getElementById('portal-user-modal-msg').innerHTML = '';
   document.getElementById('portal-user-modal-title').textContent = u ? 'Modifica utente' : 'Nuovo utente';
@@ -6805,7 +6806,7 @@ async function openPortalUserModal(u) {
     roles.map(r => `<option value="${r.id}" ${u && u.role_id === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('');
   // Scheda dipendente: nuova (predefinita per un'utenza nuova), una esistente ancora libera, o nessuna.
   const emps = await api('/api/admin/portal-users/employee-options').catch(() => []);
-  const free = emps.filter(e => !e.portal_user_id || (u && e.portal_user_id === u.id));
+  const free = PU_FREE_EMPLOYEES = emps.filter(e => !e.portal_user_id || (u && e.portal_user_id === u.id));
   document.getElementById('pu-employee').innerHTML = [
     ...(u?.employee_id ? [] : ['<option value="create">Crea una nuova scheda con questi dati</option>']),
     ...free.map(e => `<option value="${e.id}" ${u?.employee_id === e.id ? 'selected' : ''}>Collega a ${esc(e.name)}</option>`),
@@ -6824,7 +6825,13 @@ async function savePortalUser() {
     role_id: document.getElementById('pu-role').value || '',
   };
   if (!id) body.password = document.getElementById('pu-password').value;
-  const emp = document.getElementById('pu-employee').value;
+  let emp = document.getElementById('pu-employee').value;
+  // Niente doppioni: se c'è già una scheda libera con lo stesso nome (o la stessa email), si propone di collegarla.
+  if (emp === 'create') {
+    const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/s+/g, ' ').trim();
+    const same = (PU_FREE_EMPLOYEES || []).find(e => norm(e.name) === norm(body.name) || (e.work_email && norm(e.work_email) === norm(body.email)));
+    if (same && confirm(`Esiste già la scheda dipendente di ${same.name}. Vuoi collegare l'utenza a quella scheda invece di crearne una nuova?`)) emp = String(same.id);
+  }
   body.employee = emp === 'create' || emp === 'none' ? { mode: emp } : { mode: 'existing', employee_id: Number(emp) };
   if (emp === 'create') Object.assign(body.employee, { first_name: document.getElementById('pu-first-name').value.trim(), last_name: document.getElementById('pu-last-name').value.trim() });
   try {
