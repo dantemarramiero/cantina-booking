@@ -261,6 +261,19 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - **Presenze:** l'intervento confermato propone la riga agli esecutori, con l'oggetto di costo della parcella per annata. Nuovo «Centro per le ore di vigneto».
 - **Magazzino:** il fitofarmaco gestito a magazzino si scarica per parcella; lo storno lo rimette.
 
+**People — Timesheet** (ex «Presenze»; in locale, da approvare)
+- People → Presenze diventa **People → Timesheet**: è l'unico posto dove si registrano le ore, su un centro di costo (e facoltativamente un oggetto di costo).
+- Lo vede **ogni utente collegato a una scheda dipendente**, anche senza il workspace People: in quel caso il workspace People mostra solo la voce Timesheet, con il proprio foglio.
+- **Utenza e scheda dipendente insieme:** in Impostazioni → Utenti, creando un'utenza si crea anche la scheda dipendente (nome, cognome, email, sede principale), oppure si collega a una scheda esistente, oppure «nessuna» per chi non è dipendente. Se la scheda non si collega, l'utenza non nasce. L'elenco utenti mostra la scheda collegata o «Senza scheda»; People → Dipendenti segnala chi non ha un'utenza.
+- **Promemoria:** al dipendente per il giorno lavorativo di ieri scoperto (dalle 9) e l'ultimo giorno del mese per inviarlo (dalle 15); dal 3 del mese al responsabile l'elenco di chi non ha inviato il mese prima. Partono dalla prima esecuzione, non per il passato.
+- Tolti i doppioni: la sezione Presenze di «Il mio spazio» e quella della scheda del dipendente (al suo posto un pulsante «Timesheet» che apre il foglio della persona). I vecchi link delle notifiche aprono il Timesheet.
+
+**People — Festività automatiche** (in locale, da approvare)
+- **Santo patrono ricavato dal comune** della sede, da un elenco di circa 7.700 comuni (`lib/patroni.json`, dataset del 2018). Il giorno si calcola ogni anno anche quando cambia: «terza domenica di settembre», «lunedì di Pentecoste»… Si calcola per il 93% dei comuni; per gli altri la sede mostra «Patrono da indicare» e si inserisce a mano. Il patrono indicato a mano ha sempre la precedenza.
+- **La sede principale prende comune e provincia dai dati aziendali** (Impostazioni), senza riscriverli.
+- **San Francesco d'Assisi (4 ottobre)** di nuovo festa nazionale dal 2026, calcolata: gli anni prima non cambiano.
+- Restano a mano solo le chiusure aziendali.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

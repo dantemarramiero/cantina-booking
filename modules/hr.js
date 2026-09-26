@@ -3,7 +3,8 @@
 // essenziale dei dipendenti (/hr/directory, livello "base") è visibile a tutti gli utenti interni.
 // Livelli di riservatezza: l'orario contrattuale è "personale", il costo orario "retributivo".
 const { parseDecimal, formatDecimal } = require('../lib/money');
-const { holidaysForYear, MONTH_DAY, DATE } = require('../lib/calendar');
+const { holidaysForYear, patronDate, MONTH_DAY, DATE } = require('../lib/calendar');
+const PATRONS = require('../lib/patroni.json');
 const { HttpError } = require('./finance');
 
 const BASE = '/api/admin/hr';
@@ -43,7 +44,30 @@ module.exports = function registerHr(app, { db, authAdmin, audit, hasAccessLevel
     f.active = body.active !== undefined ? (body.active ? 1 : 0) : existing.active ?? 1;
     return f;
   }
-  get('/sites', () => db.prepare('SELECT * FROM sites ORDER BY name').all());
+  // Sede principale: il suo comune è quello dei dati aziendali (Impostazioni), se compilato.
+  // Il patrono indicato a mano vince; altrimenti si ricava dal comune con l'elenco dei patroni.
+  const setting = k => db.prepare('SELECT value FROM settings WHERE key = ?').get(k)?.value?.trim() || null;
+  const mainSiteId = () => db.prepare('SELECT MIN(id) AS id FROM sites WHERE active = 1').get()?.id ?? null;
+  const normCity = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  function siteLocation(site) {
+    const company = site.id === mainSiteId() && setting('company_city');
+    return company ? { city: company, province: setting('company_province'), from_company: true } : { city: site.city, province: site.province, from_company: false };
+  }
+  function autoPatron(loc) {
+    if (!loc.city || !loc.province) return null;
+    const p = PATRONS[`${loc.province.toUpperCase()}|${normCity(loc.city)}`];
+    return p ? { name: p[0] || null, rule: p[1] || null } : null;
+  }
+  function sitePatron(site, year) {
+    if (site.patron_day) return { source: 'manuale', name: site.patron_name, date: `${year}-${site.patron_day}` };
+    const auto = autoPatron(siteLocation(site));
+    const date = auto?.rule ? patronDate(auto.rule, year) : null;
+    return date ? { source: 'automatico', name: auto.name, rule: auto.rule, date } : { source: 'mancante', name: auto?.name || null, rule: auto?.rule || null, date: null };
+  }
+  get('/sites', () => {
+    const main = mainSiteId(), year = new Date().getFullYear();
+    return db.prepare('SELECT * FROM sites ORDER BY name').all().map(s => ({ ...s, main: s.id === main, location: siteLocation(s), patron: sitePatron(s, year) }));
+  });
   post('/sites', req => {
     const f = siteFields(req.body || {});
     const id = Number(db.prepare('INSERT INTO sites (name, address, city, province, patron_day, patron_name, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
@@ -65,7 +89,8 @@ module.exports = function registerHr(app, { db, authAdmin, audit, hasAccessLevel
   function calendar(year, siteId) {
     const site = siteId ? db.prepare('SELECT * FROM sites WHERE id = ?').get(siteId) : null;
     const entries = db.prepare(`SELECT * FROM holidays WHERE site_id IS NULL ${site ? 'OR site_id = ?' : ''}`).all(...(site ? [site.id] : []));
-    return holidaysForYear(year, { entries, patronDay: site?.patron_day, patronName: site?.patron_name ? `Santo patrono (${site.patron_name})` : 'Santo patrono' });
+    const patron = site ? sitePatron(site, year) : null;
+    return holidaysForYear(year, { entries, patronDate: patron?.date, patronName: patron?.name ? `Santo patrono (${patron.name})` : 'Santo patrono' });
   }
   get('/holidays', req => {
     const year = parseInt(req.query.year) || new Date().getFullYear();
@@ -187,6 +212,40 @@ module.exports = function registerHr(app, { db, authAdmin, audit, hasAccessLevel
     audit(req, 'employee.created', { entity: 'employee', entityId: id, after: f });
     return { success: true, id };
   });
+
+  // Utenza del portale ↔ scheda dipendente, da Impostazioni → Utenti. Chi ha un'utenza fa il Timesheet,
+  // quindi alla creazione dell'utenza si crea (o si collega) anche la scheda. choice.mode:
+  //   'create'   nuova scheda con nome, cognome ed email dell'utenza, nella sede principale;
+  //   'existing' collega la scheda choice.employee_id (che non deve avere già un'altra utenza);
+  //   'none'     nessuna scheda (es. un consulente esterno): l'utenza non vede il Timesheet.
+  function linkPortalUser(req, user, choice = {}) {
+    const current = db.prepare('SELECT * FROM employees WHERE portal_user_id = ?').get(user.id) || null;
+    const mode = choice.mode || 'none';
+    if (mode === 'existing') {
+      const e = employee(choice.employee_id);
+      if (current?.id === e.id) return e.id;
+      if (e.portal_user_id && e.portal_user_id !== user.id) throw new HttpError(409, `${fullName(e)} è già collegato a un'altra utenza.`);
+      if (current) db.prepare('UPDATE employees SET portal_user_id = NULL, updated_at = ? WHERE id = ?').run(now(), current.id);
+      db.prepare('UPDATE employees SET portal_user_id = ?, updated_at = ? WHERE id = ?').run(user.id, now(), e.id);
+      audit(req, 'employee.updated', { entity: 'employee', entityId: e.id, before: { portal_user_id: e.portal_user_id }, after: { portal_user_id: user.id } });
+      return e.id;
+    }
+    if (mode === 'create') {
+      if (current) return current.id;
+      const parts = String(choice.first_name ?? '').trim() ? [choice.first_name, choice.last_name] : String(user.name || '').trim().split(/\s+(.+)/);
+      const f = employeeFields({ first_name: parts[0], last_name: parts[1] || parts[0], work_email: user.email, portal_user_id: user.id, site_id: mainSiteId() });
+      const id = Number(db.prepare(`INSERT INTO employees (first_name, last_name, work_email, portal_user_id, site_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)`)
+        .run(f.first_name, f.last_name, f.work_email, f.portal_user_id, f.site_id, now(), now()).lastInsertRowid);
+      audit(req, 'employee.created', { entity: 'employee', entityId: id, after: { ...f, from_portal_user: user.id } });
+      return id;
+    }
+    if (mode !== 'none') throw new HttpError(400, 'Scheda dipendente: scegli se crearla, collegarne una esistente o nessuna.');
+    if (current) {
+      db.prepare('UPDATE employees SET portal_user_id = NULL, updated_at = ? WHERE id = ?').run(now(), current.id);
+      audit(req, 'employee.updated', { entity: 'employee', entityId: current.id, before: { portal_user_id: user.id }, after: { portal_user_id: null } });
+    }
+    return null;
+  }
 
   patch('/employees/:id', req => {
     const before = employee(req.params.id);
@@ -334,5 +393,5 @@ module.exports = function registerHr(app, { db, authAdmin, audit, hasAccessLevel
     return { success: true };
   });
 
-  return { resolveApprover, calendar, currentSchedule, registerDeleteGuard: fn => deleteGuards.push(fn) };
+  return { resolveApprover, calendar, currentSchedule, linkPortalUser, HttpError, registerDeleteGuard: fn => deleteGuards.push(fn) };
 };

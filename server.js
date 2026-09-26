@@ -4766,10 +4766,24 @@ function generatePortalAccessKey() {
 
 app.get('/api/admin/portal-users', authAdmin, (req, res) => {
   res.json(db.prepare(`
-    SELECT pu.id, pu.name, pu.email, pu.username, pu.active, pu.created_at, pu.role_id, r.name AS role_name
-    FROM portal_users pu LEFT JOIN roles r ON r.id = pu.role_id ORDER BY pu.name
+    SELECT pu.id, pu.name, pu.email, pu.username, pu.active, pu.created_at, pu.role_id, r.name AS role_name,
+      e.id AS employee_id, e.first_name || ' ' || e.last_name AS employee_name, e.active AS employee_active
+    FROM portal_users pu LEFT JOIN roles r ON r.id = pu.role_id LEFT JOIN employees e ON e.portal_user_id = pu.id ORDER BY pu.name
   `).all());
 });
+
+// Schede dipendente attive ancora senza utenza, per collegarle da Impostazioni → Utenti (senza il workspace People).
+app.get('/api/admin/portal-users/employee-options', authAdmin, (req, res) => {
+  res.json(db.prepare("SELECT id, first_name || ' ' || last_name AS name, portal_user_id FROM employees WHERE active = 1 ORDER BY last_name, first_name").all());
+});
+
+// Scheda dipendente dell'utenza (Timesheet): body.employee = { mode: 'create' | 'existing' | 'none', employee_id }.
+// Se non si indica, non cambia nulla (la finestra di Impostazioni lo manda sempre).
+function applyEmployeeChoice(req, userId, choice) {
+  if (!choice) return;
+  hr.linkPortalUser(req, db.prepare('SELECT * FROM portal_users WHERE id = ?').get(userId), choice);
+}
+const employeeChoiceError = (res, e) => (e instanceof hr.HttpError ? res.status(e.status).json({ error: e.message }) : null);
 
 app.post('/api/admin/portal-users', authAdmin, (req, res) => {
   const { name, email, username, password, role_id } = req.body || {};
@@ -4777,12 +4791,18 @@ app.post('/api/admin/portal-users', authAdmin, (req, res) => {
     return res.status(400).json({ error: 'Nome, email, username e password sono obbligatori.' });
   }
   try {
-    const result = db.prepare('INSERT INTO portal_users (name, email, username, password_hash, access_key, role_id) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(name.trim(), email.trim().toLowerCase(), username.trim(), hashPassword(password), generatePortalAccessKey(), role_id || null);
-    syncOperatorForPortalUser(db.prepare('SELECT * FROM portal_users WHERE id = ?').get(result.lastInsertRowid));
-    audit(req, 'portal_user.created', { entity: 'portal_user', entityId: result.lastInsertRowid, after: portalUserPublic(result.lastInsertRowid) });
-    res.json({ success: true, id: result.lastInsertRowid });
+    const out = events.transaction(() => {
+      const result = db.prepare('INSERT INTO portal_users (name, email, username, password_hash, access_key, role_id) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(name.trim(), email.trim().toLowerCase(), username.trim(), hashPassword(password), generatePortalAccessKey(), role_id || null);
+      const id = Number(result.lastInsertRowid);
+      applyEmployeeChoice(req, id, req.body.employee); // Impostazioni → Utenti propone «crea la scheda»: chi ha un'utenza fa il Timesheet
+      return id;
+    });
+    syncOperatorForPortalUser(db.prepare('SELECT * FROM portal_users WHERE id = ?').get(out));
+    audit(req, 'portal_user.created', { entity: 'portal_user', entityId: out, after: portalUserPublic(out) });
+    res.json({ success: true, id: out, employee_id: db.prepare('SELECT id FROM employees WHERE portal_user_id = ?').get(out)?.id ?? null });
   } catch (e) {
+    if (employeeChoiceError(res, e)) return;
     res.status(400).json({ error: 'Username o email già in uso.' });
   }
 });
@@ -4791,17 +4811,22 @@ app.patch('/api/admin/portal-users/:id', authAdmin, (req, res) => {
   const fields = ['name', 'email', 'username', 'active', 'role_id'];
   const updates = [], params = [];
   for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f] === '' ? null : req.body[f]); }
-  if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  if (!updates.length && !req.body.employee) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
   params.push(req.params.id);
   const before = portalUserPublic(req.params.id);
+  if (!before) return res.status(404).json({ error: 'Utente non trovato.' });
   try {
-    db.prepare(`UPDATE portal_users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    events.transaction(() => {
+      if (updates.length) db.prepare(`UPDATE portal_users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      applyEmployeeChoice(req, before.id, req.body.employee);
+    });
     syncOperatorForPortalUser(db.prepare('SELECT * FROM portal_users WHERE id = ?').get(req.params.id));
     // Disattivato: le sue sessioni aperte finiscono subito.
     if (req.body.active !== undefined && !req.body.active) sessions.revokeUser(parseInt(req.params.id));
     audit(req, 'portal_user.updated', { entity: 'portal_user', entityId: req.params.id, before, after: portalUserPublic(req.params.id) });
     res.json({ success: true });
   } catch (e) {
+    if (employeeChoiceError(res, e)) return;
     res.status(400).json({ error: 'Username o email già in uso.' });
   }
 });
@@ -4877,6 +4902,8 @@ app.get('/api/admin/me', authAdmin, (req, res) => {
     permittedWorkspaces, // null = accesso completo a tutti i workspace
     accessLevels: accessLevelsFor(req), // null = tutti i livelli di riservatezza
     capabilities: capabilitiesFor(req), // Produzione; null = tutte
+    // Scheda dipendente collegata: con questa il Timesheet si vede anche senza il workspace People.
+    employeeId: req.portalUser ? db.prepare('SELECT id FROM employees WHERE portal_user_id = ? AND active = 1').get(req.portalUser.id)?.id ?? null : null,
   });
 });
 
@@ -5192,7 +5219,7 @@ const secureStore = createSecureStore({ dir: path.join(DATA_DIR, 'hr-files'), ke
 const hrFile = require('./modules/hr-file')(app, { db, authAdmin, audit, events, hasAccessLevel, hasWorkspace, notifications, scheduler, signer, secureStore, getSetting, setSetting, hr, finance });
 const hrSafety = require('./modules/hr-safety')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile });
 const hrAbsences = require('./modules/hr-absences')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety });
-const hrTimesheet = require('./modules/hr-timesheet')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile, hrSafety, hrAbsences, finance });
+const hrTimesheet = require('./modules/hr-timesheet')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety, hrAbsences, finance });
 const hrServices = require('./modules/hr-services')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety, hrTimesheet, secureStore });
 
 // ── Magazzino valorizzato (Fase 3) ────────────────────────────────────────────

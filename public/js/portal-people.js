@@ -18,6 +18,7 @@ async function loadHrEmployees() {
   if (tok !== HR.renderTok) return; // nel frattempo si è aperta una scheda
   const q = (document.getElementById('hr-emp-search')?.value || '').toLowerCase();
   const shown = HR.employees.filter(e => !q || `${hrName(e)} ${e.job_title || ''}`.toLowerCase().includes(q));
+  const noUser = HR.employees.filter(e => e.active && !e.portal_username).length;
   root.innerHTML = `<div class="list-card">
     <div class="list-toolbar">
       <div class="search-input"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -27,12 +28,13 @@ async function loadHrEmployees() {
       <button class="btn secondary small" onclick="openBulkDocsModal()">Carica cedolini</button>
       <button class="btn-generate" onclick="openHrEmployeeModal()">${UI.icon.plus} Nuovo dipendente</button>
     </div>
+    ${noUser ? `<p class="mod-note" style="margin:0 16px 8px">${noUser === 1 ? "1 dipendente attivo non ha un'utenza e non compila" : `${noUser} dipendenti attivi non hanno un'utenza e non compilano`} il Timesheet da sé. Le utenze si creano in Impostazioni → Utenti, insieme alla scheda o collegandole a una esistente.</p>` : ''}
     ${shown.map(e => `<div class="mod-row mod-clickable ${e.active ? '' : 'cc-inactive'}" onclick="openHrEmployeeDetail(${e.id})">
       <div class="mod-row-main">
         <div class="mod-row-title">${esc(hrName(e))}${e.job_title ? ` <span style="font-weight:400;color:var(--ink-soft)">· ${esc(e.job_title)}</span>` : ''}</div>
         <div class="mod-row-sub">${[e.site_name, e.cost_center_code ? `${e.cost_center_code} ${e.cost_center_name}` : null, e.manager_name ? `responsabile: ${e.manager_name}` : null].filter(Boolean).map(esc).join(' · ') || 'Dati organizzativi da completare'}</div>
       </div>
-      ${e.portal_username ? `<span class="badge grey" title="Accede al portale">@${esc(e.portal_username)}</span>` : ''}
+      ${e.portal_username ? `<span class="badge grey" title="Accede al portale">@${esc(e.portal_username)}</span>` : e.active ? '<span class="badge yellow" title="Non ha un&#39;utenza: non compila il Timesheet da sé, le sue ore le registra il caposquadra o il responsabile">Senza utenza</span>' : ''}
       ${e.active ? '' : '<span class="badge grey">Non attivo</span>'}
     </div>`).join('') || `<div class="mod-empty">${q ? 'Nessun dipendente trovato.' : 'Nessun dipendente. Inizia con «Nuovo dipendente».'}</div>`}
   </div>`;
@@ -154,19 +156,20 @@ async function loadHrSites() {
   const years = [HR.year - 1, HR.year, HR.year + 1, HR.year + 2].filter((v, i, a) => a.indexOf(v) === i);
   root.innerHTML = `<div class="list-card">
     <div class="list-toolbar">
-      <div class="list-toolbar-title"><h3>Sedi</h3><p class="mod-intro">Ogni sede ha il suo santo patrono e le sue chiusure; servono a calcolare i giorni lavorativi di presenze e assenze.</p></div>
+      <div class="list-toolbar-title"><h3>Sedi</h3><p class="mod-intro">Ogni sede ha il suo santo patrono, ricavato dal comune, e le sue chiusure; servono a calcolare i giorni lavorativi di presenze e assenze.</p></div>
       <div class="list-spacer"></div>
       <button class="btn-generate" onclick="openHrSiteModal()">${UI.icon.plus} Nuova sede</button>
     </div>
     ${HR.sites.map(s => `<div class="mod-row">
       <div class="mod-row-main"><div class="mod-row-title">${esc(s.name)}</div>
-        <div class="mod-row-sub">${esc([s.city, s.province].filter(Boolean).join(' '))}${s.patron_day ? ` · patrono ${esc(s.patron_name || '')} il ${esc(s.patron_day.split('-').reverse().join('/'))}` : ' · patrono non indicato'}</div></div>
+        <div class="mod-row-sub">${esc([s.location.city, s.location.province].filter(Boolean).join(' ') || 'comune non indicato')}${s.main ? ' · sede principale' : ''} · ${hrPatronLabel(s.patron)}</div></div>
+      ${s.patron.source === 'automatico' ? '<span class="badge grey">Patrono dal comune</span>' : s.patron.source === 'mancante' ? '<span class="badge yellow">Patrono da indicare</span>' : ''}
       <button class="btn-outline-pill" onclick="openHrSiteModal(${s.id})">Modifica</button>
     </div>`).join('')}
   </div>
   <div class="list-card">
     <div class="list-toolbar">
-      <div class="list-toolbar-title"><h3>Festività</h3><p class="mod-intro">Nazionali, della sede e patrono. Pasqua e Pasquetta si calcolano da sole ogni anno.</p></div>
+      <div class="list-toolbar-title"><h3>Festività</h3><p class="mod-intro">Nazionali, della sede e patrono. Pasqua, Pasquetta, San Francesco (dal 2026) e il patrono del comune si calcolano da soli ogni anno: a mano servono solo le chiusure.</p></div>
       <div class="list-spacer"></div>
       <div class="mod-toolbar-fields">
         <select onchange="HR.siteId = parseInt(this.value) || null; loadHrSites()">${UI.options(HR.sites, HR.siteId, { empty: 'Solo nazionali' })}</select>
@@ -184,24 +187,34 @@ async function loadHrSites() {
     }).join('')}
   </div>`;
 }
+const hrPatronLabel = p => p.source === 'mancante'
+  ? (p.rule ? `patrono ${esc(p.name || '')}: «${esc(p.rule)}» non si calcola, indicalo a mano` : 'patrono non trovato per il comune')
+  : `patrono ${esc(p.name || '')} il ${esc(p.date.slice(5).split('-').reverse().join('/'))}${p.rule && !/^\d/.test(p.rule) ? ` quest'anno (${esc(p.rule)})` : ''}`;
 function openHrSiteModal(id) {
   const s = HR.sites.find(x => x.id === id) || null;
+  const fromCompany = s?.location.from_company;
+  const manual = !!s?.patron_day;
   UI.modal({
     id: 'hr-site-modal', title: s ? `Modifica ${s.name}` : 'Nuova sede', width: 520,
     body: `
       <div class="field"><label>Nome</label><input name="name" value="${UI.attr(s?.name)}"></div>
       <div class="field"><label>Indirizzo</label><input name="address" value="${UI.attr(s?.address)}"></div>
+      ${fromCompany ? `<p class="mod-note">Comune: <b>${esc(s.location.city)}${s.location.province ? ` (${esc(s.location.province)})` : ''}</b>, dai dati aziendali in Impostazioni. Per cambiarlo, modifica i dati aziendali.</p>` : `
       <div class="field-row">
         <div class="field"><label>Comune</label><input name="city" value="${UI.attr(s?.city)}"></div>
         <div class="field"><label>Provincia</label><input name="province" value="${UI.attr(s?.province)}" maxlength="2"></div>
-      </div>
-      <div class="field-row">
+      </div>${s?.main ? '<p class="mod-note">È la sede principale: se compili comune e provincia nei dati aziendali (Impostazioni), vale quello.</p>' : ''}`}
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:10px 0"><input type="checkbox" id="hr-site-auto" ${manual ? '' : 'checked'}
+        onchange="document.getElementById('hr-site-patron').style.display = this.checked ? 'none' : ''"> Santo patrono automatico dal comune</label>
+      ${s && !manual ? `<p class="mod-note" style="margin-top:0">${hrPatronLabel(s.patron)}.</p>` : ''}
+      <div class="field-row" id="hr-site-patron" style="${manual ? '' : 'display:none'}">
         <div class="field"><label>Santo patrono</label><input name="patron_name" value="${UI.attr(s?.patron_name)}" placeholder="es. San Cetteo"></div>
         <div class="field"><label>Giorno (MM-GG)</label><input name="patron_day" value="${UI.attr(s?.patron_day)}" placeholder="10-10"></div>
       </div>`,
     onSave: async b => {
       const body = {};
-      for (const k of ['name', 'address', 'city', 'province', 'patron_name', 'patron_day']) body[k] = UI.val(b, k);
+      for (const k of ['name', 'address', 'city', 'province', 'patron_name', 'patron_day']) if (b.querySelector(`[name="${k}"]`)) body[k] = UI.val(b, k);
+      if (b.querySelector('#hr-site-auto').checked) { body.patron_day = ''; body.patron_name = ''; }
       await api('/api/admin/hr/sites' + (s ? `/${s.id}` : ''), { method: s ? 'PATCH' : 'POST', body: JSON.stringify(body) });
       loadHrSites();
     },

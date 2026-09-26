@@ -432,11 +432,23 @@ Esito: **90 test, 90 superati** (14 nuovi del blocco 2C).
 
 ---
 
-## 2D — Presenze
+## 2D — Presenze (oggi «Timesheet»)
+
+> **Aggiornamento del 25/09/2026.** La sezione si chiama **People → Timesheet** ed è l'unico punto dove si registrano le ore.
+> - La vede ogni utente collegato a una scheda dipendente, anche senza il workspace People: in quel caso il workspace People mostra solo la voce Timesheet, con il proprio foglio (`/api/admin/me` restituisce `employeeId`).
+> - Tolti i doppioni: la scheda Presenze di «Il mio spazio» (2E) e la sezione Presenze della scheda del dipendente. Nella scheda resta un pulsante «Timesheet» che apre il foglio della persona.
+> - I link `sub=people-presenze` delle notifiche già inviate aprono il Timesheet.
+> - **Utenza ↔ scheda dipendente** (Impostazioni → Utenti). La scelta è `employee: { mode: 'create' | 'existing' | 'none', employee_id }` in POST/PATCH `/api/admin/portal-users`, e si applica nella stessa transazione dell'utenza. La finestra propone «crea» per le utenze nuove. Senza `employee` l'API non cambia nulla, come prima. L'elenco delle schede collegabili è `GET /api/admin/portal-users/employee-options` (Impostazioni, senza workspace People).
+> - **Promemoria** (job `hr.timesheet-reminders`, ogni ora, notifiche con chiave, quindi senza doppioni):
+>   - giorno lavorativo di ieri scoperto rispetto all'orario (quello standard se manca il contratto), dalle 9;
+>   - ultimo giorno del mese dalle 15, se il mese è aperto;
+>   - dal 3 del mese, al responsabile, chi non ha inviato il mese prima.
+>
+>   Partono dalla data della prima esecuzione (impostazione `timesheet_reminders_since`).
 
 ### Cosa c'è
 
-**People → Presenze.** Il riepilogo del mese mostra, per ogni persona visibile:
+**People → Timesheet.** Il riepilogo del mese mostra, per ogni persona visibile:
 - stato del mese;
 - ore lavorate, assenze e orario;
 - giorni scoperti;
@@ -505,7 +517,7 @@ Si confermano o si scartano, una volta per giorno. Le operazioni di Produzione a
 - solo i mesi approvati;
 - serve il livello *personale*, perché contiene il codice fiscale.
 
-**Scheda del dipendente → Presenze.** Riepilogo degli ultimi tre mesi: stato, ore ordinarie e straordinarie, assenze, giornate.
+**Scheda del dipendente → Timesheet.** Un pulsante apre il foglio della persona (il riepilogo di tre mesi è stato tolto il 25/09/2026: ripeteva il Timesheet).
 
 **Configurazione → Presenze.** Passo degli orari, centri per le proposte (visite, eventi, fiere) e colonne dell'export.
 
@@ -589,7 +601,7 @@ Esito: **102 test, 102 superati** (12 nuovi del blocco 2D).
   - la **richiesta di modifica** di IBAN, residenza, domicilio, contatti personali, taglie e contatti di emergenza. È controllata subito (per esempio un IBAN sbagliato è rifiutato) e si applica solo dopo l'approvazione di HR. Una richiesta alla volta, ritirabile.
 - **Documenti:** cedolini, CU, attestati e gli altri tipi visibili al dipendente, da scaricare con un link firmato.
 - **Ferie e permessi:** saldi, ferie arretrate, le proprie richieste, nuova richiesta.
-- **Presenze:** il proprio foglio del mese, con l'invio al responsabile.
+- ~~**Presenze:** il proprio foglio del mese~~ — tolta il 25/09/2026: il proprio foglio si apre da People → Timesheet, visibile a tutti.
 - **Dotazioni:** ciò che ha in consegna.
 
 **People → Richieste.** HR vede ogni richiesta con il valore di prima e quello proposto, e la approva o la rifiuta con un motivo. Il dipendente riceve una notifica. Nel registro attività finiscono i nomi dei campi, non i valori.

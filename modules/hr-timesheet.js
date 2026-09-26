@@ -9,6 +9,7 @@
 const crypto = require('crypto');
 const { HttpError, createRouter } = require('../lib/http');
 const { DATE, PERIOD, addDays, weekday } = require('../lib/calendar');
+const { romeDateTime } = require('../lib/time');
 
 const HOUR_TYPES = { ordinaria: 'Ordinaria', straordinaria: 'Straordinaria', notturna: 'Notturna', festiva: 'Festiva' };
 const EXPORT_COLUMNS = {
@@ -38,7 +39,7 @@ const LEAF_SQL = 'NOT EXISTS (SELECT 1 FROM cost_centers ch WHERE ch.parent_id =
 const normName = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
 module.exports = function registerHrTimesheet(app, deps) {
-  const { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile, hrSafety, hrAbsences, finance } = deps;
+  const { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety, hrAbsences, finance } = deps;
   const r = createRouter(app, '/api/admin/hr', authAdmin);
   const proposalSources = []; // fonti di righe proposte registrate da altri moduli (registerProposalSource)
   const { actor, isSelf, isManagerOf, viewerEmployee } = hrFile;
@@ -58,7 +59,7 @@ module.exports = function registerHrTimesheet(app, deps) {
   const userOfEmployee = id => (id ? db.prepare('SELECT portal_user_id FROM employees WHERE id = ?').get(id)?.portal_user_id ?? null : null);
   const notifyAll = (userIds, n) => { for (const u of new Set(userIds.filter(x => x !== undefined))) notifications.notify({ userId: u, ...n }); };
   const managerUsers = e => { const a = hr.resolveApprover(e.id)?.approver; const u = userOfEmployee(a?.id); return u ? [u] : hrFile.hrRecipients(); };
-  const LINK = '/portal.html?workspace=people&sub=people-presenze';
+  const LINK = '/portal.html?workspace=people&sub=people-timesheet';
 
   // ── Impostazioni ────────────────────────────────────────────────────────────
   function tsSettings() {
@@ -683,5 +684,55 @@ module.exports = function registerHrTimesheet(app, deps) {
   // center_code oppure center_key (un centro delle impostazioni, es. vineyard_center), cost_object_id, label }],
   // used(e) → [{ source_id, work_date }], onAccept(entryId, proposta) }.
   const registerProposalSource = src => proposalSources.push(src);
-  return { monthView, proposals, matchEmployeeByName, exportRows, syncHoursDriver, monthStatus, registerProposalSource };
+  // ── Promemoria ──────────────────────────────────────────────────────────────
+  // Chi ha un'utenza compila il Timesheet. Dalle 9 (ora italiana), per il giorno lavorativo di ieri
+  // rimasto scoperto rispetto all'orario, un avviso al dipendente. L'ultimo giorno del mese dalle 15,
+  // un avviso a chi non ha ancora inviato il mese. Dal 3 del mese, al responsabile, l'elenco di chi
+  // non ha inviato il mese prima. Le notifiche hanno una chiave: il job gira ogni ora senza doppioni.
+  // Senza orario contrattuale vale quello standard (dal lunedì al venerdì), come nel foglio del mese.
+  function sendReminders(at = new Date()) {
+    const nowRome = romeDateTime(at), todayRome = nowRome.slice(0, 10), hour = Number(nowRome.slice(11, 13));
+    // Si parte dalla prima esecuzione: niente avvisi per giorni e mesi di quando il Timesheet non c'era.
+    let since = getSetting('timesheet_reminders_since', '');
+    if (!since) { since = todayRome; setSetting('timesheet_reminders_since', since); }
+    const people = db.prepare(`SELECT e.* FROM employees e JOIN portal_users u ON u.id = e.portal_user_id AND u.active = 1 WHERE e.active = 1`).all();
+    let sent = 0;
+    const send = (userIds, n) => { for (const u of new Set(userIds.filter(Boolean))) if (notifications.notify({ userId: u, link: LINK, ...n })) sent++; };
+    const yesterday = addDays(todayRome, -1), yPeriod = yesterday.slice(0, 7);
+    if (hour >= 9 && yesterday >= since) {
+      for (const e of people) {
+        if (monthStatus(e.id, yPeriod) !== 'aperto') continue;
+        if (hr.calendar(Number(yesterday.slice(0, 4)), e.site_id).some(h => h.date === yesterday)) continue;
+        const scheduled = scheduledMinutes(e, yesterday);
+        if (!scheduled) continue;
+        const done = db.prepare('SELECT COALESCE(SUM(minutes), 0) AS m FROM timesheet_entries WHERE employee_id = ? AND work_date = ? AND voided_by_adjustment_id IS NULL').get(e.id, yesterday).m;
+        if (done >= scheduled) continue;
+        send([e.portal_user_id], { kind: 'hr.timesheet.missing-day', title: `Timesheet: mancano le ore di ${itDate(yesterday)}`,
+          body: done ? `Registrate ${done / 60} h su ${scheduled / 60} h dell'orario.` : `Non ci sono ore né assenze per un giorno lavorativo (${scheduled / 60} h di orario).`,
+          dedupeKey: `ts-missing:${e.id}:${yesterday}` });
+      }
+    }
+    const period = todayRome.slice(0, 7);
+    if (todayRome === lastDay(period) && hour >= 15) {
+      for (const e of people) {
+        if (monthStatus(e.id, period) !== 'aperto') continue;
+        send([e.portal_user_id], { kind: 'hr.timesheet.submit-reminder', title: `Timesheet di ${monthLabel(period)}: controllalo e invialo al responsabile`, dedupeKey: `ts-submit:${e.id}:${period}` });
+      }
+    }
+    if (Number(todayRome.slice(8, 10)) >= 3) {
+      const prev = addDays(`${period}-01`, -1).slice(0, 7);
+      if (prev < since.slice(0, 7)) return sent;
+      const late = new Map(); // utente del responsabile → nomi
+      for (const e of people) {
+        if (monthStatus(e.id, prev) !== 'aperto') continue;
+        for (const u of managerUsers(e)) late.set(u, [...(late.get(u) || []), fullName(e)]);
+        send([e.portal_user_id], { kind: 'hr.timesheet.submit-reminder', title: `Timesheet di ${monthLabel(prev)} non ancora inviato`, body: 'Controllalo e invialo al responsabile.', dedupeKey: `ts-late-self:${e.id}:${prev}` });
+      }
+      for (const [u, names] of late) send([u], { kind: 'hr.timesheet.late', title: `Timesheet di ${monthLabel(prev)} non inviati: ${names.length}`, body: names.join(', '), dedupeKey: `ts-late:${u}:${prev}` });
+    }
+    return sent;
+  }
+  if (scheduler) scheduler.register('hr.timesheet-reminders', 60, () => `${sendReminders()} promemoria`);
+
+  return { monthView, proposals, matchEmployeeByName, exportRows, syncHoursDriver, monthStatus, registerProposalSource, sendReminders };
 };

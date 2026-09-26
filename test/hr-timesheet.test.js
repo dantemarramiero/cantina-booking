@@ -269,3 +269,66 @@ test('un dipendente con presenze non si elimina, e nemmeno un centro con ore imp
   assert.equal(del.status, 409);
   assert.match(del.data.error, /ha movimenti/);
 });
+
+test('utenza e scheda dipendente: da Impostazioni si crea insieme o si collega; tutto o niente', async () => {
+  const mk = (username, employee) => t.api('POST', '/api/admin/portal-users', { name: 'Giulia Nuova Assunta', email: `${username}@x.it`, username, password: 'password-lunga', employee });
+  const created = await mk('giulia-ts', { mode: 'create' });
+  assert.equal(created.status, 200, JSON.stringify(created.data));
+  const e = t.db.prepare('SELECT * FROM employees WHERE id = ?').get(created.data.employee_id);
+  assert.deepEqual([e.first_name, e.last_name, e.work_email, e.portal_user_id], ['Giulia', 'Nuova Assunta', 'giulia-ts@x.it', created.data.id], 'nome, cognome ed email dall\'utenza');
+  assert.ok(e.site_id, 'nella sede principale');
+  const listed = (await t.api('GET', '/api/admin/portal-users')).data.find(u => u.id === created.data.id);
+  assert.equal(listed.employee_name, 'Giulia Nuova Assunta');
+
+  const other = await emp('Ivo', 'Esistente');
+  const linked = await mk('ivo-ts', { mode: 'existing', employee_id: other });
+  assert.equal(t.db.prepare('SELECT portal_user_id FROM employees WHERE id = ?').get(other).portal_user_id, linked.data.id);
+  const taken = await mk('ivo-bis', { mode: 'existing', employee_id: other });
+  assert.equal(taken.status, 409, 'la scheda ha già un\'utenza');
+  assert.ok(!t.db.prepare("SELECT 1 FROM portal_users WHERE username = 'ivo-bis'").get(), 'se la scheda non si collega, l\'utenza non nasce');
+
+  assert.equal((await t.api('PATCH', `/api/admin/portal-users/${linked.data.id}`, { employee: { mode: 'none' } })).status, 200);
+  assert.equal(t.db.prepare('SELECT portal_user_id FROM employees WHERE id = ?').get(other).portal_user_id, null, 'scollegata, la scheda resta');
+  assert.equal((await t.api('PATCH', `/api/admin/portal-users/${linked.data.id}`, { employee: { mode: 'existing', employee_id: other } })).status, 200);
+  const opts = (await t.api('GET', '/api/admin/portal-users/employee-options')).data;
+  assert.equal(opts.find(o => o.id === other).portal_user_id, linked.data.id);
+  const noUser = (await mk('esterno-ts')).data.id;
+  assert.ok(!t.db.prepare('SELECT 1 FROM employees WHERE portal_user_id = ?').get(noUser), 'senza scelta via API non si crea nulla');
+});
+
+test('promemoria: giorno di ieri scoperto al dipendente, fine mese da inviare, mese precedente non inviato al responsabile', async () => {
+  const capo = await person('Rita', { last: 'Responsabile' });
+  const p = await person('Otto', { manager: capo.id, last: 'Promemoria' });
+  await t.api('PUT', `/api/admin/hr/employees/${p.id}/schedule`, { valid_from: '2028-01-01', days: { 1: '8', 2: '8', 3: '8', 4: '8', 5: '8' } });
+  t.db.prepare("INSERT INTO settings (key, value) VALUES ('timesheet_reminders_since', '2028-05-01') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run();
+  const notes = (u, kind) => t.db.prepare('SELECT * FROM notifications WHERE user_id = ? AND kind = ? ORDER BY id').all(u, kind);
+
+  t.hrTimesheet.sendReminders(new Date('2028-06-07T05:00:00Z')); // 7:00 in Italia: troppo presto
+  assert.equal(notes(p.userId, 'hr.timesheet.missing-day').length, 0);
+  await add(null, { employee_id: p.id, work_date: '2028-06-06', start_time: '08:00', end_time: '12:00', hour_type: 'ordinaria', cost_center_id: center('P101') });
+  t.hrTimesheet.sendReminders(new Date('2028-06-07T08:00:00Z'));
+  t.hrTimesheet.sendReminders(new Date('2028-06-07T09:00:00Z'));
+  const missing = notes(p.userId, 'hr.timesheet.missing-day');
+  assert.equal(missing.length, 1, 'una volta sola');
+  assert.match(missing[0].title, /06\/06\/2028/);
+  assert.match(missing[0].body, /4 h su 8 h/);
+  const late = notes(capo.userId, 'hr.timesheet.late').find(n => /maggio 2028/.test(n.title));
+  assert.ok(late && late.body.includes('Otto Promemoria'), 'il responsabile vede chi non ha inviato maggio');
+  assert.equal(notes(capo.userId, 'hr.timesheet.missing-day').length, 1, 'anche senza orario contrattuale: vale quello standard');
+
+  t.hrTimesheet.sendReminders(new Date('2028-06-30T14:00:00Z')); // ultimo giorno del mese, 16:00
+  assert.ok(notes(p.userId, 'hr.timesheet.submit-reminder').some(n => /giugno 2028/.test(n.title)));
+  await p.call('POST', '/api/admin/hr/timesheet/months/submit', { employee_id: p.id, period: '2028-07' });
+  await add(null, { employee_id: p.id, work_date: '2028-07-03', start_time: '08:00', end_time: '16:00', hour_type: 'ordinaria', cost_center_id: center('P101') }).catch(() => {});
+  const before = notes(p.userId, 'hr.timesheet.missing-day').length;
+  t.hrTimesheet.sendReminders(new Date('2028-07-04T08:00:00Z'));
+  assert.equal(notes(p.userId, 'hr.timesheet.missing-day').length, before, 'giorno coperto: nessun avviso');
+});
+
+test('promemoria: al primo avvio non si avvisa per il passato', () => {
+  t.db.prepare("DELETE FROM settings WHERE key = 'timesheet_reminders_since'").run();
+  const before = t.db.prepare("SELECT COUNT(*) AS c FROM notifications WHERE kind LIKE 'hr.timesheet.%'").get().c;
+  t.hrTimesheet.sendReminders(new Date('2029-03-05T09:00:00Z'));
+  assert.equal(t.db.prepare("SELECT value FROM settings WHERE key = 'timesheet_reminders_since'").get().value, '2029-03-05');
+  assert.equal(t.db.prepare("SELECT COUNT(*) AS c FROM notifications WHERE kind LIKE 'hr.timesheet.%'").get().c, before, "né ieri né febbraio: prima dell'avvio");
+});

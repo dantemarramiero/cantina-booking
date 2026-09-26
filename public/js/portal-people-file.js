@@ -1,5 +1,5 @@
 // Portale → People: scheda del dipendente (fascicolo), scadenzario, configurazione (mansioni, soglie, oneri).
-const HR_TABS = [['organizzazione', 'Organizzazione'], ['personali', 'Dati personali'], ['lavoro', 'Rapporto di lavoro'], ['competenze', 'Competenze'], ['sicurezza', 'Sicurezza'], ['assenze', 'Assenze'], ['presenze', 'Presenze'], ['percorso', 'Ingresso e uscita'], ['documenti', 'Documenti'], ['scadenze', 'Scadenze']];
+const HR_TABS = [['organizzazione', 'Organizzazione'], ['personali', 'Dati personali'], ['lavoro', 'Rapporto di lavoro'], ['competenze', 'Competenze'], ['sicurezza', 'Sicurezza'], ['assenze', 'Assenze'],['percorso', 'Ingresso e uscita'], ['documenti', 'Documenti'], ['scadenze', 'Scadenze']];
 const HR_CONTRACT_TYPES = { OTD: 'Operaio a tempo determinato', OTI: 'Operaio a tempo indeterminato', impiegato: 'Impiegato', quadro: 'Quadro', dirigente: 'Dirigente', apprendista: 'Apprendista', stagionale: 'Stagionale', somministrato: 'Somministrato', collaboratore: 'Collaboratore' };
 const HR_ID_DOCS = { carta_identita: "Carta d'identità", passaporto: 'Passaporto', patente: 'Patente', permesso_soggiorno: 'Permesso di soggiorno' };
 const HR_SKILL_KINDS = { lingua: 'Lingue', titolo_studio: 'Titoli di studio', esperienza: 'Esperienze precedenti', qualifica: 'Qualifiche di settore', competenza: 'Competenze operative' };
@@ -41,10 +41,10 @@ async function openHrRecord(id, tab) {
     REC.jobRoles.length ? REC.jobRoles : api('/api/admin/hr/job-roles'), REC.docTypes.length ? REC.docTypes : api('/api/admin/hr/document-types'),
   ]);
   if (tok !== HR.renderTok) return;
-  Object.assign(REC, { org, file, jobRoles, docTypes, safety: null, safetyFor: null, absences: null, timesheet: null, journey: null });
+  Object.assign(REC, { org, file, jobRoles, docTypes, safety: null, safetyFor: null, absences: null, journey: null });
+  if (REC.tab === 'presenze') REC.tab = 'organizzazione'; // vecchi link alla sezione Presenze della scheda
   if (REC.tab === 'sicurezza') await hrLoadSafety();
   if (REC.tab === 'assenze') await hrLoadAbsences();
-  if (REC.tab === 'presenze') await hrLoadTimesheetSummary();
   if (REC.tab === 'percorso') await hrLoadJourney();
   renderHrRecord();
 }
@@ -57,7 +57,6 @@ async function hrSelectTab(k) {
   REC.tab = k;
   if (k === 'sicurezza' && REC.safetyFor !== REC.id) await hrLoadSafety();
   if (k === 'assenze' && REC.absences?.for !== REC.id) await hrLoadAbsences();
-  if (k === 'presenze' && REC.timesheet?.for !== REC.id) await hrLoadTimesheetSummary();
   if (k === 'percorso' && REC.journey?.for !== REC.id) await hrLoadJourney();
   renderHrRecord();
 }
@@ -76,6 +75,7 @@ function renderHrRecord() {
       </div>
       ${e.active ? '' : '<span class="badge grey">Non attivo</span>'}
       ${expiredBlocking ? `<span class="badge red" title="${UI.attr(f.blocking_today.join('; '))}">Ore bloccate</span>` : ''}
+      <button class="btn-outline-pill" onclick="tsOpenFor(${e.id})">Timesheet</button>
       <button class="btn-outline-pill" onclick="openHrEmployeeModal(${e.id})">Modifica dati</button>
     </div>
     <div class="rec-tabs">${HR_TABS.map(([k, l]) => `<button class="${REC.tab === k ? 'active' : ''}" onclick="hrSelectTab('${k}')">${l}${k === 'scadenze' && f.deadlines.length ? ` (${f.deadlines.length})` : ''}</button>`).join('')}</div>
@@ -100,7 +100,6 @@ function hrRecordTab() {
     case 'competenze': return f.access.personale ? hrTabSkills(f) : locked('personale');
     case 'sicurezza': return hrTabSafety();
     case 'assenze': return hrTabAbsences();
-    case 'presenze': return hrTabTimesheet();
     case 'percorso': return hrTabJourney();
     case 'documenti': return hrTabDocuments(f);
     case 'scadenze': return f.deadlines.length ? f.deadlines.map(d => hrDeadlineRow(d)).join('') : '<div class="mod-empty">Nessuna scadenza nei prossimi 12 mesi.</div>';

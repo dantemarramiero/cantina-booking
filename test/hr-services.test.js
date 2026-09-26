@@ -38,6 +38,8 @@ test('self-service: il dipendente vede il suo fascicolo e chiede modifiche, che 
   assert.equal(mine.status, 200, JSON.stringify(mine.data));
   assert.equal(mine.data.file.personal.data.residence_city, 'Pescara');
   assert.equal((await p.call('GET', `/api/admin/hr/employees/${p.id}/file`)).status, 403, 'senza il workspace People passa solo dal self-service');
+  assert.equal((await p.call('GET', '/api/admin/me')).data.employeeId, p.id, 'con la scheda collegata il portale gli mostra il Timesheet');
+  assert.equal((await p.call('GET', `/api/admin/hr/timesheet/month?employee_id=${p.id}&period=2026-09`)).status, 200, 'e le API del Timesheet gli rispondono');
   assert.equal((await p.call('POST', '/api/admin/hr/me/change-requests', { iban: 'XX12' })).status, 400, 'IBAN controllato subito');
   const req = await p.call('POST', '/api/admin/hr/me/change-requests', { iban: 'IT02 L123 4512 3451 2345 6789 012', residence_city: 'Montesilvano', emergency_contacts: [{ name: 'Lucia', relationship: 'sorella', phone: '3331112222' }] });
   assert.equal(req.status, 200, JSON.stringify(req.data));

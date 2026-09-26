@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { allocate, sharePpm, parseDecimal, formatDecimal, PPM } = require('../lib/money');
-const { easterSunday, holidaysForYear, weekday } = require('../lib/calendar');
+const { easterSunday, holidaysForYear, weekday, patronDate } = require('../lib/calendar');
 const { computeCascade, validateRuleTargets } = require('../lib/cascade');
 
 test('allocate: le quote sommano sempre al totale, il resto va all\'ultima', () => {
@@ -62,6 +62,24 @@ test('calendario: Pasqua e Pasquetta calcolate, patrono di sede, festività nazi
   assert.ok(!byDate['2027-08-14'], 'le date di un altro anno non entrano');
   assert.equal(weekday('2026-09-28'), 1, 'lunedì = 1');
   assert.equal(weekday('2026-09-27'), 7, 'domenica = 7');
+});
+
+test('calendario: San Francesco festa nazionale dal 2026, non prima', () => {
+  assert.equal(holidaysForYear(2026).find(x => x.date === '2026-10-04')?.kind, 'nazionale');
+  assert.ok(!holidaysForYear(2025).find(x => x.date === '2025-10-04'));
+});
+
+test('calendario: il giorno del patrono si calcola dalla regola scritta in italiano', () => {
+  const cases = [
+    ['10 ottobre', '2026-10-10'], ['1° maggio', '2026-05-01'], ['primo settembre', '2026-09-01'],
+    ['terza domenica di settembre', '2026-09-20'], ['ultima domenica di agosto', '2026-08-30'], ['terza domenica settembre', '2026-09-20'],
+    ['lunedì successivo alla terza domenica di settembre', '2026-09-21'], ['martedì dopo Pasqua', '2026-04-07'],
+    ['lunedì di Pentecoste', '2026-05-25'], ['prima domenica dopo Pasqua', '2026-04-12'], ['Corpus Domini', '2026-06-04'],
+  ];
+  for (const [rule, date] of cases) assert.equal(patronDate(rule, 2026), date, rule);
+  assert.equal(patronDate('29 febbraio', 2026), null, 'giorno che non esiste');
+  assert.equal(patronDate('29 febbraio', 2028), '2028-02-29');
+  assert.equal(patronDate('domenica più vicina al 16 luglio', 2026), null, 'regola non riconosciuta: si indica a mano');
 });
 
 // Centri di prova: G1 generale, A1 ausiliario, P1/P2 produttivi, C1 commerciale, più un aggregato.
