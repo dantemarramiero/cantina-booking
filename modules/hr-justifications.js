@@ -25,7 +25,7 @@ const LIVE = ['richiesta', 'approvata', 'comunicata', 'presa_visione'];
 const MIME = /^(application\/pdf|image\/(jpeg|png|heic|heif))$/i;
 const EXT = /\.(pdf|jpe?g|png|heic|heif)$/i;
 const LINK_SELF = '/portal.html?workspace=people&sub=people-timesheet&tab=giustificativi';
-const LINK_HR = '/portal.html?workspace=people&sub=people-assenze&view=giustificativi';
+const LINK_HR = '/portal.html?workspace=people&sub=people-timesheet&tab=registro&view=giustificativi';
 
 module.exports = function registerHrJustifications(app, deps) {
   const { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, hrFile, secureStore } = deps;

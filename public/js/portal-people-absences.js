@@ -47,7 +47,6 @@ function cancelAbsence(id, status) {
 function absRefresh() {
   if (document.getElementById('module-people')?.classList.contains('active') && document.getElementById('sub-people-timesheet')?.classList.contains('active')) return loadHrTimesheet();
   if (document.getElementById('module-me')?.classList.contains('active')) return loadMySpace();
-  if (document.getElementById('sub-people-assenze')?.classList.contains('active')) return loadHrAbsences();
   if (REC.id) return openHrRecord(REC.id, 'assenze');
 }
 

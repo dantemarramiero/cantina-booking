@@ -60,7 +60,7 @@ module.exports = function registerHrTimesheet(app, deps) {
   const managerUsers = e => { const a = hr.resolveApprover(e.id)?.approver; const u = userOfEmployee(a?.id); return u ? [u] : hrFile.hrRecipients(); };
   // Due schermate: il Timesheet personale (dove ognuno inserisce le proprie ore) e Presenze (controllo di HR e responsabili).
   const LINK = '/portal.html?workspace=people&sub=people-timesheet';
-  const LINK_REVIEW = '/portal.html?workspace=people&sub=people-presenze';
+  const LINK_REVIEW = '/portal.html?workspace=people&sub=people-timesheet&tab=team&seg=presenze';
 
   // ── Impostazioni ────────────────────────────────────────────────────────────
   function tsSettings() {

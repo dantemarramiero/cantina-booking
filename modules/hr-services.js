@@ -122,7 +122,7 @@ module.exports = function registerHrServices(app, deps) {
       const cid = Number(db.prepare('INSERT INTO personal_change_requests (employee_id, changes, note, requested_at, requested_user_id) VALUES (?, ?, ?, ?, ?)')
         .run(e.id, JSON.stringify(payload), text(b.note), now(), req.portalUser?.id ?? null).lastInsertRowid);
       notifyAll(hrFile.hrRecipients(), { kind: 'hr.change_request', title: `${fullName(e)} chiede di aggiornare i propri dati`, body: [...Object.keys(changes), ...(contacts ? ['contatti di emergenza'] : [])].join(', '),
-        link: '/portal.html?workspace=people&sub=people-richieste', dedupeKey: `change-request:${cid}` });
+        link: '/portal.html?workspace=people&sub=people-timesheet&tab=team&seg=dati', dedupeKey: `change-request:${cid}` });
       return cid;
     });
     audit(req, 'change_request.created', { entity: 'employee', entityId: e.id, after: { request_id: id, fields: Object.keys(changes), emergency_contacts: !!contacts } }); // niente valori (IBAN) nel registro

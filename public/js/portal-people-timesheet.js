@@ -6,8 +6,11 @@
 //      · Giustificativi: i documenti a supporto delle assenze che li richiedono (portal-people-justifications.js).
 //      · Richieste del team: per responsabili, delegati e ufficio del personale, calendario delle assenze e
 //        decisioni (approva, rifiuta con motivo, presa visione delle comunicazioni).
-//  - Presenze: il controllo di HR e responsabili sui fogli dei collaboratori, in sola lettura, con
-//    approvazione o rinvio del mese, rettifiche dei mesi approvati ed export per il consulente.
+//      · Richieste del team: tutto ciò che si decide. Assenze (calendario e decisioni), Presenze (fogli dei
+//        collaboratori in sola lettura, approvazione o rinvio del mese, rettifiche, export per il consulente)
+//        e, per l'ufficio del personale, Modifiche dati (IBAN, residenza, contatti dal self-service).
+//      · Registro (chi ha il workspace People): elenco di tutte le assenze, verifica dei giustificativi, contatori.
+// Nel menu di People non ci sono più Assenze, Presenze e Richieste: sono queste sezioni.
 // Le assenze entrano nel foglio solo da una richiesta approvata (o una comunicazione): nell'editor non si inseriscono.
 const TS_STATUS = { aperto: ['neutral', 'Aperto'], inviato: ['warning', 'Inviato'], approvato: ['success', 'Approvato'] };
 const TS_ORIGIN = { manuale: '', squadra: 'squadra', proposta: 'proposta', assenza: 'assenza', rettifica: 'rettifica' };
@@ -15,7 +18,7 @@ const TS_DN = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
 const TS_DNF = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
 const TS_MN = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 // mode: 'self' (Timesheet) o 'review' (Presenze, reviewId = il collaboratore aperto).
-const TS = { period: UI.thisMonth(), mode: 'self', employeeId: null, reviewId: null, sheet: null, options: null, tab: 'ore',
+const TS = { period: UI.thisMonth(), mode: 'self', employeeId: null, reviewId: null, sheet: null, options: null, tab: 'ore', teamSeg: 'assenze',
   compact: true, openDays: new Set(), onlyMissing: false, counts: { mine: 0, team: 0 }, urlTab: null };
 
 // Icone (Lucide, come nel design system).
@@ -86,34 +89,63 @@ function tsDialog({ title, text, buttons }) {
 // ── Timesheet: la propria schermata ────────────────────────────────────────────
 async function loadHrTimesheet() {
   TS.mode = 'self';
-  if (TS.urlTab === null) { TS.urlTab = new URLSearchParams(location.search).get('tab') || ''; if (['ore', 'ferie', 'giustificativi', 'team'].includes(TS.urlTab)) TS.tab = TS.urlTab; }
+  if (TS.urlTab === null) {
+    const q = new URLSearchParams(location.search);
+    TS.urlTab = q.get('tab') || '';
+    if (['ore', 'ferie', 'giustificativi', 'team', 'registro'].includes(TS.urlTab)) TS.tab = TS.urlTab;
+    if (['assenze', 'presenze', 'dati'].includes(q.get('seg'))) TS.teamSeg = q.get('seg');
+  }
   await tsOptions(true);
   if (!TS.options.me) {
     tsRoot().innerHTML = '<div class="list-card"><div class="mod-empty">La tua utenza non è collegata a una scheda dipendente, quindi non hai un Timesheet. Chiedi di collegarla in Impostazioni → Utenti.</div></div>';
     return;
   }
   if (TS.tab === 'team' && !TS.options.supervises) TS.tab = 'ore';
+  if (TS.tab === 'registro' && !tsHasPeople()) TS.tab = 'ore';
+  if (TS.tab === 'team' && TS.teamSeg === 'dati' && !TS.options.hr) TS.teamSeg = 'assenze';
   TS.employeeId = TS.options.me.id;
   await tsLoadCounts();
   if (TS.tab === 'ferie') return tsRenderLeave();
   if (TS.tab === 'giustificativi') return tsRenderDocs();
-  if (TS.tab === 'team') return tsRenderTeam();
+  if (TS.tab === 'team') return TS.teamSeg === 'presenze' ? tsRenderTeamPresenze() : TS.teamSeg === 'dati' ? tsRenderTeamData() : tsRenderTeam();
+  if (TS.tab === 'registro') return tsRenderRegistry();
   return loadTsSheet();
+}
+// Il workspace People completo (non solo il Timesheet): serve per il Registro.
+const tsHasPeople = () => typeof PERMITTED_WORKSPACES === 'undefined' || PERMITTED_WORKSPACES === null || (PERMITTED_WORKSPACES.includes('people') && !window.PEOPLE_TIMESHEET_ONLY);
+// Sezioni di «Richieste del team»: la barra sopra il contenuto.
+function tsTeamSegs() {
+  const segs = [['assenze', 'Assenze', TS.counts.teamAbs], ['presenze', 'Presenze', 0], ...(TS.options.hr ? [['dati', 'Modifiche dati', TS.counts.data]] : [])];
+  return `<div class="rq-seg">${segs.map(([k, l, n]) => `<button type="button" class="${TS.teamSeg === k ? 'is-on' : ''}" onclick="TS.teamSeg = '${k}'; TS.reviewId = null; loadHrTimesheet()">${l}${n ? ` <b style="margin-left:4px;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--mw-rame-500);color:#fff;font-size:11px;display:inline-grid;place-items:center">${n}</b>` : ''}</button>`).join('')}</div>`;
+}
+// Presenze e Modifiche dati, Registro: le schermate dell'ufficio del personale dentro il Timesheet.
+async function tsRenderTeamPresenze() {
+  document.getElementById('people-timesheet-root').innerHTML = `<div class="ts-page">${tsHead({})}${tsTeamSegs()}<div id="people-presenze-root"></div></div>`;
+  return loadHrPresenze();
+}
+async function tsRenderTeamData() {
+  document.getElementById('people-timesheet-root').innerHTML = `<div class="ts-page">${tsHead({})}${tsTeamSegs()}<div id="people-richieste-root"></div></div>`;
+  return loadHrChangeRequests();
+}
+async function tsRenderRegistry() {
+  document.getElementById('people-timesheet-root').innerHTML = `<div class="ts-page">${tsHead({})}<div id="people-assenze-root"></div></div>`;
+  return loadHrAbsences();
 }
 async function tsLoadCounts() {
   const [mine, team, docs] = await Promise.all([
     api(`/api/admin/hr/absences?employee_id=${TS.employeeId}`).catch(() => []),
     TS.options.supervises ? api('/api/admin/hr/absences?to_decide=1').catch(() => []) : [],
     api('/api/admin/hr/absences/justifications/mine').catch(() => []),
-  ]);
+    TS.options.hr ? api('/api/admin/hr/change-requests?status=richiesta').catch(() => []) : [],
+  ]).then(([m, t, d, c]) => (TS.pendingData = c.filter(x => x.status === 'richiesta').length, [m, t, d]));
   TS.myAbsences = mine;
   TS.myDocs = docs;
-  TS.counts = { mine: mine.filter(a => a.status === 'richiesta').length, team: team.filter(a => a.employee_id !== TS.employeeId).length, docs: docs.filter(d => ['todo', 'ko'].includes(d.status)).length };
+  TS.counts = { mine: mine.filter(a => a.status === 'richiesta').length, teamAbs: team.filter(a => a.employee_id !== TS.employeeId).length, data: TS.pendingData || 0, team: team.filter(a => a.employee_id !== TS.employeeId).length + (TS.pendingData || 0), docs: docs.filter(d => ['todo', 'ko'].includes(d.status)).length };
 }
 function tsSetTab(t) { TS.tab = t; loadHrTimesheet(); }
 function tsHead({ s = null, review = false }) {
   const who = review ? s.employee : { name: TS.options.me.name };
-  const tabs = review ? '' : `<div class="ts-tabs" role="tablist">${[['ore', 'Le mie ore'], ['ferie', 'Ferie e permessi', TS.counts.mine], ['giustificativi', 'Giustificativi', TS.counts.docs], ...(TS.options.supervises ? [['team', 'Richieste del team', TS.counts.team]] : [])]
+  const tabs = review ? '' : `<div class="ts-tabs" role="tablist">${[['ore', 'Le mie ore'], ['ferie', 'Ferie e permessi', TS.counts.mine], ['giustificativi', 'Giustificativi', TS.counts.docs], ...(TS.options.supervises ? [['team', 'Richieste del team', TS.counts.team]] : []), ...(tsHasPeople() ? [['registro', 'Registro']] : [])]
     .map(([k, l, n]) => `<button type="button" role="tab" class="${TS.tab === k ? 'is-on' : ''}" onclick="tsSetTab('${k}')">${l}${n ? `<b>${n}</b>` : ''}</button>`).join('')}</div>`;
   let actions = '';
   if (s) {
@@ -165,6 +197,7 @@ async function loadTsSheet() {
   tsRenderSheet();
 }
 function tsRenderSheet() {
+  if (TS.mode === 'review' && !document.getElementById('people-presenze-root')) return tsRenderTeamPresenze();
   const s = TS.sheet, review = TS.mode === 'review', locked = !s.can_edit;
   const today = tsToday();
   const shown = TS.onlyMissing ? s.days.filter(d => d.flag === 'mancano') : s.days;
@@ -608,6 +641,7 @@ async function tsRenderTeam() {
   TS.teamCal = cal;
   tsRoot().innerHTML = `<div class="ts-page">
     ${tsHead({})}
+    ${tsTeamSegs()}
     ${tsTeamCalendar(cal, start)}
     <section class="ts-card rq-list">
       <div class="rq-listhead"><div class="rq-filter">
@@ -721,10 +755,11 @@ function tsAdjRow() {
 function tsOpenFor(employeeId, period, tab) {
   if (period) TS.period = period;
   const mine = !employeeId || (typeof ME !== 'undefined' && ME.data?.employee?.id === employeeId) || TS.options?.me?.id === employeeId;
-  if (!mine) TS.reviewId = employeeId;
-  if (tab) TS.tab = tab;
+  if (!mine) { TS.reviewId = employeeId; TS.tab = 'team'; TS.teamSeg = 'presenze'; }
+  else if (tab) { TS.tab = tab; if (tab === 'team') TS.teamSeg = 'assenze'; }
+  TS.urlTab = '';
   if (!document.getElementById('module-people').classList.contains('active')) switchWorkspace('people');
-  clickSidebarSub(mine ? 'people-timesheet' : 'people-presenze');
+  clickSidebarSub('people-timesheet');
 }
 
 // ── Configurazione ─────────────────────────────────────────────────────────────
