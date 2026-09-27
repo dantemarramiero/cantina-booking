@@ -282,8 +282,12 @@ module.exports = function registerHrTimesheet(app, deps) {
     const b = req.body || {};
     const e = selfEmployee(req, b);
     const date = checkDate(b.work_date, 'la data', true);
+    const res = saveDay(req, e, date, Array.isArray(b.slots) ? b.slots : []);
+    return { success: true, ...res };
+  });
+  // Le fasce di un giorno (vedi PUT /timesheet/day): usato anche dalla copia dal mese precedente.
+  function saveDay(req, e, date, slots) {
     assertWritable(req, e, date);
-    const slots = Array.isArray(b.slots) ? b.slots : [];
     const current = dayRows(e.id, date).filter(x => x.origin !== 'assenza');
     const byId = new Map(current.map(x => [x.id, x]));
     const inputs = slots.map((sl, i) => {
@@ -328,7 +332,44 @@ module.exports = function registerHrTimesheet(app, deps) {
     const pendingOt = db.prepare(`SELECT COALESCE(SUM(minutes), 0) AS m FROM timesheet_entries WHERE employee_id = ? AND work_date = ? AND overtime_status = 'da_approvare' AND id NOT IN (${current.filter(x => x.overtime_status === 'da_approvare').map(x => x.id).join(',') || 0})`).get(e.id, date).m;
     notifyOvertime(e, date, pendingOt);
     audit(req, 'timesheet.day_saved', { entity: 'employee', entityId: e.id, after: { work_date: date, entries: ids, minutes: inputs.reduce((t, x) => t + x.f.minutes, 0) } });
-    return { success: true, ids, warnings: uniq(warnings) };
+    return { ids, warnings: uniq(warnings) };
+  }
+
+  // Copia dal mese precedente: riempie i giorni lavorativi ancora vuoti del mese, fino a oggi, con le fasce del
+  // giorno corrispondente del mese prima (stesso giorno della settimana e stessa occorrenza: il primo lunedì dal
+  // primo lunedì; se quel giorno era vuoto, dall'ultimo dello stesso giorno della settimana compilato).
+  // Non tocca festivi, assenze e giorni già compilati; non copia gli straordinari (vanno segnati e approvati di volta in volta).
+  r.post('/timesheet/copy-month', req => {
+    const b = req.body || {};
+    const e = selfEmployee(req, b);
+    const period = checkPeriod(b.period);
+    if (monthStatus(e.id, period) !== 'aperto') throw new HttpError(409, `Il mese di ${monthLabel(period)} non è aperto: non si copia.`);
+    const prev = periodOf(addDays(`${period}-01`, -1));
+    const t = today();
+    const holidays = new Set(hr.calendar(Number(period.slice(0, 4)), e.site_id).map(h => h.date));
+    const source = d => db.prepare(`SELECT t.* FROM timesheet_entries t WHERE t.employee_id = ? AND t.work_date = ? AND t.voided_by_adjustment_id IS NULL AND t.origin <> 'assenza'
+      AND t.hour_type <> 'straordinaria' AND (t.overtime_status IS NULL OR t.overtime_status <> 'rifiutato') ORDER BY t.start_time`).all(e.id, d)
+      .map(x => ({ x, al: db.prepare('SELECT cost_center_id, cost_object_id FROM timesheet_allocations WHERE entry_id = ?').all(x.id) })).filter(r2 => r2.al.length === 1);
+    const prevDays = [];
+    for (let d = `${prev}-01`; d <= lastDay(prev); d = addDays(d, 1)) prevDays.push(d);
+    const copied = [], skipped = [];
+    for (let d = `${period}-01`; d <= lastDay(period) && d <= t; d = addDays(d, 1)) {
+      if (holidays.has(d) || !scheduledMinutes(e, d) || dayRows(e.id, d).length) continue;
+      const wd = weekday(d), nth = Math.ceil(Number(d.slice(8)) / 7);
+      const same = prevDays.filter(x => weekday(x) === wd);
+      let rows = same[nth - 1] ? source(same[nth - 1]) : [];
+      if (!rows.length) for (const x of [...same].reverse()) { rows = source(x); if (rows.length) break; }
+      if (!rows.length) { skipped.push({ date: d, reason: 'nessun giorno da copiare nel mese precedente' }); continue; }
+      try {
+        saveDay(req, e, d, rows.map(({ x, al }) => ({ start_time: x.start_time, end_time: x.end_time, hour_type: x.hour_type, cost_center_id: al[0].cost_center_id, cost_object_id: al[0].cost_object_id, note: x.note })));
+        copied.push(d);
+      } catch (err) {
+        if (!err.status) throw err;
+        skipped.push({ date: d, reason: err.message });
+      }
+    }
+    audit(req, 'timesheet.month_copied', { entity: 'employee', entityId: e.id, after: { period, from: prev, days: copied.length } });
+    return { success: true, copied, skipped };
   });
   r.patch('/timesheet/entries/:id', req => {
     const x = entry(req.params.id);

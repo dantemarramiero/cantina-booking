@@ -483,3 +483,22 @@ test('straordinario: in sospeso finché il responsabile non decide; rifiutato no
   m = (await w.call('GET', '/api/admin/hr/timesheet/month?period=2030-02')).data;
   assert.equal(m.totals.straordinaria, 60);
 });
+
+test('copia dal mese precedente: giorni vuoti con il giorno corrispondente, senza straordinari; compilati e mesi non aperti restano', async () => {
+  const w = await person('Ugo', { last: 'Copia' });
+  const day = (work_date, slots) => w.call('PUT', '/api/admin/hr/timesheet/day', { work_date, slots });
+  await day('2026-06-01', [{ start_time: '08:00', end_time: '12:00', cost_center_id: center('P101') }, { start_time: '13:00', end_time: '17:00', cost_center_id: center('P02') },
+    { start_time: '17:00', end_time: '18:00', hour_type: 'straordinaria', cost_center_id: center('P02') }]);
+  await day('2026-06-02', [{ start_time: '08:00', end_time: '12:00', cost_center_id: center('P03') }]);
+  await day('2026-07-08', [{ start_time: '09:00', end_time: '10:00', cost_center_id: center('P101') }]);
+  const r = await w.call('POST', '/api/admin/hr/timesheet/copy-month', { period: '2026-07' });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.deepEqual(rows(w.id, '2026-07-06').map(x => [x.start_time, x.end_time, x.hour_type]), [['08:00', '12:00', 'ordinaria'], ['13:00', '17:00', 'ordinaria']], 'primo lunedì dal primo lunedì, senza lo straordinario');
+  assert.deepEqual(rows(w.id, '2026-07-07').map(x => x.start_time), ['08:00'], 'primo martedì');
+  assert.equal(rows(w.id, '2026-07-13').length, 2, 'secondo lunedì: il secondo di giugno era vuoto, si prende l\'ultimo lunedì compilato');
+  assert.deepEqual(rows(w.id, '2026-07-08').map(x => x.start_time), ['09:00'], 'il giorno già compilato non si tocca');
+  assert.ok(r.data.skipped.some(x => x.date === '2026-07-01'), 'mercoledì senza nulla da copiare');
+  assert.ok(!r.data.copied.includes('2026-07-04'), 'sabato non lavorativo');
+  await w.call('POST', '/api/admin/hr/timesheet/months/submit', { period: '2026-07' });
+  assert.equal((await w.call('POST', '/api/admin/hr/timesheet/copy-month', { period: '2026-07' })).status, 409, 'mese inviato: non si copia');
+});

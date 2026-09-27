@@ -224,8 +224,9 @@ function tsStats(s) {
   const diff = work - exp;
   return `<div class="ts-stats">
     <div class="ts-stat"><span>Ore previste</span><b>${tsH(exp)}</b><small>fino a oggi</small></div>
-    <div class="ts-stat"><span>Ore registrate</span><b>${tsH(work)}</b><small>di cui ${tsH(abs)} assenze${s.totals.straordinaria || s.totals.overtime_pending ? ` · straord. ${tsH(s.totals.straordinaria)}${s.totals.overtime_pending ? ` (+${tsH(s.totals.overtime_pending)} da approvare)` : ''}` : ''}</small></div>
-    <div class="ts-stat"><span>Differenza</span><b class="${diff < 0 ? 'ts-neg' : diff > 0 ? 'ts-pos' : ''}">${diff > 0 ? '+' : diff < 0 ? '−' : ''}${tsH(Math.abs(diff))}</b><small>${diff < 0 ? 'ore mancanti' : 'in pari'}</small></div>
+    <div class="ts-stat"><span>Ore registrate</span><b>${tsH(work)}</b><small>di cui ${tsH(abs)} assenze</small></div>
+    <div class="ts-stat"><span>Straordinari</span><b class="${s.totals.overtime_pending ? 'ts-neg' : ''}">${tsH(s.totals.straordinaria)}</b><small>${s.totals.overtime_pending ? `+ ${tsH(s.totals.overtime_pending)} da approvare` : 'approvati nel mese'}${s.totals.overtime_rejected ? ` · ${tsH(s.totals.overtime_rejected)} non approvate` : ''}</small></div>
+    <div class="ts-stat"><span>Differenza</span><b class="${diff < 0 ? 'ts-neg' : diff > 0 ? 'ts-pos' : ''}">${diff > 0 ? '+' : diff < 0 ? '−' : ''}${tsH(Math.abs(diff))}</b><small>${diff < 0 ? 'ore mancanti' : diff > 0 ? 'ore in più' : 'in pari'}</small></div>
     <button type="button" class="ts-stat is-btn ${TS.onlyMissing ? 'is-on' : ''}" onclick="TS.onlyMissing = !TS.onlyMissing; tsRenderSheet()" ${missing.length ? '' : 'disabled'}>
       <span>Da completare</span><b class="${missing.length ? 'ts-neg' : ''}">${missing.length} ${missing.length === 1 ? 'giorno' : 'giorni'}</b><small>${missing.length ? (TS.onlyMissing ? 'Mostra tutti' : 'Mostra solo questi') : 'Tutto compilato'}</small></button>
   </div>`;
@@ -261,7 +262,7 @@ function tsRenderSheet() {
     <div class="ts-layout">
       <section class="ts-card ts-table">
         <div class="ts-tools"><div class="rq-seg sm">${[[true, 'Sintetica', 'rows'], [false, 'Dettagliata', 'list']].map(([v, l, ic]) => `<button type="button" class="${TS.compact === v ? 'is-on' : ''}" onclick="TS.compact = ${v}; TS.openDays = new Set(); tsRenderSheet()">${tsi(ic, 14)}${l}</button>`).join('')}</div>
-          <div class="ts-tools-r"><button type="button" class="ts-linkbtn" onclick="TS.openDays = new Set(TS.sheet.days.filter(d => tsLive(d).length).map(d => d.date)); tsRenderSheet()">${tsi('expand', 14)}Espandi tutti</button>
+          <div class="ts-tools-r">${locked ? '' : `<button type="button" class="ts-linkbtn" onclick="tsCopyPrevMonth()">${tsi('copy', 14)}Copia dal mese precedente</button>`}<button type="button" class="ts-linkbtn" onclick="TS.openDays = new Set(TS.sheet.days.filter(d => tsLive(d).length).map(d => d.date)); tsRenderSheet()">${tsi('expand', 14)}Espandi tutti</button>
           ${TS.openDays.size ? `<button type="button" class="ts-linkbtn" onclick="TS.openDays = new Set(); tsRenderSheet()">${tsi('collapse', 14)}Chiudi tutti</button>` : ''}</div></div>
         <div class="ts-thead"><span>Giorno</span><span>Attività e centri di costo</span><span>Ore</span><span>Diff.</span><span></span></div>
         ${weeks.map(w => {
@@ -342,6 +343,21 @@ function tsCenterSummary(s) {
       : '<div class="ts-muted" style="font-size:13px">Nessuna ora imputata questo mese.</div>'}
     <div class="ts-muted" style="font-size:12px">Le assenze non si imputano ai centri di costo.</div>
   </section>`;
+}
+
+// Copia dal mese precedente: i giorni lavorativi vuoti fino a oggi, dal giorno corrispondente del mese prima.
+function tsCopyPrevMonth() {
+  const prev = UI.monthLabel(tsShiftMonth(TS.sheet.period, -1));
+  tsDialog({ title: `Copiare le ore di ${prev}?`, text: `Riempio i giorni lavorativi ancora vuoti fino a oggi con le fasce del giorno corrispondente di ${prev} (il primo lunedì dal primo lunedì, e così via). Festivi, assenze e giorni già compilati restano come sono; gli straordinari non si copiano. Poi controlla i giorni e correggi dove serve.`,
+    buttons: [{ label: 'Annulla' }, { label: 'Copia', variant: 'accent', onClick: async () => {
+      try {
+        const r = await api('/api/admin/hr/timesheet/copy-month', { method: 'POST', body: JSON.stringify({ period: TS.sheet.period }) });
+        await loadTsSheet();
+        const blocked = r.skipped.filter(x => !/nessun giorno da copiare/.test(x.reason));
+        tsToast(r.copied.length ? `Copiati ${r.copied.length} ${r.copied.length === 1 ? 'giorno' : 'giorni'}` : 'Nessun giorno copiato',
+          blocked.length ? `Non copiati: ${blocked.map(x => `${Number(x.date.slice(8))} (${x.reason})`).join('; ')}` : r.copied.length ? 'Controlla i giorni e correggi dove serve.' : "Non c'erano giorni vuoti da riempire o ore da copiare.", blocked.length ? 'warn' : '');
+      } catch (e) { alert(e.message); }
+    } }] });
 }
 
 // Invio, riapertura, decisioni sul mese
