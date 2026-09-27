@@ -93,7 +93,7 @@ async function loadHrTimesheet() {
     const q = new URLSearchParams(location.search);
     TS.urlTab = q.get('tab') || '';
     if (['ore', 'ferie', 'giustificativi', 'team', 'registro'].includes(TS.urlTab)) TS.tab = TS.urlTab;
-    if (['assenze', 'presenze', 'dati'].includes(q.get('seg'))) TS.teamSeg = q.get('seg');
+    if (['assenze', 'straordinari', 'presenze', 'dati'].includes(q.get('seg'))) TS.teamSeg = q.get('seg');
   }
   await tsOptions(true);
   if (!TS.options.me) {
@@ -107,7 +107,7 @@ async function loadHrTimesheet() {
   await tsLoadCounts();
   if (TS.tab === 'ferie') return tsRenderLeave();
   if (TS.tab === 'giustificativi') return tsRenderDocs();
-  if (TS.tab === 'team') return TS.teamSeg === 'presenze' ? tsRenderTeamPresenze() : TS.teamSeg === 'dati' ? tsRenderTeamData() : tsRenderTeam();
+  if (TS.tab === 'team') return TS.teamSeg === 'straordinari' ? tsRenderTeamOvertime() : TS.teamSeg === 'presenze' ? tsRenderTeamPresenze() : TS.teamSeg === 'dati' ? tsRenderTeamData() : tsRenderTeam();
   if (TS.tab === 'registro') return tsRenderRegistry();
   return loadTsSheet();
 }
@@ -115,13 +115,52 @@ async function loadHrTimesheet() {
 const tsHasPeople = () => typeof PERMITTED_WORKSPACES === 'undefined' || PERMITTED_WORKSPACES === null || (PERMITTED_WORKSPACES.includes('people') && !window.PEOPLE_TIMESHEET_ONLY);
 // Sezioni di «Richieste del team»: la barra sopra il contenuto.
 function tsTeamSegs() {
-  const segs = [['assenze', 'Assenze', TS.counts.teamAbs], ['presenze', 'Presenze', 0], ...(TS.options.hr ? [['dati', 'Modifiche dati', TS.counts.data]] : [])];
+  const segs = [['assenze', 'Assenze', TS.counts.teamAbs], ['straordinari', 'Straordinari', TS.counts.ot], ['presenze', 'Presenze', 0], ...(TS.options.hr ? [['dati', 'Modifiche dati', TS.counts.data]] : [])];
   return `<div class="rq-seg">${segs.map(([k, l, n]) => `<button type="button" class="${TS.teamSeg === k ? 'is-on' : ''}" onclick="TS.teamSeg = '${k}'; TS.reviewId = null; loadHrTimesheet()">${l}${n ? ` <b style="margin-left:4px;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--mw-rame-500);color:#fff;font-size:11px;display:inline-grid;place-items:center">${n}</b>` : ''}</button>`).join('')}</div>`;
 }
 // Presenze e Modifiche dati, Registro: le schermate dell'ufficio del personale dentro il Timesheet.
 async function tsRenderTeamPresenze() {
   document.getElementById('people-timesheet-root').innerHTML = `<div class="ts-page">${tsHead({})}${tsTeamSegs()}<div id="people-presenze-root"></div></div>`;
   return loadHrPresenze();
+}
+// Straordinari da approvare: valgono (mese, export, Finance) solo dopo l'approvazione.
+async function tsRenderTeamOvertime() {
+  TS.otView = TS.otView || 'da_approvare';
+  const rows = await api(`/api/admin/hr/timesheet/overtime?state=${TS.otView === 'storico' ? 'all' : 'da_approvare'}`);
+  const list = TS.otView === 'storico' ? rows.filter(x => x.status !== 'da_approvare') : rows;
+  const tone = { da_approvare: ['warning', 'Da approvare'], approvato: ['success', 'Approvato'], rifiutato: ['danger', 'Non approvato'] };
+  document.getElementById('people-timesheet-root').innerHTML = `<div class="ts-page">${tsHead({})}${tsTeamSegs()}
+    <section class="ts-card rq-list">
+      <div class="rq-listhead"><div class="rq-filter">
+        <button type="button" class="${TS.otView !== 'storico' ? 'is-on' : ''}" onclick="TS.otView = 'da_approvare'; tsRenderTeamOvertime()">Da approvare${TS.counts.ot ? ` <b>${TS.counts.ot}</b>` : ''}</button>
+        <button type="button" class="${TS.otView === 'storico' ? 'is-on' : ''}" onclick="TS.otView = 'storico'; tsRenderTeamOvertime()">Storico</button></div>
+        <span class="ts-muted" style="font-size:12px">Finché non è approvato, lo straordinario non conta nel mese, nell'export e per Finance.</span></div>
+      ${list.map(x => `<div class="rq-row"><span class="rq-avatar">${esc(tsInitials(x.employee_name))}</span>
+        <div class="rq-main"><div class="rq-title"><b>${esc(x.employee_name)}</b>${x.employee_job_title ? `<span class="ts-muted">· ${esc(x.employee_job_title)}</span>` : ''}<span class="rq-typetag t-fer">Straordinario</span></div>
+          <div class="rq-when">${rqShort(x.work_date)} · ${x.start_time}–${x.end_time} <span class="ts-muted">· ${tsH(x.minutes)}</span></div>
+          <div class="ts-muted" style="font-size:13px">${x.allocations.map(a => esc(`${a.center_code} ${a.center_name}${a.object_name ? ` · ${a.object_name}` : ''}`)).join(', ')}</div>
+          ${x.note ? `<div class="rq-note">“${esc(x.note)}”</div>` : ''}${x.status === 'rifiutato' && x.decision_note ? `<div class="rq-reason">${tsi('message', 14)}${esc(x.decision_note)}</div>` : ''}
+          ${x.status === 'da_approvare' ? (x.month_status === 'approvato' ? '<div class="ts-muted" style="font-size:12px">Mese già approvato: si cambia con una rettifica.</div>' : `<div class="rq-actions" id="ot-dec-${x.id}">
+            <button type="button" class="ts-btn primary sm" onclick="tsDecideOvertime(${x.id}, 'approve')">${tsi('check', 14)}Approva</button>
+            <button type="button" class="ts-btn secondary sm" onclick="tsRejectOvertimeForm(${x.id})">${tsi('x', 14)}Rifiuta</button></div>`) : ''}
+        </div>
+        <div class="rq-side"><span class="ts-badge ${tone[x.status][0]}">${tone[x.status][1]}</span>${x.decided_by ? `<span class="ts-muted">${esc(x.decided_by)}</span>` : ''}</div></div>`).join('')
+        || `<div class="rq-empty">${tsi('circle-check', 28)}<b>${TS.otView === 'storico' ? 'Nessuna decisione negli ultimi mesi' : 'Nessuno straordinario da approvare'}</b><span>Quando qualcuno segna ore di straordinario le trovi qui.</span></div>`}
+    </section></div>`;
+}
+function tsRejectOvertimeForm(id) {
+  document.getElementById(`ot-dec-${id}`).outerHTML = `<div class="rq-rej" id="ot-dec-${id}"><input class="ts-input" id="ot-reason-${id}" placeholder="Motivo (lo legge il dipendente)" oninput="document.getElementById('ot-rej-${id}').disabled = !this.value.trim()">
+    <button type="button" class="ts-btn ghost sm" onclick="tsRenderTeamOvertime()">Annulla</button><button type="button" class="ts-btn danger sm" id="ot-rej-${id}" disabled onclick="tsDecideOvertime(${id}, 'reject')">Rifiuta</button></div>`;
+  document.getElementById(`ot-reason-${id}`).focus();
+}
+async function tsDecideOvertime(id, action) {
+  try {
+    const note = action === 'reject' ? document.getElementById(`ot-reason-${id}`).value.trim() : undefined;
+    await api(`/api/admin/hr/timesheet/entries/${id}/overtime/${action}`, { method: 'POST', body: JSON.stringify(note ? { note } : {}) });
+    tsToast(action === 'approve' ? 'Straordinario approvato' : 'Straordinario non approvato');
+    await tsLoadCounts();
+    tsRenderTeamOvertime();
+  } catch (e) { alert(e.message); }
 }
 async function tsRenderTeamData() {
   document.getElementById('people-timesheet-root').innerHTML = `<div class="ts-page">${tsHead({})}${tsTeamSegs()}<div id="people-richieste-root"></div></div>`;
@@ -137,10 +176,11 @@ async function tsLoadCounts() {
     TS.options.supervises ? api('/api/admin/hr/absences?to_decide=1').catch(() => []) : [],
     api('/api/admin/hr/absences/justifications/mine').catch(() => []),
     TS.options.hr ? api('/api/admin/hr/change-requests?status=richiesta').catch(() => []) : [],
-  ]).then(([m, t, d, c]) => (TS.pendingData = c.filter(x => x.status === 'richiesta').length, [m, t, d]));
+    TS.options.supervises ? api('/api/admin/hr/timesheet/overtime').catch(() => []) : [],
+  ]).then(([m, t, d, c, o]) => (TS.pendingData = c.filter(x => x.status === 'richiesta').length, TS.pendingOt = o.length, [m, t, d]));
   TS.myAbsences = mine;
   TS.myDocs = docs;
-  TS.counts = { mine: mine.filter(a => a.status === 'richiesta').length, teamAbs: team.filter(a => a.employee_id !== TS.employeeId).length, data: TS.pendingData || 0, team: team.filter(a => a.employee_id !== TS.employeeId).length + (TS.pendingData || 0), docs: docs.filter(d => ['todo', 'ko'].includes(d.status)).length };
+  TS.counts = { mine: mine.filter(a => a.status === 'richiesta').length, teamAbs: team.filter(a => a.employee_id !== TS.employeeId).length, data: TS.pendingData || 0, ot: TS.pendingOt || 0, team: team.filter(a => a.employee_id !== TS.employeeId).length + (TS.pendingData || 0) + (TS.pendingOt || 0), docs: docs.filter(d => ['todo', 'ko'].includes(d.status)).length };
 }
 function tsSetTab(t) { TS.tab = t; loadHrTimesheet(); }
 function tsHead({ s = null, review = false }) {
@@ -184,7 +224,7 @@ function tsStats(s) {
   const diff = work - exp;
   return `<div class="ts-stats">
     <div class="ts-stat"><span>Ore previste</span><b>${tsH(exp)}</b><small>fino a oggi</small></div>
-    <div class="ts-stat"><span>Ore registrate</span><b>${tsH(work)}</b><small>di cui ${tsH(abs)} assenze</small></div>
+    <div class="ts-stat"><span>Ore registrate</span><b>${tsH(work)}</b><small>di cui ${tsH(abs)} assenze${s.totals.straordinaria || s.totals.overtime_pending ? ` · straord. ${tsH(s.totals.straordinaria)}${s.totals.overtime_pending ? ` (+${tsH(s.totals.overtime_pending)} da approvare)` : ''}` : ''}</small></div>
     <div class="ts-stat"><span>Differenza</span><b class="${diff < 0 ? 'ts-neg' : diff > 0 ? 'ts-pos' : ''}">${diff > 0 ? '+' : diff < 0 ? '−' : ''}${tsH(Math.abs(diff))}</b><small>${diff < 0 ? 'ore mancanti' : 'in pari'}</small></div>
     <button type="button" class="ts-stat is-btn ${TS.onlyMissing ? 'is-on' : ''}" onclick="TS.onlyMissing = !TS.onlyMissing; tsRenderSheet()" ${missing.length ? '' : 'disabled'}>
       <span>Da completare</span><b class="${missing.length ? 'ts-neg' : ''}">${missing.length} ${missing.length === 1 ? 'giorno' : 'giorni'}</b><small>${missing.length ? (TS.onlyMissing ? 'Mostra tutti' : 'Mostra solo questi') : 'Tutto compilato'}</small></button>
@@ -206,6 +246,8 @@ function tsRenderSheet() {
   const notices = [];
   if (review) notices.push(`<div class="ts-notice info">${tsi('info')}<span>Sola lettura: le ore le inserisce ${esc(s.employee.name)} nel suo Timesheet.</span></div>`);
   if (s.status === 'inviato' && !review) notices.push(`<div class="ts-notice info">${tsi('info')}<span>Il mese è inviato al responsabile: il foglio è in sola lettura. Se devi correggere qualcosa, usa «Riapri».</span></div>`);
+  if (s.totals.overtime_pending) notices.push(`<div class="ts-notice warn">${tsi('clock')}<span><b>${tsH(s.totals.overtime_pending)} di straordinario da approvare.</b> ${review ? 'Si decidono in Richieste del team → Straordinari.' : 'Il responsabile le deve approvare: fino ad allora non contano.'}</span></div>`);
+  if (s.totals.overtime_rejected) notices.push(`<div class="ts-notice bad">${tsi('alert')}<span><b>${tsH(s.totals.overtime_rejected)} di straordinario non approvate.</b> Sono barrate nei giorni: correggile o eliminale.</span></div>`);
   if (s.month?.return_note && s.status === 'aperto') notices.push(`<div class="ts-notice warn">${tsi('message')}<span>Rimandato indietro: ${esc(s.month.return_note)}</span></div>`);
   if (s.conflicts.length) notices.push(`<div class="ts-notice bad">${tsi('alert')}<div class="ts-grow"><b>Conflitti tra ore e assenze</b>${s.conflicts.map(c => `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span>${esc(c.message)}</span>
     ${s.can_edit || s.can_approve ? `<button type="button" class="ts-btn secondary sm" onclick="tsResolveConflict(${c.id})">Risolto</button>` : ''}</div>`).join('')}</div></div>`);
@@ -236,11 +278,11 @@ function tsRenderSheet() {
   </div>`;
 }
 function tsChip(x) {
-  const voided = x.voided_by_adjustment_id ? ' is-void' : '';
+  const voided = x.voided_by_adjustment_id || x.overtime_status === 'rifiutato' ? ' is-void' : '';
   if (x.origin === 'assenza') return `<span class="ts-chip is-abs${voided}">${tsi('plane', 13)}${esc(x.absence_type)} · ${tsH(x.minutes)}</span>`;
   const a = x.allocations[0], c = a && TS.centers[a.cost_center_id];
   const where = x.allocations.length > 1 ? `${x.allocations.length} centri` : `${c ? c.name : a ? `${a.center_code} ${a.center_name}` : 'Senza centro'}${a?.object_name ? ` · ${a.object_name}` : ''}`;
-  return `<span class="ts-chip${voided}"><i style="background:${c ? c.group_color : 'var(--mw-grigio-300)'}"></i><b>${x.start_time.replace(':00', '')}–${x.end_time.replace(':00', '')}</b><span>${esc(where)}</span>${x.hour_type !== 'ordinaria' ? `<em>${esc(TS.options.hour_types[x.hour_type].slice(0, 7))}.</em>` : ''}</span>`;
+  return `<span class="ts-chip${voided}"><i style="background:${c ? c.group_color : 'var(--mw-grigio-300)'}"></i><b>${x.start_time.replace(':00', '')}–${x.end_time.replace(':00', '')}</b><span>${esc(where)}</span>${x.overtime_status === 'da_approvare' ? '<em class="ts-ot-wait">Straord. da approvare</em>' : x.overtime_status === 'rifiutato' ? '<em class="ts-ot-ko">Straord. rifiutato</em>' : x.hour_type !== 'ordinaria' ? `<em>${esc(TS.options.hour_types[x.hour_type].slice(0, 7))}.</em>` : ''}</span>`;
 }
 function tsSummary(list) {
   const names = [...new Set(list.map(x => x.origin === 'assenza' ? x.absence_type : (TS.centers[x.allocations[0]?.cost_center_id]?.name || x.allocations[0]?.center_name || 'Senza centro')))];
@@ -277,7 +319,7 @@ function tsDetail(d, locked) {
       const style = x.voided_by_adjustment_id ? ' style="text-decoration:line-through;opacity:.5"' : '';
       if (x.origin === 'assenza') return `<div class="ts-dt"${style}><span class="ts-dt-time">${x.start_time ? `${x.start_time}–${x.end_time}` : 'Giornata'}</span><span><span class="ts-abstag">${esc(x.absence_type)}</span></span><span class="ts-muted">—</span><span class="ts-muted">—</span><span class="ts-dt-note ts-muted">da richiesta approvata</span><b>${tsH(x.minutes)}</b></div>`;
       return x.allocations.map((a, i) => { const c = TS.centers[a.cost_center_id];
-        return `<div class="ts-dt"${style}><span class="ts-dt-time">${i ? '' : `${x.start_time}–${x.end_time}`}</span><span>${esc(TS.options.hour_types[x.hour_type])}${TS_ORIGIN[x.origin] ? ` <span class="ts-origin">${TS_ORIGIN[x.origin]}</span>` : ''}</span>
+        return `<div class="ts-dt"${style}><span class="ts-dt-time">${i ? '' : `${x.start_time}–${x.end_time}`}</span><span>${esc(TS.options.hour_types[x.hour_type])}${x.overtime_status === 'da_approvare' ? ' <span class="ts-origin" style="color:var(--mw-warning-600)">da approvare</span>' : x.overtime_status === 'rifiutato' ? ` <span class="ts-origin" style="color:var(--mw-danger-600)" title="${UI.attr(x.overtime_note || '')}">rifiutato</span>` : ''}${TS_ORIGIN[x.origin] ? ` <span class="ts-origin">${TS_ORIGIN[x.origin]}</span>` : ''}</span>
           <span class="ts-dt-cc"><i style="background:${c?.group_color || 'var(--mw-grigio-300)'}"></i><span>${esc(`${a.center_code} ${a.center_name}`)}<small>${esc(c?.group_name || '')}</small></span></span>
           <span>${a.object_name ? esc(`${a.object_code} ${a.object_name}`) : '<span class="ts-muted">—</span>'}</span><span class="ts-dt-note">${x.note && !i ? esc(x.note) : '<span class="ts-muted">—</span>'}</span><b>${tsH(a.minutes)}</b></div>`; }).join('');
     }).join('')}
@@ -357,7 +399,8 @@ function tsOpenDay(date) {
   const d = TS.sheet.days.find(x => x.date === date);
   if (!d || !TS.sheet.can_edit) return;
   const rows = tsWorkRows(d);
-  TSE = { date, tried: false, slots: rows.length ? rows.map(tsSlotFrom) : [{ key: ++tsSlotSeq, start_time: '08:00', end_time: '12:00', hour_type: 'ordinaria', cost_center_id: String(TS.sheet.recent[0]?.cost_center_id || TS.sheet.employee.cost_center_id || ''), cost_object_id: String(TS.sheet.recent[0]?.cost_object_id || ''), note: '' }] };
+  const first = tsDaySlots(date)[0];
+  TSE = { date, tried: false, slots: rows.length ? rows.map(tsSlotFrom) : [{ key: ++tsSlotSeq, start_time: first.start, end_time: first.end, hour_type: 'ordinaria', cost_center_id: String(TS.sheet.recent[0]?.cost_center_id || TS.sheet.employee.cost_center_id || ''), cost_object_id: String(TS.sheet.recent[0]?.cost_object_id || ''), note: '' }] };
   tsRenderEditor();
 }
 function tsCloseEditor() { TSE = null; document.querySelector('.ts-veil')?.remove(); document.removeEventListener('keydown', tsEditorKeys); }
@@ -401,6 +444,9 @@ function tsSlotHtml(s, i, err) {
     <div class="ts-ccgrid"><label class="ts-field"><span>Centro di costo <b>*</b></span>${tsCenterSelect(s, err && !s.cost_center_id)}</label>
       <label class="ts-field"><span>Attività / lotto</span>${tsObjectSelect(s)}</label></div>
     ${s.showNote || s.note ? `<input class="ts-input" placeholder="Nota (facoltativa)" value="${UI.attr(s.note)}" oninput="tsSlotSet(${s.key}, { note: this.value }, false)">` : `<button type="button" class="ts-linkbtn" onclick="tsSlotSet(${s.key}, { showNote: true })">${tsi('plus', 14)}Aggiungi nota</button>`}
+    ${tsCoveredBreaks(s, TSE.date).map(b => `<div class="ts-absnote">${tsi('info', 14)}<span>Copre la pausa ${b.start}–${b.end}: al salvataggio la tolgo e divido la fascia.
+      <label style="display:inline-flex;gap:6px;align-items:center;margin-left:6px"><input type="checkbox" ${s.keepBreak ? 'checked' : ''} onchange="tsSlotSet(${s.key}, { keepBreak: this.checked })"> ho lavorato anche in pausa</label></span></div>`).join('')}
+    ${s.hour_type === 'straordinaria' ? `<div class="ts-absnote">${tsi('clock', 14)}Lo straordinario va approvato dal responsabile: fino ad allora non conta.</div>` : ''}
     ${err ? `<div class="ts-err">${tsi('alert', 14)}${esc(err)}</div>` : ''}
   </div>`;
 }
@@ -417,7 +463,7 @@ function tsRenderEditor() {
         <button type="button" class="ts-icbtn" onclick="tsEditorNav(1)" aria-label="Giorno successivo">${tsi('chevron-right', 18)}</button>
         <button type="button" class="ts-icbtn" onclick="tsCloseEditor()" aria-label="Chiudi">${tsi('x', 18)}</button></div></header>
     <div class="ts-quick">
-      <button type="button" class="ts-qbtn" onclick="tsStandardDay()">${tsi('sun', 15)}Giornata tipo<small>8–12 · 13–17</small></button>
+      <button type="button" class="ts-qbtn" onclick="tsStandardDay()">${tsi('sun', 15)}Giornata tipo<small>${tsDaySlots(TSE.date).map(x => `${x.start.replace(':00', '')}–${x.end.replace(':00', '')}`).join(' · ')}${d.slots_standard ? '' : ' (proposta)'}</small></button>
       <button type="button" class="ts-qbtn" onclick="tsCopyPrevIntoEditor()" ${prev ? '' : 'disabled'}>${tsi('copy', 15)}Copia ultimo giorno<small>${prev ? `${TS_DN[tsDate(prev.date).getDay()]} ${Number(prev.date.slice(8))} · ${tsH(tsWorkRows(prev).reduce((t, x) => t + x.minutes, 0))}` : 'nessuno'}</small></button>
     </div>
     <div class="ts-dbody">
@@ -454,12 +500,29 @@ function tsSlotAdd() {
   TSE.slots.push({ key: ++tsSlotSeq, start_time: from, end_time: to, hour_type: 'ordinaria', cost_center_id: last?.cost_center_id || '', cost_object_id: last?.cost_object_id || '', note: '' });
   tsRenderEditor();
 }
+// Le fasce dell'orario di quel giorno (impostate da HR, o proposte dalle 8 con la pausa alle 12).
+const tsDaySlots = date => { const d = TS.sheet.days.find(x => x.date === date); return d?.slots?.length ? d.slots : [{ start: '08:00', end: '12:00' }, { start: '13:00', end: '17:00' }]; };
+// Pause dell'orario: gli spazi tra una fascia e l'altra.
+const tsBreaks = date => { const sl = TS.sheet.days.find(x => x.date === date)?.slots || []; return sl.slice(1).map((x, i) => ({ start: sl[i].end, end: x.start })).filter(b => b.start < b.end); };
+const tsCoveredBreaks = (s, date) => tsBreaks(date).filter(b => s.start_time <= b.start && b.end <= s.end_time); // la pausa sta per intero dentro la fascia
+// Al salvataggio: le fasce che coprono la pausa si dividono (salvo «ho lavorato anche in pausa»).
+function tsSplitBreaks(slots, date) {
+  const out = [];
+  let removed = [];
+  for (const s of slots) {
+    const cover = s.fixed || s.keepBreak ? [] : tsCoveredBreaks(s, date);
+    if (!cover.length) { out.push(s); continue; }
+    let from = s.start_time;
+    cover.forEach((b, i) => { out.push({ ...s, key: i ? ++tsSlotSeq : s.key, id: i ? null : s.id, start_time: from, end_time: b.start }); from = b.end; removed.push(b); });
+    out.push({ ...s, key: ++tsSlotSeq, id: null, start_time: from, end_time: s.end_time });
+  }
+  return { slots: out, removed };
+}
 function tsStandardDay() {
   const r = TS.sheet.recent[0] || {};
   const c = String(r.cost_center_id || TS.sheet.employee.cost_center_id || ''), o = String(r.cost_object_id || '');
-  // Sostituisce le fasce del giorno (anche quelle già salvate, che al salvataggio si tolgono).
-  TSE.slots = [{ key: ++tsSlotSeq, start_time: '08:00', end_time: '12:00', hour_type: 'ordinaria', cost_center_id: c, cost_object_id: o, note: '' },
-    { key: ++tsSlotSeq, start_time: '13:00', end_time: '17:00', hour_type: 'ordinaria', cost_center_id: c, cost_object_id: o, note: '' }];
+  // Sostituisce le fasce del giorno (anche quelle già salvate, che al salvataggio si tolgono) con l'orario della persona.
+  TSE.slots = tsDaySlots(TSE.date).map(x => ({ key: ++tsSlotSeq, start_time: x.start, end_time: x.end, hour_type: 'ordinaria', cost_center_id: c, cost_object_id: o, note: '' }));
   tsRenderEditor();
 }
 function tsCopyPrevIntoEditor() {
@@ -470,15 +533,18 @@ function tsCopyPrevIntoEditor() {
 }
 async function tsSaveDay(next) {
   TSE.tried = true;
-  const errs = tsValidate(TSE.slots);
+  const split = tsSplitBreaks(TSE.slots, TSE.date);
+  const errs = tsValidate(split.slots);
   if (Object.keys(errs).length) return tsRenderEditor();
+  TSE.slots = split.slots;
   const date = TSE.date;
   try {
     const res = await api('/api/admin/hr/timesheet/day', { method: 'PUT', body: JSON.stringify({ work_date: date, slots: TSE.slots.map(s => (s.fixed ? { id: s.id, unchanged: true }
       : { id: s.id || null, start_time: s.start_time, end_time: s.end_time, hour_type: s.hour_type, cost_center_id: s.cost_center_id, cost_object_id: s.cost_object_id || null, note: s.note })) }) });
     const dt = tsDate(date);
     await loadTsSheet();
-    if (res.warnings?.length) tsWarn(res); else tsToast('Ore salvate', `${TS_DNF[dt.getDay()]} ${dt.getDate()}: ${tsH(TSE.slots.reduce((t, s) => t + tsToMin(s.end_time) - tsToMin(s.start_time), 0))}`);
+    const breakMsg = split.removed.length ? ` · pausa ${split.removed.map(b => `${b.start}–${b.end}`).join(', ')} tolta` : '';
+    if (res.warnings?.length) tsWarn(res); else tsToast('Ore salvate', `${TS_DNF[dt.getDay()]} ${dt.getDate()}: ${tsH(TSE.slots.reduce((t, s) => t + tsToMin(s.end_time) - tsToMin(s.start_time), 0))}${breakMsg}`);
     if (next) tsEditorNav(1, true); else tsCloseEditor();
   } catch (e) { UI.msg(document.getElementById('ts-editor-msg'), e.message); }
 }
@@ -708,12 +774,12 @@ async function loadHrPresenze() {
       <div class="mod-toolbar-fields"><input type="month" value="${TS.period}" onchange="TS.period = this.value || UI.thisMonth(); loadHrPresenze()"></div>
       ${TS.options.hr ? `<button class="btn secondary small" onclick="UI.download('/api/admin/hr/timesheet/export/${TS.period}')">Esporta CSV</button>` : ''}
     </div>
-    ${rows.length ? `<div class="mod-table-wrap"><table class="mod-table"><thead><tr><th>Dipendente</th><th>Stato</th><th class="num">Lavorate</th><th class="num">Assenze</th><th class="num">Orario</th><th class="num">Giorni scoperti</th><th class="num">Conflitti</th></tr></thead><tbody>
+    ${rows.length ? `<div class="mod-table-wrap"><table class="mod-table"><thead><tr><th>Dipendente</th><th>Stato</th><th class="num">Lavorate</th><th class="num">Assenze</th><th class="num">Orario</th><th class="num">Giorni scoperti</th><th class="num">Conflitti</th><th class="num">Straord. da approvare</th></tr></thead><tbody>
       ${rows.map(x => `<tr class="mod-clickable" onclick="TS.reviewId = ${x.employee_id}; TS.openDays = new Set(); loadTsSheet()"><td><b>${esc(x.name)}</b></td>
         <td><span class="badge ${{ aperto: 'grey', inviato: 'yellow', approvato: 'green' }[x.status]}">${TS_STATUS[x.status][1]}</span>${x.can_approve ? ' <span class="badge yellow">da approvare</span>' : ''}</td>
         <td class="num">${tsHours(x.worked)}</td><td class="num">${tsHours(x.absent)}</td><td class="num">${tsHours(x.scheduled)}</td>
         <td class="num" style="${x.missing_days ? 'color:var(--warn);font-weight:600' : ''}">${x.missing_days || '—'}</td>
-        <td class="num" style="${x.conflicts ? 'color:var(--bad);font-weight:600' : ''}">${x.conflicts || '—'}</td></tr>`).join('')}
+        <td class="num" style="${x.conflicts ? 'color:var(--bad);font-weight:600' : ''}">${x.conflicts || '—'}</td><td class="num" style="${x.overtime_pending ? 'color:var(--warn);font-weight:600' : ''}">${x.overtime_pending ? tsHours(x.overtime_pending) : '—'}</td></tr>`).join('')}
     </tbody></table></div>` : '<div class="mod-empty">Nessun collaboratore da mostrare.</div>'}
   </div>`;
 }

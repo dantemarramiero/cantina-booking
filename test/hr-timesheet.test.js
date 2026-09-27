@@ -249,7 +249,10 @@ test('export per il consulente: solo mesi approvati, giornate lavorate, virgola 
   const csv = () => t.hrTimesheet.exportRows('2027-11', false).map(l => l.join(';'));
   assert.ok(!csv().some(l => l.includes('RSSRSO80A41G482Q')), 'mese non approvato: fuori');
   await w.call('POST', '/api/admin/hr/timesheet/months/submit', { period: '2027-11' });
-  await boss.call('POST', '/api/admin/hr/timesheet/months/approve', { employee_id: w.id, period: '2027-11' });
+  const ot = t.db.prepare("SELECT id FROM timesheet_entries WHERE employee_id = ? AND hour_type = 'straordinaria'").get(w.id).id;
+  assert.match((await boss.call('POST', '/api/admin/hr/timesheet/months/approve', { employee_id: w.id, period: '2027-11' })).data.error, /straordinario da approvare/);
+  assert.equal((await boss.call('POST', `/api/admin/hr/timesheet/entries/${ot}/overtime/approve`)).status, 200);
+  assert.equal((await boss.call('POST', '/api/admin/hr/timesheet/months/approve', { employee_id: w.id, period: '2027-11' })).status, 200);
   const lines = csv();
   assert.equal(lines[0], 'Codice fiscale;Cognome;Nome;Tipo contratto;Data;Giornata lavorata;Ore ordinarie;Ore straordinarie;Ore notturne;Ore festive;Assenza;Ore assenza');
   assert.ok(lines.includes('RSSRSO80A41G482Q;Export;Rosa;OTD;02/11/2027;1;4;6;0;0;;0'));
@@ -435,4 +438,48 @@ test('assenze: la richiesta porta il responsabile a «Richieste del team», la d
   const listed = (await boss.call('GET', `/api/admin/hr/absences?employee_id=${w.id}`)).data[0];
   assert.equal(listed.decision_note, 'Vendemmia');
   assert.ok('employee_job_title' in listed);
+});
+
+test('orario a fasce: HR imposta le fasce con la pausa; il foglio le mostra; fascia oltre 6 ore avvisata', async () => {
+  const w = await person('Fabio', { last: 'Fasce' });
+  assert.equal((await t.api('PUT', `/api/admin/hr/employees/${w.id}/schedule`, { valid_from: '2030-01-01', days: { 1: '8-12, 13-17', 2: '08:00-12:30 13:30-17:00', 3: '8', 4: '12-10', 5: '0' } })).status, 400, 'fascia rovesciata');
+  const ok = await t.api('PUT', `/api/admin/hr/employees/${w.id}/schedule`, { valid_from: '2030-01-01', days: { 1: '8-12, 13-17', 2: '08:00-12:30 13:30-17:00', 3: '8', 4: '7-13', 5: '0' } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  const month = (await w.call('GET', '/api/admin/hr/timesheet/month?period=2030-01')).data;
+  const day = date => month.days.find(d => d.date === date);
+  assert.deepEqual([day('2030-01-07').scheduled, day('2030-01-07').slots, day('2030-01-07').slots_standard], [480, [{ start: '08:00', end: '12:00' }, { start: '13:00', end: '17:00' }], true]);
+  assert.deepEqual([day('2030-01-08').scheduled, day('2030-01-08').slots.length], [480, 2]);
+  assert.deepEqual([day('2030-01-09').slots, day('2030-01-09').slots_standard], [[{ start: '08:00', end: '12:00' }, { start: '13:00', end: '17:00' }], false], 'solo ore: fasce proposte con la pausa alle 12');
+  const long = await w.call('PUT', '/api/admin/hr/timesheet/day', { work_date: '2030-01-07', slots: [{ start_time: '08:00', end_time: '17:00', cost_center_id: center('P101') }] });
+  assert.equal(long.status, 200);
+  assert.match(long.data.warnings.join(' '), /supera le 6 ore senza pausa/);
+});
+
+test('straordinario: in sospeso finché il responsabile non decide; rifiutato non conta; il proprio no', async () => {
+  const boss = await person('Gino', { last: 'Capo' });
+  const w = await person('Irma', { manager: boss.id, last: 'Straord' });
+  const date = '2030-02-04';
+  const r = await w.call('PUT', '/api/admin/hr/timesheet/day', { work_date: date, slots: [
+    { start_time: '08:00', end_time: '12:00', cost_center_id: center('P101') }, { start_time: '13:00', end_time: '17:00', cost_center_id: center('P101') },
+    { start_time: '17:00', end_time: '19:00', hour_type: 'straordinaria', cost_center_id: center('P02') }] });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const ot = rows(w.id, date).find(x => x.hour_type === 'straordinaria');
+  assert.equal(ot.overtime_status, 'da_approvare');
+  assert.ok(t.db.prepare("SELECT 1 FROM notifications WHERE user_id = ? AND kind = 'hr.timesheet.overtime'").get(boss.userId), 'il responsabile è avvisato');
+  let m = (await w.call('GET', '/api/admin/hr/timesheet/month?period=2030-02')).data;
+  assert.deepEqual([m.totals.straordinaria, m.totals.overtime_pending], [0, 120], 'non conta finché non è approvato');
+  const list = (await boss.call('GET', '/api/admin/hr/timesheet/overtime')).data;
+  assert.ok(list.some(x => x.id === ot.id && x.employee_name === 'Irma Straord'));
+  assert.equal((await w.call('POST', `/api/admin/hr/timesheet/entries/${ot.id}/overtime/approve`)).status, 403, 'mai il proprio');
+  assert.equal((await boss.call('POST', `/api/admin/hr/timesheet/entries/${ot.id}/overtime/reject`, {})).status, 400, 'il motivo serve');
+  assert.equal((await boss.call('POST', `/api/admin/hr/timesheet/entries/${ot.id}/overtime/reject`, { note: 'Non autorizzato' })).status, 200);
+  m = (await w.call('GET', '/api/admin/hr/timesheet/month?period=2030-02')).data;
+  assert.deepEqual([m.totals.straordinaria, m.totals.overtime_rejected, m.days.find(d => d.date === date).worked], [0, 120, 480], 'rifiutato: fuori dalle ore');
+  // Lo corregge e torna da approvare; approvato conta.
+  const again = await w.call('PUT', '/api/admin/hr/timesheet/day', { work_date: date, slots: rows(w.id, date).map(x => ({ id: x.id, start_time: x.start_time, end_time: x.id === ot.id ? '18:00' : x.end_time, hour_type: x.hour_type, cost_center_id: center(x.id === ot.id ? 'P02' : 'P101') })) });
+  assert.equal(again.status, 200, JSON.stringify(again.data));
+  assert.equal(rows(w.id, date).find(x => x.id === ot.id).overtime_status, 'da_approvare');
+  assert.equal((await boss.call('POST', `/api/admin/hr/timesheet/entries/${ot.id}/overtime/approve`)).status, 200);
+  m = (await w.call('GET', '/api/admin/hr/timesheet/month?period=2030-02')).data;
+  assert.equal(m.totals.straordinaria, 60);
 });

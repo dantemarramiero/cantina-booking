@@ -11,6 +11,7 @@ const BASE = '/api/admin/hr';
 const now = () => new Date().toISOString();
 const intOrNull = v => (v === '' || v == null ? null : parseInt(v));
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
+const PPL_DAYS = { 1: 'lunedì', 2: 'martedì', 3: 'mercoledì', 4: 'giovedì', 5: 'venerdì', 6: 'sabato', 7: 'domenica' };
 
 module.exports = function registerHr(app, { db, authAdmin, audit, hasAccessLevel, finance }) {
   const route = handler => (req, res) => {
@@ -288,28 +289,50 @@ module.exports = function registerHr(app, { db, authAdmin, audit, hasAccessLevel
     if (!from) return null;
     const rows = db.prepare('SELECT weekday, minutes FROM work_schedules WHERE employee_id = ? AND valid_from = ?').all(employeeId, from);
     const days = Object.fromEntries(WEEKDAYS.map(d => [d, rows.find(r => r.weekday === d)?.minutes ?? 0]));
-    return { valid_from: from, days, weekly_minutes: Object.values(days).reduce((s, m) => s + m, 0) };
+    // Fasce del giorno (la pausa è lo spazio tra due fasce); vuoto = solo il monte ore.
+    const slotRows = db.prepare('SELECT weekday, start_time, end_time FROM work_schedule_slots WHERE employee_id = ? AND valid_from = ? ORDER BY weekday, start_time').all(employeeId, from);
+    const slots = Object.fromEntries(WEEKDAYS.map(d => [d, slotRows.filter(r => r.weekday === d).map(r => ({ start: r.start_time, end: r.end_time }))]));
+    return { valid_from: from, days, slots, weekly_minutes: Object.values(days).reduce((s, m) => s + m, 0) };
   }
   put('/employees/:id/schedule', req => {
     requireLevel(req, 'personale');
     const e = employee(req.params.id);
     const { valid_from, days } = req.body || {};
     if (!DATE.test(valid_from || '')) throw new HttpError(400, 'Decorrenza nel formato AAAA-MM-GG.');
+    // Ogni giorno: le ore («8», «6,5») oppure le fasce («8-12, 13-17» o «08:00-12:00 13:00-17:00»): con le fasce
+    // le ore si calcolano e la pausa è lo spazio tra una fascia e l'altra.
+    const HM = v => { const m = String(v).trim().match(/^(\d{1,2})(?:[:.](\d{2}))?$/); if (!m || Number(m[1]) > 24 || Number(m[2] || 0) > 59) return null; return `${m[1].padStart(2, '0')}:${m[2] || '00'}`; };
+    const toM = t => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+    const slotsOf = {};
     const minutes = WEEKDAYS.map(d => {
+      const v = String(days?.[d] ?? '0').trim();
+      if (/\d\s*-\s*\d/.test(v)) {
+        const list = v.split(/[,;]|\s+(?=\d{1,2}(?:[:.]\d{2})?\s*-)/).map(x => x.trim()).filter(Boolean).map(x => {
+          const [a, b] = x.split('-').map(HM);
+          if (!a || !b || toM(b) <= toM(a)) throw new HttpError(400, `Fascia non valida: «${x}» (es. 8-12, 13-17).`);
+          return { start: a, end: b };
+        }).sort((x, y) => x.start.localeCompare(y.start));
+        list.forEach((x, i) => { if (i && toM(x.start) < toM(list[i - 1].end)) throw new HttpError(400, `Le fasce di ${PPL_DAYS[d]} si sovrappongono.`); });
+        slotsOf[d] = list;
+        return [d, list.reduce((t, x) => t + toM(x.end) - toM(x.start), 0)];
+      }
       let m;
-      try { m = parseDecimal(days?.[d] ?? '0', 2); } catch (err) { throw new HttpError(400, err.message); }
+      try { m = parseDecimal(v || '0', 2); } catch (err) { throw new HttpError(400, err.message); }
       m = Math.round(((m ?? 0) * 60) / 100); // ore con due decimali → minuti
       if (m > 1440) throw new HttpError(400, 'Un giorno non può avere più di 24 ore.');
       return [d, m];
     });
     const ins = db.prepare('INSERT INTO work_schedules (employee_id, valid_from, weekday, minutes) VALUES (?, ?, ?, ?)');
+    const insSlot = db.prepare('INSERT INTO work_schedule_slots (employee_id, valid_from, weekday, start_time, end_time) VALUES (?, ?, ?, ?, ?)');
     db.exec('SAVEPOINT schedule');
     try {
       db.prepare('DELETE FROM work_schedules WHERE employee_id = ? AND valid_from = ?').run(e.id, valid_from);
+      db.prepare('DELETE FROM work_schedule_slots WHERE employee_id = ? AND valid_from = ?').run(e.id, valid_from);
       for (const [d, m] of minutes) ins.run(e.id, valid_from, d, m);
+      for (const [d, list] of Object.entries(slotsOf)) for (const x of list) insSlot.run(e.id, valid_from, Number(d), x.start, x.end);
       db.exec('RELEASE schedule');
     } catch (err) { db.exec('ROLLBACK TO schedule'); db.exec('RELEASE schedule'); throw err; }
-    audit(req, 'employee.schedule_set', { entity: 'employee', entityId: e.id, after: { valid_from, minutes: Object.fromEntries(minutes) } });
+    audit(req, 'employee.schedule_set', { entity: 'employee', entityId: e.id, after: { valid_from, minutes: Object.fromEntries(minutes), slots: slotsOf } });
     return { success: true };
   });
 
