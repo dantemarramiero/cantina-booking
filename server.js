@@ -4895,6 +4895,7 @@ app.delete('/api/admin/roles/:id', authAdmin, (req, res) => {
 
 app.get('/api/admin/me', authAdmin, (req, res) => {
   const permittedWorkspaces = permittedWorkspacesFor(req);
+  const employeeId = req.portalUser ? db.prepare('SELECT id FROM employees WHERE portal_user_id = ? AND active = 1').get(req.portalUser.id)?.id ?? null : null;
   res.json({
     isMaster: !!req.isMasterKey,
     name: req.portalUser?.name || (req.isMasterKey ? 'Amministratore' : null),
@@ -4902,8 +4903,10 @@ app.get('/api/admin/me', authAdmin, (req, res) => {
     permittedWorkspaces, // null = accesso completo a tutti i workspace
     accessLevels: accessLevelsFor(req), // null = tutti i livelli di riservatezza
     capabilities: capabilitiesFor(req), // Produzione; null = tutte
-    // Scheda dipendente collegata: con questa il Timesheet si vede anche senza il workspace People.
-    employeeId: req.portalUser ? db.prepare('SELECT id FROM employees WHERE portal_user_id = ? AND active = 1').get(req.portalUser.id)?.id ?? null : null,
+    // Scheda dipendente collegata: con questa il Timesheet (il proprio foglio) si vede anche senza il workspace People.
+    employeeId,
+    // Responsabile o delegato di qualcuno: vede anche People → Presenze (approvazioni), pure senza il workspace People.
+    supervisesEmployees: !!employeeId && !!db.prepare('SELECT 1 FROM employees WHERE active = 1 AND id <> ? AND (manager_id = ? OR delegate_id = ?)').get(employeeId, employeeId, employeeId),
   });
 });
 

@@ -25,18 +25,18 @@ const add = (who, body) => (who ? who.call('POST', '/api/admin/hr/timesheet/entr
 const rows = (id, date) => t.db.prepare('SELECT * FROM timesheet_entries WHERE employee_id = ? AND work_date = ? AND voided_by_adjustment_id IS NULL ORDER BY start_time').all(id, date);
 
 test('righe: passo degli orari, centro foglia e attivo, niente sovrapposizioni, ripartizione esatta', async () => {
-  const e = await emp('Remo', 'Righe');
-  const base = { employee_id: e, work_date: '2027-03-01', hour_type: 'ordinaria' };
-  assert.match((await add(null, { ...base, start_time: '08:30', end_time: '12:00' })).data.error, /a passi di 60 minuti/);
+  const e = await person('Remo', { last: 'Righe' });
+  const base = { work_date: '2027-03-01', hour_type: 'ordinaria' };
+  assert.match((await add(e, { ...base, start_time: '08:30', end_time: '12:00' })).data.error, /a passi di 60 minuti/);
   await t.api('PUT', '/api/admin/hr/timesheet/settings', { granularity: 30 });
-  assert.equal((await add(null, { ...base, start_time: '08:30', end_time: '12:00' })).status, 200);
-  assert.match((await add(null, { ...base, start_time: '14:00', end_time: '13:00' })).data.error, /passa la mezzanotte/);
-  assert.match((await add(null, { ...base, start_time: '13:00', end_time: '14:00', cost_center_id: center('P') })).data.error, /è un aggregato/);
-  assert.match((await add(null, { ...base, start_time: '11:00', end_time: '13:00' })).data.error, /già ore registrate il 01\/03\/2027 dalle 08:30 alle 12:00/);
+  assert.equal((await add(e, { ...base, start_time: '08:30', end_time: '12:00' })).status, 200);
+  assert.match((await add(e, { ...base, start_time: '14:00', end_time: '13:00' })).data.error, /passa la mezzanotte/);
+  assert.match((await add(e, { ...base, start_time: '13:00', end_time: '14:00', cost_center_id: center('P') })).data.error, /è un aggregato/);
+  assert.match((await add(e, { ...base, start_time: '11:00', end_time: '13:00' })).data.error, /già ore registrate il 01\/03\/2027 dalle 08:30 alle 12:00/);
   const split = { ...base, start_time: '13:00', end_time: '17:00', allocations: [{ cost_center_id: center('P101'), minutes: 150 }, { cost_center_id: center('P02'), minutes: 60 }] };
-  assert.match((await add(null, split)).data.error, /non corrisponde alla durata/);
+  assert.match((await add(e, split)).data.error, /non corrisponde alla durata/);
   split.allocations[1].minutes = 90;
-  const ok = await add(null, split);
+  const ok = await add(e, split);
   assert.equal(ok.status, 200, JSON.stringify(ok.data));
   assert.deepEqual(t.db.prepare('SELECT minutes FROM timesheet_allocations WHERE entry_id = ? ORDER BY id').all(ok.data.id).map(x => x.minutes), [150, 90]);
   await t.api('PUT', '/api/admin/hr/timesheet/settings', { granularity: 60 });
@@ -159,54 +159,58 @@ test('controlli bloccanti sulle ore: abilitazione, deroga, permesso scaduto, non
   await t.api('PUT', `/api/admin/hr/operations/${op}/trainings`, { training_type_ids: [trainingId('fitosanitari')] });
   const boss = await person('Lorena');
   const w = await person('Luca', { manager: boss.id });
-  const row = { employee_id: w.id, work_date: '2027-08-02', start_time: '07:00', end_time: '11:00', cost_center_id: center('P101'), cost_object_id: op };
-  const blocked = await add(null, row);
+  const row = { work_date: '2027-08-02', start_time: '07:00', end_time: '11:00', cost_center_id: center('P101'), cost_object_id: op };
+  const blocked = await add(w, row);
   assert.equal(blocked.status, 409);
   assert.match(blocked.data.error, /manca l'abilitazione «Certificato di abilitazione all'uso dei prodotti fitosanitari» richiesta per «Trattamento fitosanitario»/);
   const roleId = t.db.prepare("SELECT id FROM job_roles WHERE code = 'operaio_agricolo'").get().id;
   await t.api('POST', `/api/admin/hr/employees/${w.id}/contracts`, { effective_from: '2027-01-01', contract_type: 'OTI', job_role_id: roleId });
   await t.api('POST', `/api/admin/hr/employees/${w.id}/waivers`, { training_type_id: trainingId('fitosanitari'), cost_object_id: op, valid_from: '2027-07-01', valid_to: '2027-08-31', reason: 'Corso prenotato per settembre, affiancato' });
-  const ok = await add(null, row);
+  const ok = await add(w, row);
   assert.equal(ok.status, 200, JSON.stringify(ok.data));
   assert.match(ok.data.warnings.join(), /deroga del responsabile sicurezza/);
 
   await t.api('POST', `/api/admin/hr/employees/${w.id}/identity-documents`, { doc_type: 'permesso_soggiorno', number: 'PS1', expires_on: '2027-08-10' });
-  const permit = await add(null, { ...row, work_date: '2027-08-16', cost_object_id: null });
+  const permit = await add(w, { ...row, work_date: '2027-08-16', cost_object_id: null });
   assert.equal(permit.status, 409);
   assert.match(permit.data.error, /permesso di soggiorno scaduto il 2027-08-10/);
 
   const f = await person('Mirko', { manager: boss.id });
   const op2 = (await t.api('POST', '/api/admin/finance/cost-objects', { type: 'operazione', code: 'OP-TS-VASCHE', name: 'Pulizia vasche' })).data.id;
   await t.api('POST', `/api/admin/hr/employees/${f.id}/medical-visits`, { visit_type: 'periodica', visit_date: '2026-09-01', judgment: 'idoneo_prescrizioni', limitations: 'No sollevamento carichi oltre 15 kg', restricted_cost_object_ids: [op2] });
-  const lim = await add(null, { employee_id: f.id, work_date: '2027-08-03', start_time: '08:00', end_time: '10:00', cost_center_id: center('P02'), cost_object_id: op2 });
+  const lim = await add(f, { work_date: '2027-08-03', start_time: '08:00', end_time: '10:00', cost_center_id: center('P02'), cost_object_id: op2 });
   assert.equal(lim.status, 200);
   assert.match(lim.data.warnings.join(), /limitazioni incompatibili con «Pulizia vasche»/);
   assert.equal(t.db.prepare("SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND kind = 'hr.timesheet.limitations'").get(boss.userId).c, 1, 'il responsabile è avvisato');
   await t.api('POST', `/api/admin/hr/employees/${f.id}/medical-visits`, { visit_type: 'su_richiesta', visit_date: '2026-09-10', judgment: 'non_idoneo' });
-  const unfit = await add(null, { employee_id: f.id, work_date: '2027-08-04', start_time: '08:00', end_time: '10:00', cost_center_id: center('P02') });
+  const unfit = await add(f, { work_date: '2027-08-04', start_time: '08:00', end_time: '10:00', cost_center_id: center('P02') });
   assert.equal(unfit.status, 409);
   assert.match(unfit.data.error, /non è assegnabile: giudizio di non idoneità/);
 });
 
-test('squadra: il caposquadra registra per tutti; se qualcuno è bloccato non si registra nulla e si dice chi', async () => {
-  const leader = await person('Nerio');
-  const a = await emp('Aldo', 'Squadra');
-  const b = await emp('Bruno', 'Squadra');
-  const team = (await t.api('POST', '/api/admin/hr/teams', { name: 'Vendemmia 2027', leader_employee_id: leader.id, member_ids: [a, b] })).data.id;
-  const op = (await t.api('POST', '/api/admin/finance/cost-objects', { type: 'operazione', code: 'OP-TS-TRATT', name: 'Guida trattore' })).data.id;
-  await t.api('PUT', `/api/admin/hr/operations/${op}/trainings`, { training_type_ids: [trainingId('trattori')] });
-  await t.api('POST', `/api/admin/hr/employees/${a}/trainings`, { training_type_id: trainingId('trattori'), completed_on: '2026-01-10' });
-  const body = { team_id: team, work_date: '2027-09-13', start_time: '07:00', end_time: '12:00', cost_center_id: center('P101'), cost_object_id: op };
-  const refused = await leader.call('POST', '/api/admin/hr/timesheet/team', body);
-  assert.equal(refused.status, 409);
-  assert.deepEqual(refused.data.members.map(m => m.name).sort(), ['Bruno Squadra', 'Nerio Test'], "il caposquadra è nella squadra e non ha l'abilitazione");
-  assert.equal(rows(a, '2027-09-13').length, 0, 'tutto o niente');
-  const ok = await leader.call('POST', '/api/admin/hr/timesheet/team', { ...body, member_ids: [a] });
-  assert.equal(ok.status, 200, JSON.stringify(ok.data));
-  assert.equal(ok.data.ids.length, 1);
-  assert.equal(rows(a, '2027-09-13')[0].origin, 'squadra');
-  const outsider = await person('Oreste');
-  assert.equal((await outsider.call('POST', '/api/admin/hr/timesheet/team', { ...body, member_ids: [a] })).status, 403);
+test('ognuno solo le proprie ore: né il responsabile né l\'ufficio del personale scrivono nel Timesheet di altri', async () => {
+  const boss = await person('Nerio', { last: 'Capo', levels: ['personale'], workspaces: ['people'] });
+  const w = await person('Aldo', { manager: boss.id, last: 'Operaio' });
+  const body = { work_date: '2027-09-13', start_time: '07:00', end_time: '12:00' };
+  assert.equal((await boss.call('POST', '/api/admin/hr/timesheet/entries', { ...body, employee_id: w.id })).status, 403, 'il responsabile no');
+  assert.equal((await t.api('POST', '/api/admin/hr/timesheet/entries', { ...body, employee_id: w.id })).status, 403, 'la chiave master no');
+  const own = await add(w, body);
+  assert.equal(own.status, 200, JSON.stringify(own.data));
+  assert.equal((await boss.call('PATCH', `/api/admin/hr/timesheet/entries/${own.data.id}`, { end_time: '13:00' })).status, 403);
+  assert.equal((await boss.call('DELETE', `/api/admin/hr/timesheet/entries/${own.data.id}`)).status, 403);
+  assert.equal((await boss.call('POST', '/api/admin/hr/timesheet/months/submit', { employee_id: w.id, period: '2027-09' })).status, 403, 'il mese lo invia il dipendente');
+  const seen = await boss.call('GET', `/api/admin/hr/timesheet/month?employee_id=${w.id}&period=2027-09`);
+  assert.equal(seen.status, 200, 'ma lo vede');
+  assert.deepEqual([seen.data.can_edit, seen.data.can_submit], [false, false]);
+  assert.equal((await t.api('POST', '/api/admin/hr/timesheet/team', { member_ids: [w.id] })).status, 404, 'niente più ore di squadra');
+  assert.equal((await boss.call('GET', '/api/admin/hr/timesheet/options')).data.supervises, true);
+  assert.equal((await w.call('GET', '/api/admin/hr/timesheet/options')).data.supervises, false);
+  assert.equal((await w.call('GET', '/api/admin/me')).data.supervisesEmployees, false);
+  // Inviato: nemmeno chi approva lo corregge; lo rimanda indietro e corregge il dipendente.
+  assert.equal((await w.call('POST', '/api/admin/hr/timesheet/months/submit', { period: '2027-09' })).status, 200);
+  assert.match((await add(w, { ...body, work_date: '2027-09-14' })).data.error, /il responsabile lo rimanda indietro/);
+  assert.equal((await boss.call('POST', '/api/admin/hr/timesheet/months/return', { employee_id: w.id, period: '2027-09', note: 'manca il 14' })).status, 200);
+  assert.equal((await add(w, { ...body, work_date: '2027-09-14' })).status, 200);
 });
 
 test('righe proposte: prenotazioni assegnate e fiere del responsabile; si accettano o si scartano, mai da sole', async () => {
@@ -258,13 +262,13 @@ test('export per il consulente: solo mesi approvati, giornate lavorate, virgola 
 });
 
 test('un dipendente con presenze non si elimina, e nemmeno un centro con ore imputate', async () => {
-  const d = await emp('Zeno', 'Presenze');
-  await add(null, { employee_id: d, work_date: '2027-12-01', start_time: '08:00', end_time: '12:00' });
-  assert.match((await t.api('DELETE', `/api/admin/hr/employees/${d}`)).data.error, /presenze registrate/);
+  const d = await person('Zeno', { last: 'Presenze' });
+  await add(d, { work_date: '2027-12-01', start_time: '08:00', end_time: '12:00' });
+  assert.match((await t.api('DELETE', `/api/admin/hr/employees/${d.id}`)).data.error, /presenze registrate/);
   const parent = t.db.prepare("SELECT id FROM cost_centers WHERE code = 'P'").get().id;
   const c = (await t.api('POST', '/api/admin/finance/cost-centers', { code: 'P09', name: 'Centro ore', parent_id: parent, cascade_level: 3 })).data.id;
-  const e2 = await emp('Ugo', 'Centro', { cost_center_id: null });
-  await add(null, { employee_id: e2, work_date: '2027-12-02', start_time: '08:00', end_time: '12:00', cost_center_id: c });
+  const e2 = await person('Ugo', { last: 'Centro' });
+  await add(e2, { work_date: '2027-12-02', start_time: '08:00', end_time: '12:00', cost_center_id: c });
   const del = await t.api('DELETE', `/api/admin/finance/cost-centers/${c}`);
   assert.equal(del.status, 409);
   assert.match(del.data.error, /ha movimenti/);
@@ -305,7 +309,7 @@ test('promemoria: giorno di ieri scoperto al dipendente, fine mese da inviare, m
 
   t.hrTimesheet.sendReminders(new Date('2028-06-07T05:00:00Z')); // 7:00 in Italia: troppo presto
   assert.equal(notes(p.userId, 'hr.timesheet.missing-day').length, 0);
-  await add(null, { employee_id: p.id, work_date: '2028-06-06', start_time: '08:00', end_time: '12:00', hour_type: 'ordinaria', cost_center_id: center('P101') });
+  await add(p, { work_date: '2028-06-06', start_time: '08:00', end_time: '12:00', hour_type: 'ordinaria', cost_center_id: center('P101') });
   t.hrTimesheet.sendReminders(new Date('2028-06-07T08:00:00Z'));
   t.hrTimesheet.sendReminders(new Date('2028-06-07T09:00:00Z'));
   const missing = notes(p.userId, 'hr.timesheet.missing-day');
@@ -319,7 +323,7 @@ test('promemoria: giorno di ieri scoperto al dipendente, fine mese da inviare, m
   t.hrTimesheet.sendReminders(new Date('2028-06-30T14:00:00Z')); // ultimo giorno del mese, 16:00
   assert.ok(notes(p.userId, 'hr.timesheet.submit-reminder').some(n => /giugno 2028/.test(n.title)));
   await p.call('POST', '/api/admin/hr/timesheet/months/submit', { employee_id: p.id, period: '2028-07' });
-  await add(null, { employee_id: p.id, work_date: '2028-07-03', start_time: '08:00', end_time: '16:00', hour_type: 'ordinaria', cost_center_id: center('P101') }).catch(() => {});
+  await add(p, { work_date: '2028-07-03', start_time: '08:00', end_time: '16:00', hour_type: 'ordinaria', cost_center_id: center('P101') }).catch(() => {});
   const before = notes(p.userId, 'hr.timesheet.missing-day').length;
   t.hrTimesheet.sendReminders(new Date('2028-07-04T08:00:00Z'));
   assert.equal(notes(p.userId, 'hr.timesheet.missing-day').length, before, 'giorno coperto: nessun avviso');

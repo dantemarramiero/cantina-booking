@@ -6,7 +6,6 @@
 //   - mese per dipendente: aperto → inviato → approvato (chiuso); dopo, solo rettifiche tracciate;
 //   - assenze valide → righe "assenza" nella stessa transazione (ganci del modulo assenze), con conflitti;
 //   - export CSV per il consulente del lavoro; ore approvate → driver "Ore lavorate" di Finance.
-const crypto = require('crypto');
 const { HttpError, createRouter } = require('../lib/http');
 const { DATE, PERIOD, addDays, weekday } = require('../lib/calendar');
 const { romeDateTime } = require('../lib/time');
@@ -59,7 +58,9 @@ module.exports = function registerHrTimesheet(app, deps) {
   const userOfEmployee = id => (id ? db.prepare('SELECT portal_user_id FROM employees WHERE id = ?').get(id)?.portal_user_id ?? null : null);
   const notifyAll = (userIds, n) => { for (const u of new Set(userIds.filter(x => x !== undefined))) notifications.notify({ userId: u, ...n }); };
   const managerUsers = e => { const a = hr.resolveApprover(e.id)?.approver; const u = userOfEmployee(a?.id); return u ? [u] : hrFile.hrRecipients(); };
+  // Due schermate: il Timesheet personale (dove ognuno inserisce le proprie ore) e Presenze (controllo di HR e responsabili).
   const LINK = '/portal.html?workspace=people&sub=people-timesheet';
+  const LINK_REVIEW = '/portal.html?workspace=people&sub=people-presenze';
 
   // ── Impostazioni ────────────────────────────────────────────────────────────
   function tsSettings() {
@@ -95,19 +96,15 @@ module.exports = function registerHrTimesheet(app, deps) {
     audit(req, 'timesheet_settings.updated', { entity: 'hr_settings', after: tsSettings() });
     return tsSettings();
   });
-  // Centri (foglie attive) e oggetti di costo aperti da scegliere nelle righe: servono a chi inserisce ore.
-  // Squadre: tutte per l'ufficio del personale, altrimenti quelle di cui si è caposquadra.
+  // Centri (foglie attive) e oggetti di costo aperti da scegliere nelle righe: servono a chi inserisce le proprie ore.
+  // supervises: vede i fogli di altri (HR o responsabile), quindi ha la sezione Presenze.
   r.get('/timesheet/options', req => {
     const me = viewerEmployee(req);
     const all = hasAccessLevel(req, 'personale');
-    const teams = db.prepare('SELECT id, name, leader_employee_id FROM teams WHERE active = 1 ORDER BY name').all()
-      .filter(t => all || (me && t.leader_employee_id === me.id))
-      .map(t => ({ ...t, members: db.prepare(`SELECT e.id, e.first_name || ' ' || e.last_name AS name FROM team_members m JOIN employees e ON e.id = m.employee_id
-        WHERE m.team_id = ? AND e.active = 1 ORDER BY e.last_name, e.first_name`).all(t.id) }));
     return {
       centers: db.prepare(`SELECT c.id, c.code, c.name, c.cascade_level FROM cost_centers c WHERE c.active = 1 AND ${LEAF_SQL} ORDER BY c.code`).all(),
       objects: db.prepare("SELECT id, type, code, name FROM cost_objects WHERE status = 'aperto' ORDER BY type, code").all(),
-      hour_types: HOUR_TYPES, granularity: tsSettings().granularity, teams, me: me ? { id: me.id, name: fullName(me) } : null, hr: all,
+      hour_types: HOUR_TYPES, granularity: tsSettings().granularity, me: me ? { id: me.id, name: fullName(me) } : null, hr: all, supervises: supervises(req),
     };
   });
 
@@ -115,7 +112,22 @@ module.exports = function registerHrTimesheet(app, deps) {
   const monthRow = (employeeId, period) => db.prepare('SELECT * FROM timesheet_months WHERE employee_id = ? AND period = ?').get(employeeId, period) || null;
   const monthStatus = (employeeId, period) => monthRow(employeeId, period)?.status || 'aperto';
   const ensureMonth = (employeeId, period) => { db.prepare('INSERT OR IGNORE INTO timesheet_months (employee_id, period) VALUES (?, ?)').run(employeeId, period); return monthRow(employeeId, period); };
-  const canEditFor = (req, e) => hasAccessLevel(req, 'personale') || isSelf(req, e) || isManagerOf(req, e);
+  // Vedere: sé stessi, il responsabile, l'ufficio del personale. Scrivere (righe, proposte, invio del mese): solo sé stessi.
+  // L'unica eccezione è la rettifica di un mese approvato, con motivo, di chi approva o dell'ufficio del personale.
+  const canView = (req, e) => hasAccessLevel(req, 'personale') || isSelf(req, e) || isManagerOf(req, e);
+  const canWrite = (req, e) => isSelf(req, e);
+  function supervises(req) {
+    if (hasAccessLevel(req, 'personale')) return true;
+    const me = viewerEmployee(req);
+    return !!me && !!db.prepare('SELECT 1 FROM employees WHERE active = 1 AND id <> ? AND (manager_id = ? OR delegate_id = ?)').get(me.id, me.id, me.id);
+  }
+  // La propria scheda: chi scrive ore lo fa solo per sé.
+  function selfEmployee(req, b = {}) {
+    const me = viewerEmployee(req);
+    if (!me) throw new HttpError(403, 'La tua utenza non è collegata a una scheda dipendente: chiedi di collegarla in Impostazioni → Utenti.');
+    if (b.employee_id && Number(b.employee_id) !== me.id) throw new HttpError(403, 'Nel Timesheet ognuno registra solo le proprie ore.');
+    return employee(me.id);
+  }
   function canApproveMonth(req, e, m = monthRow(e.id, null)) {
     if (req.isMasterKey) return true;
     const me = viewerEmployee(req);
@@ -127,7 +139,7 @@ module.exports = function registerHrTimesheet(app, deps) {
     const p = periodOf(date);
     const m = monthRow(e.id, p);
     if (m?.status === 'approvato') throw new HttpError(409, `Il mese di ${monthLabel(p)} di ${fullName(e)} è approvato: le correzioni si fanno con una rettifica.`);
-    if (m?.status === 'inviato' && !canApproveMonth(req, e, m)) throw new HttpError(409, `Il mese di ${monthLabel(p)} di ${fullName(e)} è in approvazione: può correggerlo solo chi lo approva.`);
+    if (m?.status === 'inviato') throw new HttpError(409, `Il mese di ${monthLabel(p)} di ${fullName(e)} è in approvazione: se va corretto, il responsabile lo rimanda indietro.`);
   }
 
   // ── Righe: validazione ──────────────────────────────────────────────────────
@@ -195,7 +207,7 @@ module.exports = function registerHrTimesheet(app, deps) {
   }
   function notifyLimitations(e, warnings, entryId) {
     const hits = warnings.filter(w => w.includes('limitazioni'));
-    if (hits.length) notifyAll(managerUsers(e), { kind: 'hr.timesheet.limitations', title: `${fullName(e)}: ore su un'attività incompatibile con le limitazioni`, body: hits.join(' '), link: LINK, dedupeKey: `ts-limit:${entryId}` });
+    if (hits.length) notifyAll(managerUsers(e), { kind: 'hr.timesheet.limitations', title: `${fullName(e)}: ore su un'attività incompatibile con le limitazioni`, body: hits.join(' '), link: LINK_REVIEW, dedupeKey: `ts-limit:${entryId}` });
   }
   function insertEntry(req, e, f, extra = {}) {
     const id = Number(db.prepare(`INSERT INTO timesheet_entries (employee_id, work_date, start_time, end_time, minutes, hour_type, origin, team_id, batch_id, source_booking_id, source_fair_id,
@@ -214,8 +226,7 @@ module.exports = function registerHrTimesheet(app, deps) {
   // ── Righe: inserimento, modifica, eliminazione ──────────────────────────────
   r.post('/timesheet/entries', req => {
     const b = req.body || {};
-    const e = employee(b.employee_id || viewerEmployee(req)?.id || 0);
-    if (!canEditFor(req, e)) throw new HttpError(403, 'Puoi registrare ore solo per te o per i tuoi collaboratori.');
+    const e = selfEmployee(req, b);
     const f = entryInput(e, b);
     assertWritable(req, e, f.work_date);
     const warnings = [...clashCheck(e, f), ...safetyCheck(req, e, f)];
@@ -228,7 +239,7 @@ module.exports = function registerHrTimesheet(app, deps) {
     if (x.origin === 'assenza') throw new HttpError(409, 'Le righe di assenza si cambiano dall\'assenza.');
     if (x.voided_by_adjustment_id) throw new HttpError(409, 'Riga annullata da una rettifica.');
     const e = employee(x.employee_id);
-    if (!canEditFor(req, e)) throw new HttpError(403, 'Non puoi modificare queste ore.');
+    if (!canWrite(req, e)) throw new HttpError(403, 'Nel Timesheet ognuno modifica solo le proprie ore: un mese approvato si corregge con una rettifica, uno inviato si rimanda indietro.');
     assertWritable(req, e, x.work_date);
     const b = req.body || {};
     const current = db.prepare('SELECT cost_center_id, cost_object_id, minutes FROM timesheet_allocations WHERE entry_id = ?').all(x.id);
@@ -257,7 +268,7 @@ module.exports = function registerHrTimesheet(app, deps) {
     if (x.origin === 'assenza') throw new HttpError(409, 'Le righe di assenza si tolgono annullando l\'assenza.');
     if (x.voided_by_adjustment_id) throw new HttpError(409, 'Riga già annullata da una rettifica.');
     const e = employee(x.employee_id);
-    if (!canEditFor(req, e)) throw new HttpError(403, 'Non puoi eliminare queste ore.');
+    if (!canWrite(req, e)) throw new HttpError(403, 'Nel Timesheet ognuno elimina solo le proprie ore: un mese approvato si corregge con una rettifica, uno inviato si rimanda indietro.');
     assertWritable(req, e, x.work_date);
     events.transaction(() => {
       db.prepare('DELETE FROM timesheet_proposal_decisions WHERE entry_id = ?').run(x.id); // la proposta torna disponibile
@@ -265,44 +276,6 @@ module.exports = function registerHrTimesheet(app, deps) {
     });
     audit(req, 'timesheet.entry_deleted', { entity: 'employee', entityId: e.id, before: { entry_id: x.id, work_date: x.work_date, start_time: x.start_time, end_time: x.end_time } });
     return { success: true };
-  });
-
-  // ── Inserimento a squadra ───────────────────────────────────────────────────
-  // Il caposquadra registra ore, particella (centro) e operazione per tutti i membri in un colpo solo.
-  // Tutto o niente: se per qualcuno c'è un blocco, non si registra nulla e si dice chi e perché.
-  r.post('/timesheet/team', req => {
-    const b = req.body || {};
-    const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(b.team_id);
-    if (!team || !team.active) throw new HttpError(404, 'Squadra non trovata.');
-    const members = db.prepare(`SELECT e.* FROM team_members m JOIN employees e ON e.id = m.employee_id WHERE m.team_id = ? AND e.active = 1 ORDER BY e.last_name, e.first_name`).all(team.id);
-    const wanted = Array.isArray(b.member_ids) && b.member_ids.length ? new Set(b.member_ids.map(Number)) : null;
-    const chosen = members.filter(m => !wanted || wanted.has(m.id));
-    if (!chosen.length) throw new HttpError(400, 'Scegli almeno una persona della squadra.');
-    const me = viewerEmployee(req);
-    const allowed = hasAccessLevel(req, 'personale') || (me && team.leader_employee_id === me.id) || chosen.every(m => isManagerOf(req, m, me));
-    if (!allowed) throw new HttpError(403, 'Le ore di squadra le registra il caposquadra (o l\'ufficio del personale).');
-    const prepared = [];
-    const errors = [];
-    for (const m of chosen) {
-      try {
-        const f = entryInput(m, b);
-        assertWritable(req, m, f.work_date);
-        const warnings = [...clashCheck(m, f), ...safetyCheck(req, m, f)];
-        prepared.push({ m, f, warnings });
-      } catch (err) {
-        if (!err.status) throw err;
-        errors.push({ employee_id: m.id, name: fullName(m), error: err.message });
-      }
-    }
-    if (errors.length) throw new HttpError(409, `Nessuna ora registrata: ${errors.map(x => x.error).join(' ')}`, { members: errors });
-    const batch = crypto.randomUUID();
-    const ids = events.transaction(() => prepared.map(p => {
-      const id = insertEntry(req, p.m, p.f, { origin: 'squadra', team_id: team.id, batch_id: batch });
-      notifyLimitations(p.m, p.warnings, id);
-      return id;
-    }));
-    audit(req, 'timesheet.team_entry', { entity: 'team', entityId: team.id, after: { batch, members: chosen.map(m => m.id), work_date: b.work_date } });
-    return { success: true, ids, warnings: uniq(prepared.flatMap(p => p.warnings)) };
   });
 
   // ── Righe proposte (prenotazioni assegnate, fiere di cui si è responsabili) ──
@@ -377,8 +350,7 @@ module.exports = function registerHrTimesheet(app, deps) {
   }
   r.post('/timesheet/proposals/accept', req => {
     const b = req.body || {};
-    const e = employee(b.employee_id || viewerEmployee(req)?.id || 0);
-    if (!canEditFor(req, e)) throw new HttpError(403, 'Non puoi registrare ore per questa persona.');
+    const e = selfEmployee(req, b);
     const p = findProposal(e, b);
     const input = { ...p, ...Object.fromEntries(['start_time', 'end_time', 'hour_type', 'cost_center_id', 'cost_object_id', 'note'].filter(k => b[k] !== undefined && b[k] !== '').map(k => [k, b[k]])) };
     const f = entryInput(e, input);
@@ -397,8 +369,7 @@ module.exports = function registerHrTimesheet(app, deps) {
   });
   r.post('/timesheet/proposals/dismiss', req => {
     const b = req.body || {};
-    const e = employee(b.employee_id || viewerEmployee(req)?.id || 0);
-    if (!canEditFor(req, e)) throw new HttpError(403, 'Non puoi decidere per questa persona.');
+    const e = selfEmployee(req, b);
     const p = findProposal(e, b);
     db.prepare('INSERT INTO timesheet_proposal_decisions (employee_id, source, source_id, work_date, decision, decided_at, decided_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(e.id, p.source, p.source_id, p.work_date, 'scartata', now(), actor(req));
@@ -438,10 +409,10 @@ module.exports = function registerHrTimesheet(app, deps) {
     }
     const m = monthRow(e.id, period);
     const status = m?.status || 'aperto';
-    const editable = canEditFor(req, e) && (status === 'aperto' || (status === 'inviato' && canApproveMonth(req, e, m)));
+    const editable = canWrite(req, e) && status === 'aperto';
     return {
       employee: { id: e.id, name: fullName(e), site_id: e.site_id, cost_center_id: e.cost_center_id }, period, status, month: m, days, totals,
-      can_edit: editable, can_submit: canEditFor(req, e) && status === 'aperto', can_approve: status === 'inviato' && canApproveMonth(req, e, m),
+      can_edit: editable, can_submit: editable, can_approve: status === 'inviato' && canApproveMonth(req, e, m),
       can_adjust: status === 'approvato' && (hasAccessLevel(req, 'personale') || canApproveMonth(req, e, m)),
       proposals: editable ? proposals(e, period) : [],
       conflicts: db.prepare(`SELECT c.*, at.name AS absence_type FROM timesheet_conflicts c LEFT JOIN absences a ON a.id = c.absence_id LEFT JOIN absence_types at ON at.id = a.absence_type_id
@@ -451,7 +422,7 @@ module.exports = function registerHrTimesheet(app, deps) {
   }
   r.get('/timesheet/month', req => {
     const e = employee(req.query.employee_id || viewerEmployee(req)?.id || 0);
-    if (!canEditFor(req, e)) throw new HttpError(403, 'Non puoi vedere le presenze di questa persona.');
+    if (!canView(req, e)) throw new HttpError(403, 'Non puoi vedere le presenze di questa persona.');
     return monthView(req, e, checkPeriod(req.query.period));
   });
   // Riepilogo del mese per chi gestisce: stato, ore, giorni scoperti, conflitti, proposte.
@@ -469,7 +440,8 @@ module.exports = function registerHrTimesheet(app, deps) {
   r.post('/timesheet/conflicts/:id/resolve', req => {
     const c = db.prepare('SELECT * FROM timesheet_conflicts WHERE id = ?').get(req.params.id);
     if (!c) throw new HttpError(404, 'Conflitto non trovato.');
-    if (!canEditFor(req, employee(c.employee_id))) throw new HttpError(403, 'Non puoi gestire questo conflitto.');
+    const ce = employee(c.employee_id);
+    if (!canWrite(req, ce) && !canApproveMonth(req, ce)) throw new HttpError(403, 'Non puoi gestire questo conflitto.');
     db.prepare('UPDATE timesheet_conflicts SET resolved_at = ?, resolved_by = ? WHERE id = ?').run(now(), actor(req), c.id);
     audit(req, 'timesheet.conflict_resolved', { entity: 'employee', entityId: c.employee_id, after: { conflict_id: c.id, note: text(req.body?.note) } });
     return { success: true };
@@ -478,16 +450,15 @@ module.exports = function registerHrTimesheet(app, deps) {
   // ── Stati del mese ──────────────────────────────────────────────────────────
   r.post('/timesheet/months/submit', req => {
     const b = req.body || {};
-    const e = employee(b.employee_id || viewerEmployee(req)?.id || 0);
+    const e = selfEmployee(req, b);
     const period = checkPeriod(b.period);
-    if (!canEditFor(req, e)) throw new HttpError(403, 'Non puoi inviare questo mese.');
     const m = ensureMonth(e.id, period);
     if (m.status !== 'aperto') throw new HttpError(409, `Il mese è già ${m.status}.`);
     const approver = hrAbsences.approverFor(e.id, viewerEmployee(req)).approver;
     events.transaction(() => {
       db.prepare("UPDATE timesheet_months SET status = 'inviato', approver_employee_id = ?, submitted_at = ?, submitted_by = ?, return_note = NULL WHERE id = ?").run(approver, now(), actor(req), m.id);
       const u = userOfEmployee(approver);
-      notifyAll(u ? [u] : hrFile.hrRecipients(), { kind: 'hr.timesheet.submitted', title: `Presenze di ${monthLabel(period)} da approvare: ${fullName(e)}`, body: `Inviate da ${actor(req)}.`, link: LINK, dedupeKey: `ts-month:${m.id}:submitted:${now()}` });
+      notifyAll(u ? [u] : hrFile.hrRecipients(), { kind: 'hr.timesheet.submitted', title: `Presenze di ${monthLabel(period)} da approvare: ${fullName(e)}`, body: `Inviate da ${actor(req)}.`, link: LINK_REVIEW, dedupeKey: `ts-month:${m.id}:submitted:${now()}` });
     });
     audit(req, 'timesheet.month_submitted', { entity: 'employee', entityId: e.id, after: { period } });
     return { success: true };
@@ -605,7 +576,7 @@ module.exports = function registerHrTimesheet(app, deps) {
           db.prepare('INSERT INTO timesheet_conflicts (employee_id, work_date, absence_id, entry_id, message, created_at) VALUES (?, ?, ?, ?, ?, ?)')
             .run(e.id, d.date, a.id, w.id, `Il ${itDate(d.date)} risultano ore dalle ${w.start_time} alle ${w.end_time} ma anche ${type}.`, now());
         }
-        if (work.length) notifyAll(managerUsers(e), { kind: 'hr.timesheet.conflict', title: `${fullName(e)}: ore e ${type.toLowerCase()} lo stesso giorno`, body: `Il ${itDate(d.date)} ci sono già ore registrate: controlla le presenze.`, link: LINK, dedupeKey: `ts-conflict:${a.id}:${d.date}` });
+        if (work.length) notifyAll(managerUsers(e), { kind: 'hr.timesheet.conflict', title: `${fullName(e)}: ore e ${type.toLowerCase()} lo stesso giorno`, body: `Il ${itDate(d.date)} ci sono già ore registrate: controlla le presenze.`, link: LINK_REVIEW, dedupeKey: `ts-conflict:${a.id}:${d.date}` });
       }
     },
     revert(a) {
@@ -739,7 +710,7 @@ module.exports = function registerHrTimesheet(app, deps) {
         for (const u of managerUsers(e)) late.set(u, [...(late.get(u) || []), fullName(e)]);
         send([e.portal_user_id], { kind: 'hr.timesheet.submit-reminder', title: `Timesheet di ${monthLabel(prev)} non ancora inviato`, body: 'Controllalo e invialo al responsabile.', dedupeKey: `ts-late-self:${e.id}:${prev}` });
       }
-      for (const [u, names] of late) send([u], { kind: 'hr.timesheet.late', title: `Timesheet di ${monthLabel(prev)} non inviati: ${names.length}`, body: names.join(', '), dedupeKey: `ts-late:${u}:${prev}` });
+      for (const [u, names] of late) send([u], { kind: 'hr.timesheet.late', link: LINK_REVIEW, title: `Timesheet di ${monthLabel(prev)} non inviati: ${names.length}`, body: names.join(', '), dedupeKey: `ts-late:${u}:${prev}` });
     }
     return sent;
   }

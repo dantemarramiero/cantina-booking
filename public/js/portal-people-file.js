@@ -75,7 +75,7 @@ function renderHrRecord() {
       </div>
       ${e.active ? '' : '<span class="badge grey">Non attivo</span>'}
       ${expiredBlocking ? `<span class="badge red" title="${UI.attr(f.blocking_today.join('; '))}">Ore bloccate</span>` : ''}
-      <button class="btn-outline-pill" onclick="tsOpenFor(${e.id})">Timesheet</button>
+      <button class="btn-outline-pill" onclick="tsOpenFor(${e.id})">Presenze</button>
       <button class="btn-outline-pill" onclick="openHrEmployeeModal(${e.id})">Modifica dati</button>
     </div>
     <div class="rec-tabs">${HR_TABS.map(([k, l]) => `<button class="${REC.tab === k ? 'active' : ''}" onclick="hrSelectTab('${k}')">${l}${k === 'scadenze' && f.deadlines.length ? ` (${f.deadlines.length})` : ''}</button>`).join('')}</div>

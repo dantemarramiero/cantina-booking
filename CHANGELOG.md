@@ -274,6 +274,14 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - **San Francesco d'Assisi (4 ottobre)** di nuovo festa nazionale dal 2026, calcolata: gli anni prima non cambiano.
 - Restano a mano solo le chiusure aziendali.
 
+## 2026-09-27 — Timesheet personale
+
+**People — Timesheet personale e Presenze per il controllo** (in locale, da approvare)
+- **Timesheet**: la schermata personale di ogni utente collegato a una scheda dipendente. Si vede solo il proprio foglio; ognuno inserisce, modifica ed elimina **solo le proprie ore**, conferma le proprie proposte e invia il mese. Chi non ha una scheda vede un avviso con il rimando a Impostazioni → Utenti.
+- **People → Presenze**: per HR e responsabili (anche senza il workspace People, se si è responsabili o delegati di qualcuno). Riepilogo dei collaboratori, fogli in sola lettura, approvazione o rinvio del mese con una nota, rettifiche dei mesi approvati, export CSV.
+- Nessuno scrive più nel foglio di un altro: né il responsabile, né l'ufficio del personale, né la chiave master. Tolte le **ore di squadra**. Un mese inviato non lo corregge nemmeno chi approva: lo rimanda indietro e corregge il dipendente. Resta l'eccezione della **rettifica** di un mese approvato, con motivo obbligatorio.
+- Le notifiche per chi approva (mese da approvare, mesi non inviati, conflitti, limitazioni) aprono Presenze; quelle per il dipendente aprono il suo Timesheet.
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

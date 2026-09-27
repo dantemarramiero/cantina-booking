@@ -1016,6 +1016,9 @@
       <button data-sub="people-timesheet">
         <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nv-label">Timesheet</span>
       </button>
+      <button data-sub="people-presenze">
+        <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/><path d="m15 16 1.5 1.5L19 15"/></svg></span><span class="nv-label">Presenze</span>
+      </button>
       <button data-sub="people-richieste">
         <span class="nv-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3Z"/><path d="M8 9h8M8 12h5"/></svg></span><span class="nv-label">Richieste</span>
       </button>
@@ -1459,6 +1462,7 @@
       <div class="subpanel active" id="sub-people-dipendenti"><div id="people-dipendenti-root"></div></div>
       <div class="subpanel" id="sub-people-assenze"><div id="people-assenze-root"></div></div>
       <div class="subpanel" id="sub-people-timesheet"><div id="people-timesheet-root"></div></div>
+      <div class="subpanel" id="sub-people-presenze"><div id="people-presenze-root"></div></div>
       <div class="subpanel" id="sub-people-richieste"><div id="people-richieste-root"></div></div>
       <div class="subpanel" id="sub-people-scadenze"><div id="people-scadenze-root"></div></div>
       <div class="subpanel" id="sub-people-sicurezza"><div id="people-sicurezza-root"></div></div>
@@ -3344,7 +3348,6 @@ document.querySelectorAll('[data-workspace-nav] button[data-sub]').forEach(btn =
 
 // ── Navigazione mobile (bottom tab bar + tab di sezione, stile app social) ────
 function clickSidebarSub(sub) {
-  if (sub === 'people-presenze') sub = 'people-timesheet'; // link delle notifiche di prima del Timesheet
   const btn = document.querySelector(`.sidebar-nav button[data-sub="${sub}"]`);
   if (btn && btn.style.display !== 'none') btn.click(); // le voci nascoste (Timesheet senza People) non si aprono da un link
 }
@@ -3381,6 +3384,7 @@ function loadSubpanel(sub) {
   if (sub === 'people-scadenze') loadHrDeadlines();
   if (sub === 'people-assenze') loadHrAbsences();
   if (sub === 'people-timesheet') loadHrTimesheet();
+  if (sub === 'people-presenze') loadHrPresenze();
   if (sub === 'people-richieste') loadHrChangeRequests();
   if (sub === 'people-sicurezza') loadHrSafety();
   if (sub === 'people-sedi') loadHrConfig();
@@ -7112,12 +7116,14 @@ async function saveWarehouseNote() {
 // ── Boot ──────────────────────────────────────────────────────────────────────
 let PERMITTED_WORKSPACES = null; // null = accesso completo a tutti i workspace
 
-// Il Timesheet è di tutti: chi è collegato a una scheda dipendente ma non ha il workspace People
-// lo vede comunque, con la sola sezione Timesheet (le API delle presenze sono aperte a chi ha fatto l'accesso).
+// Il Timesheet è di tutti: chi è collegato a una scheda dipendente ma non ha il workspace People vede
+// comunque il proprio Timesheet, e Presenze se è responsabile o delegato di qualcuno (per approvare i mesi).
+// Le API delle presenze sono aperte a chi ha fatto l'accesso: chi vede e chi scrive lo controlla il server.
 function applyPeopleTimesheetOnly(me) {
   if (PERMITTED_WORKSPACES === null || PERMITTED_WORKSPACES.includes('people') || !me.employeeId) return;
   PERMITTED_WORKSPACES = [...PERMITTED_WORKSPACES, 'people'];
-  document.querySelectorAll('[data-workspace-nav="people"] button[data-sub]').forEach(b => { if (b.dataset.sub !== 'people-timesheet') b.style.display = 'none'; });
+  const keep = ['people-timesheet', ...(me.supervisesEmployees ? ['people-presenze'] : [])];
+  document.querySelectorAll('[data-workspace-nav="people"] button[data-sub]').forEach(b => { if (!keep.includes(b.dataset.sub)) b.style.display = 'none'; });
 }
 
 function applyPermissions() {

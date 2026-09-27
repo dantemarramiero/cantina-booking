@@ -434,6 +434,13 @@ Esito: **90 test, 90 superati** (14 nuovi del blocco 2C).
 
 ## 2D — Presenze (oggi «Timesheet»)
 
+> **Aggiornamento del 27/09/2026 — Timesheet personale.** Due schermate sullo stesso foglio del mese:
+> - **People → Timesheet**: il proprio foglio, per ogni utente collegato a una scheda. Si scrivono **solo le proprie ore** (`selfEmployee`: un `employee_id` diverso dal proprio → 403), si confermano le proprie proposte, si invia il mese.
+> - **People → Presenze**: controllo di HR e responsabili (`supervises` nelle opzioni, `supervisesEmployees` in `/api/admin/me` per chi non ha People). Fogli in sola lettura, approvazione, rinvio, rettifiche, export.
+> - Vedere = sé stessi, responsabile, livello *personale*; scrivere = solo sé stessi. Tolte le ore di squadra (`/timesheet/team`). Un mese inviato non lo corregge nessuno: si rimanda indietro. Unica eccezione la rettifica di un mese approvato.
+>
+> Le sezioni qui sotto su «ore di squadra» e sul responsabile che registra per i collaboratori non valgono più.
+>
 > **Aggiornamento del 25/09/2026.** La sezione si chiama **People → Timesheet** ed è l'unico punto dove si registrano le ore.
 > - La vede ogni utente collegato a una scheda dipendente, anche senza il workspace People: in quel caso il workspace People mostra solo la voce Timesheet, con il proprio foglio (`/api/admin/me` restituisce `employeeId`).
 > - Tolti i doppioni: la scheda Presenze di «Il mio spazio» (2E) e la sezione Presenze della scheda del dipendente. Nella scheda resta un pulsante «Timesheet» che apre il foglio della persona.

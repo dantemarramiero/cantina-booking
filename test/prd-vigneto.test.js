@@ -36,6 +36,14 @@ async function worker({ licensed = true, restricted = false } = {}) {
   }
   return e;
 }
+// Utenza collegata alla scheda: nel Timesheet ognuno conferma le proprie proposte.
+async function loginFor(employeeId) {
+  const username = `vigna-${++seq}`;
+  const u = await t.api('POST', '/api/admin/portal-users', { name: username, email: `${username}@x.it`, username, password: 'password-lunga', employee: { mode: 'existing', employee_id: employeeId } });
+  assert.equal(u.status, 200, JSON.stringify(u.data));
+  const token = (await t.request('POST', '/api/portal-users/login', { body: { username, password: 'password-lunga' } })).data.key;
+  return (method, p, body) => t.request(method, p, { token, body });
+}
 const sprayer = async (last = '2025-06-01') => (await t.api('POST', `${P}/equipment`, { name: `Atomizzatore ${++seq}`, type: 'irroratrice', last_inspection_date: last })).data.id;
 async function product(extra = {}) {
   const res = await t.api('POST', `${P}/phyto-products`, { commercial_name: `Prodotto ${++seq}`, registration_number: `R${1000 + seq}`, max_dose_per_ha_e4: '2', dose_unit: 'kg/ha',
@@ -276,6 +284,7 @@ test('PRD-A02 con interventi confermati nella campagna aperta la parcella non si
 test('ore: l\'intervento confermato propone la riga nelle presenze dell\'esecutore, con l\'oggetto di costo della parcella per annata', async () => {
   const p = await parcel();
   const w = await worker();
+  const as = await loginFor(w);
   const res = await t.api('POST', `${P}/interventions`, { type: 'potatura_verde', started_at: `${yesterday}T07:00`, ended_at: `${yesterday}T11:00`,
     parcels: [{ parcel_id: p.id, area_m2: 4000 }], workers: [{ employee_id: w }], confirm: true });
   assert.equal(res.status, 200, JSON.stringify(res.data));
@@ -283,14 +292,14 @@ test('ore: l\'intervento confermato propone la riga nelle presenze dell\'esecuto
   assert.equal(co.type, 'parcella');
   assert.equal(co.vintage, res.data.intervention.harvest_year);
   const period = yesterday.slice(0, 7);
-  const month = (await t.api('GET', `/api/admin/hr/timesheet/month?employee_id=${w}&period=${period}`)).data;
+  const month = (await as('GET', `/api/admin/hr/timesheet/month?period=${period}`)).data;
   const prop = month.proposals.find(x => x.source === 'intervento' && x.source_id === res.data.id);
   assert.ok(prop, JSON.stringify(month.proposals));
   assert.deepEqual([prop.start_time, prop.end_time, prop.cost_object_id], ['07:00', '11:00', co.id]);
-  const acc = await t.api('POST', '/api/admin/hr/timesheet/proposals/accept', { employee_id: w, source: 'intervento', source_id: res.data.id, work_date: yesterday });
+  const acc = await as('POST', '/api/admin/hr/timesheet/proposals/accept', { source: 'intervento', source_id: res.data.id, work_date: yesterday });
   assert.equal(acc.status, 200, JSON.stringify(acc.data));
   assert.ok(t.db.prepare('SELECT 1 FROM timesheet_intervention_links WHERE entry_id = ? AND intervention_id = ?').get(acc.data.id, res.data.id));
-  const proposals = async () => (await t.api('GET', `/api/admin/hr/timesheet/month?employee_id=${w}&period=${period}`)).data.proposals.filter(x => x.source === 'intervento');
+  const proposals = async () => (await as('GET', `/api/admin/hr/timesheet/month?period=${period}`)).data.proposals.filter(x => x.source === 'intervento');
   assert.equal((await proposals()).length, 0, 'accettata non si ripropone');
   // Stornato e rifatto: le ore sono già nelle presenze e non si propongono di nuovo.
   await t.api('POST', `${P}/interventions/${res.data.id}/reverse`, { reason: 'parcella sbagliata' });
