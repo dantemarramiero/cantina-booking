@@ -375,3 +375,64 @@ test('promemoria: non prima dell\'assunzione, non dopo la cessazione, non con un
   t.hrTimesheet.sendReminders(new Date('2028-09-07T08:00:00Z'));
   assert.equal(count(nuovo.userId), 1, 'dal primo giorno di servizio sì');
 });
+
+test('giorno intero: più fasce in un colpo solo, tutto o niente; aggiorna, crea e toglie; Riapri; recenti e gruppi', async () => {
+  const boss = await person('Ada', { last: 'Capo' });
+  const w = await person('Bea', { manager: boss.id, last: 'Fasce' });
+  const day = (work_date, slots) => w.call('PUT', '/api/admin/hr/timesheet/day', { work_date, slots });
+  const date = '2029-02-05';
+  let r = await day(date, [{ start_time: '08:00', end_time: '12:00', cost_center_id: center('P101') }, { start_time: '13:00', end_time: '17:00', cost_center_id: center('P02') }]);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(rows(w.id, date).length, 2);
+  const [morning] = rows(w.id, date);
+  r = await day(date, [{ start_time: '08:00', end_time: '12:00', cost_center_id: center('P101') }, { start_time: '11:00', end_time: '14:00', cost_center_id: center('P02') }]);
+  assert.equal(r.status, 409);
+  assert.match(r.data.error, /La fascia 2 si sovrappone alla fascia 1/);
+  assert.equal(rows(w.id, date).length, 2, 'tutto o niente');
+  r = await day(date, [{ start_time: '08:00', end_time: '12:00' }]);
+  assert.equal(r.status, 400, 'senza centro di costo');
+  assert.match(r.data.error, /^Fascia 1: /);
+  r = await day(date, [{ id: morning.id, start_time: '07:00', end_time: '12:00', cost_center_id: center('P03') }, { start_time: '14:00', end_time: '16:00', hour_type: 'straordinaria', cost_center_id: center('P101') }]);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const now = rows(w.id, date);
+  assert.deepEqual(now.map(x => [x.start_time, x.end_time, x.hour_type]), [['07:00', '12:00', 'ordinaria'], ['14:00', '16:00', 'straordinaria']]);
+  assert.equal(now[0].id, morning.id, 'la fascia con id aggiorna la riga');
+  assert.equal(t.db.prepare('SELECT c.code FROM timesheet_allocations a JOIN cost_centers c ON c.id = a.cost_center_id WHERE a.entry_id = ?').get(morning.id).code, 'P03');
+  assert.equal((await boss.call('PUT', '/api/admin/hr/timesheet/day', { employee_id: w.id, work_date: date, slots: [] })).status, 403, 'solo le proprie ore');
+
+  const opts = (await w.call('GET', '/api/admin/hr/timesheet/options')).data;
+  const p101 = opts.centers.find(c => c.code === 'P101'), p02 = opts.centers.find(c => c.code === 'P02');
+  assert.equal(p101.group_name, 'Vigneto');
+  assert.equal(p101.group_color, '#4a6b3c', 'vigneti verdi');
+  assert.equal(p02.group_name, 'Produttivi');
+  const month = (await w.call('GET', '/api/admin/hr/timesheet/month?period=2029-02')).data;
+  assert.deepEqual(month.recent.slice(0, 2).map(x => x.cost_center_id).sort(), [center('P03'), center('P101')].sort(), 'centri usati di recente');
+
+  assert.equal((await w.call('POST', '/api/admin/hr/timesheet/months/withdraw', { period: '2029-02' })).status, 409, 'non inviato');
+  assert.equal((await w.call('POST', '/api/admin/hr/timesheet/months/submit', { period: '2029-02' })).status, 200);
+  assert.equal((await day(date, [])).status, 409, 'inviato: sola lettura');
+  assert.equal((await w.call('POST', '/api/admin/hr/timesheet/months/withdraw', { period: '2029-02' })).status, 200);
+  assert.ok(t.db.prepare("SELECT 1 FROM notifications WHERE user_id = ? AND kind = 'hr.timesheet.withdrawn'").get(boss.userId), 'chi approva è avvisato');
+  r = await day(date, []);
+  assert.equal(r.status, 200, 'riaperto: si corregge');
+  assert.equal(rows(w.id, date).length, 0, 'le righe non più presenti si tolgono');
+  assert.equal((await w.call('POST', '/api/admin/hr/timesheet/months/submit', { period: '2029-02' })).status, 200);
+  assert.equal((await boss.call('POST', '/api/admin/hr/timesheet/months/approve', { employee_id: w.id, period: '2029-02' })).status, 200);
+  assert.match((await w.call('POST', '/api/admin/hr/timesheet/months/withdraw', { period: '2029-02' })).data.error, /già approvato/);
+});
+
+test('assenze: la richiesta porta il responsabile a «Richieste del team», la decisione il dipendente a «Ferie e permessi»', async () => {
+  const boss = await person('Ciro', { last: 'Capo' });
+  const w = await person('Dora', { manager: boss.id, last: 'Ferie' });
+  await t.api('PUT', `/api/admin/hr/employees/${w.id}/allowances`, { counter: 'ferie', year: 2029, annual: '26', accrual: 'annuale' });
+  const req = await w.call('POST', '/api/admin/hr/absences', { absence_type_id: typeId('ferie'), start_date: '2029-03-05', end_date: '2029-03-06' });
+  assert.equal(req.status, 200, JSON.stringify(req.data));
+  const asked = t.db.prepare("SELECT link FROM notifications WHERE user_id = ? AND kind = 'hr.absence.requested' ORDER BY id DESC").get(boss.userId);
+  assert.equal(asked.link, '/portal.html?workspace=people&sub=people-timesheet&tab=team');
+  assert.equal((await boss.call('POST', `/api/admin/hr/absences/${req.data.id}/reject`, { note: 'Vendemmia' })).status, 200);
+  const decided = t.db.prepare("SELECT link FROM notifications WHERE user_id = ? AND kind = 'hr.absence.decided' ORDER BY id DESC").get(w.userId);
+  assert.equal(decided.link, '/portal.html?workspace=people&sub=people-timesheet&tab=ferie');
+  const listed = (await boss.call('GET', `/api/admin/hr/absences?employee_id=${w.id}`)).data[0];
+  assert.equal(listed.decision_note, 'Vendemmia');
+  assert.ok('employee_job_title' in listed);
+});

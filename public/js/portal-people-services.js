@@ -29,11 +29,11 @@ async function loadMySpace() {
     return;
   }
   const d = ME.data;
-  const tabs = [['dati', 'I miei dati'], ['documenti', 'Documenti'], ['assenze', 'Ferie e permessi'], ['dotazioni', 'Dotazioni']];
+  const tabs = [['dati', 'I miei dati'], ['documenti', 'Documenti'], ['dotazioni', 'Dotazioni']];
   if (!tabs.some(([k]) => k === ME.tab)) ME.tab = 'dati';
   root.innerHTML = `<div class="list-card">
     <div class="rec-head"><div class="rec-avatar">${esc(d.employee.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}</div>
-      <div style="flex:1"><div class="rec-name">${esc(d.employee.name)}</div><div class="rec-sub">Il tuo fascicolo, i tuoi documenti e le tue ferie. Le ore si registrano in <a href="#" onclick="tsOpenFor(ME.data.employee.id); return false">People → Timesheet</a>.</div></div></div>
+      <div style="flex:1"><div class="rec-name">${esc(d.employee.name)}</div><div class="rec-sub">Il tuo fascicolo, i tuoi documenti e le tue dotazioni. Ore, ferie e permessi sono nel tuo <a href="#" onclick="tsOpenFor(ME.data.employee.id, null, 'ore'); return false">Timesheet</a> (<a href="#" onclick="tsOpenFor(ME.data.employee.id, null, 'ferie'); return false">ferie e permessi</a>).</div></div></div>
     <div class="rec-tabs">${tabs.map(([k, l]) => `<button class="${ME.tab === k ? 'active' : ''}" onclick="ME.tab='${k}'; loadMySpace()">${l}</button>`).join('')}</div>
     <div class="mod-body" id="me-body"></div>
   </div>`;
@@ -44,16 +44,6 @@ async function loadMySpace() {
       <a class="btn secondary small" href="${UI.attr(x.download_url)}">Scarica</a></div>`).join('') : '<div class="mod-empty">Nessun documento per ora.</div>';
   if (ME.tab === 'dotazioni') body.innerHTML = d.assets.map(a => `<div class="dl-item" style="${a.returned_on ? 'opacity:.55' : ''}"><div class="mod-row-main"><div class="mod-row-title">${esc(a.description)}</div>
       <div class="mod-row-sub">${esc(SVC_ASSETS[a.kind])} · consegnata il ${UI.date(a.delivered_on)}${a.returned_on ? ` · restituita il ${UI.date(a.returned_on)}` : ''}</div></div></div>`).join('') || '<div class="mod-empty">Nessuna dotazione.</div>';
-  if (ME.tab === 'assenze') {
-    const [bal, list] = await Promise.all([api('/api/admin/hr/absences/balances'), api(`/api/admin/hr/absences?employee_id=${d.employee.id}`)]);
-    body.innerHTML = `<div class="mod-section-title">Saldi ${bal.year}</div>
-      ${bal.balances.filter(b => b.annual || b.opening || b.taken || b.planned).map(b => `<div class="dl-item"><div class="mod-row-main"><div class="mod-row-title">${esc(ABS_COUNTERS[b.counter])}: ${absAmount(b.remaining, b.unit)} residui</div>
-        <div class="mod-row-sub">goduti ${absAmount(b.taken, b.unit)} · pianificati ${absAmount(b.planned, b.unit)}${b.pending ? ` · in attesa ${absAmount(b.pending, b.unit)}` : ''}</div></div></div>`).join('') || '<p class="mod-note">Nessuna spettanza impostata.</p>'}
-      ${bal.arrears.length ? `<div class="mod-warn" style="margin-top:10px">Ferie arretrate: ${bal.arrears.map(v => `${v.year} — ${absAmount(v.amount, 'giorni')} entro il ${UI.date(v.due_date)}`).join('; ')}.</div>` : ''}
-      <div class="mod-section-title" style="margin-top:22px">Le mie richieste</div>
-      <div class="list-card" style="margin:0;box-shadow:none">${list.map(a => absRow(a, { withName: false })).join('') || '<div class="mod-empty">Nessuna assenza.</div>'}</div>
-      <button class="btn small" style="margin-top:10px" onclick="openAbsenceModal(ME.data.employee.id)">+ Chiedi ferie o permesso</button>`;
-  }
 }
 function meTabData(d) {
   const p = d.file.personal?.data || {};

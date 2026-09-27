@@ -247,7 +247,8 @@ function openHrContractModal() {
       </div>
       <div class="field-row">
         <div class="field"><label>Mansione</label><select name="job_role_id">${UI.options(REC.jobRoles.filter(j => j.active), prev.job_role_id, { empty: '— Nessuna —' })}</select></div>
-        <div class="field"><label>CCNL</label><input name="ccnl" value="${UI.attr(prev.ccnl)}" placeholder="es. Operai agricoli e florovivaisti"></div>
+        <div class="field"><label>CCNL</label><input name="ccnl" list="hr-ccnl-list" value="${UI.attr(prev.ccnl)}" placeholder="es. Operai agricoli e florovivaisti">
+          <datalist id="hr-ccnl-list"><option value="Agricoltura — operai agricoli e florovivaisti"><option value="Agricoltura — impiegati e quadri"><option value="Commercio e terziario"></datalist></div>
       </div>
       <div class="field-row">
         <div class="field"><label>Livello</label><input name="level" value="${UI.attr(prev.level)}"></div>

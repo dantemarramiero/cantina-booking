@@ -60,7 +60,7 @@ module.exports = function registerHrTimesheet(app, deps) {
   const managerUsers = e => { const a = hr.resolveApprover(e.id)?.approver; const u = userOfEmployee(a?.id); return u ? [u] : hrFile.hrRecipients(); };
   // Due schermate: il Timesheet personale (dove ognuno inserisce le proprie ore) e Presenze (controllo di HR e responsabili).
   const LINK = '/portal.html?workspace=people&sub=people-timesheet';
-  const LINK_REVIEW = '/portal.html?workspace=people&sub=people-presenze';
+  const LINK_REVIEW = '/portal.html?workspace=people&sub=people-timesheet&tab=team&seg=presenze';
 
   // ── Impostazioni ────────────────────────────────────────────────────────────
   function tsSettings() {
@@ -96,13 +96,28 @@ module.exports = function registerHrTimesheet(app, deps) {
     audit(req, 'timesheet_settings.updated', { entity: 'hr_settings', after: tsSettings() });
     return tsSettings();
   });
+  // Gruppo di un centro foglia = il suo aggregato padre (Vigneto, Produttivi, Commerciali…), con un colore
+  // della palette MyWinery scelto dal nome (vigneti verde, cantina bordeaux, accoglienza rosa, amministrazione grigio).
+  const GROUP_COLORS = [[/vign|agric|campagna/i, '#4a6b3c'], [/produtt|cantin|vinific|affin|imbott/i, '#5c1a24'], [/commerc|enotur|accogl|vendit|marketing/i, '#c98a86'],
+    [/general|ammin|direz|uffic/i, '#6b6157'], [/ausil|manut|magazz|serviz/i, '#a5623a']];
+  const PALETTE = ['#4a6b3c', '#5c1a24', '#c98a86', '#6b6157', '#a5623a', '#8a7a3c', '#3c5a6b'];
+  function centerGroups(centers) {
+    const all = new Map(db.prepare('SELECT id, code, name, parent_id FROM cost_centers').all().map(c => [c.id, c]));
+    const used = new Map();
+    return centers.map(c => {
+      const g = (c.parent_id && all.get(c.parent_id)) || all.get(c.id);
+      if (!used.has(g.id)) used.set(g.id, (GROUP_COLORS.find(([re]) => re.test(g.name)) || [null, PALETTE[used.size % PALETTE.length]])[1]);
+      return { ...c, group_id: g.id, group_name: g.name, group_color: used.get(g.id) };
+    });
+  }
+
   // Centri (foglie attive) e oggetti di costo aperti da scegliere nelle righe: servono a chi inserisce le proprie ore.
   // supervises: vede i fogli di altri (HR o responsabile), quindi ha la sezione Presenze.
   r.get('/timesheet/options', req => {
     const me = viewerEmployee(req);
     const all = hasAccessLevel(req, 'personale');
     return {
-      centers: db.prepare(`SELECT c.id, c.code, c.name, c.cascade_level FROM cost_centers c WHERE c.active = 1 AND ${LEAF_SQL} ORDER BY c.code`).all(),
+      centers: centerGroups(db.prepare(`SELECT c.id, c.code, c.name, c.cascade_level, c.parent_id FROM cost_centers c WHERE c.active = 1 AND ${LEAF_SQL} ORDER BY c.code`).all()),
       objects: db.prepare("SELECT id, type, code, name FROM cost_objects WHERE status = 'aperto' ORDER BY type, code").all(),
       hour_types: HOUR_TYPES, granularity: tsSettings().granularity, me: me ? { id: me.id, name: fullName(me) } : null, hr: all, supervises: supervises(req),
     };
@@ -233,6 +248,56 @@ module.exports = function registerHrTimesheet(app, deps) {
     const id = events.transaction(() => { const eid = insertEntry(req, e, f, { origin: 'manuale' }); notifyLimitations(e, warnings, eid); return eid; });
     audit(req, 'timesheet.entry_added', { entity: 'employee', entityId: e.id, after: { entry_id: id, work_date: f.work_date, minutes: f.minutes } });
     return { success: true, id, warnings };
+  });
+  // Le ore di un giorno in un colpo solo, come le vede l'editor: più fasce, ognuna su un centro (e un'attività).
+  // Le fasce con id aggiornano la riga, quelle senza la creano, le righe del giorno non più presenti si tolgono
+  // (le assenze e le righe annullate non si toccano). Tutto o niente: se una fascia non va, non cambia nulla.
+  r.put('/timesheet/day', req => {
+    const b = req.body || {};
+    const e = selfEmployee(req, b);
+    const date = checkDate(b.work_date, 'la data', true);
+    assertWritable(req, e, date);
+    const slots = Array.isArray(b.slots) ? b.slots : [];
+    const current = dayRows(e.id, date).filter(x => x.origin !== 'assenza');
+    const byId = new Map(current.map(x => [x.id, x]));
+    const inputs = slots.map((sl, i) => {
+      const id = sl.id ? Number(sl.id) : null;
+      if (id && !byId.has(id)) throw new HttpError(404, `La fascia ${i + 1} non è più tra le ore del giorno: ricarica la pagina.`);
+      // unchanged: la riga resta com'è (per esempio una vecchia riga ripartita su più centri); conta solo per le sovrapposizioni.
+      if (id && sl.unchanged) { const x = byId.get(id); return { id, unchanged: true, f: { start_time: x.start_time, end_time: x.end_time, minutes: x.minutes, hour_type: x.hour_type, allocations: [] } }; }
+      try {
+        if (!intOrNull(sl.cost_center_id)) throw new HttpError(400, 'scegli un centro di costo.'); // nell'editor il centro è obbligatorio, niente predefinito
+        return { id, f: entryInput(e, { ...sl, work_date: date, allocations: undefined }) };
+      }
+      catch (err) { if (err.status) err.message = `Fascia ${i + 1}: ${err.message}`; throw err; }
+    });
+    inputs.forEach((a, i) => inputs.forEach((o, j) => {
+      if (j > i && toMin(a.f.start_time) < toMin(o.f.end_time) && toMin(o.f.start_time) < toMin(a.f.end_time)) throw new HttpError(409, `La fascia ${j + 1} si sovrappone alla fascia ${i + 1}.`);
+    }));
+    const others = new Set(current.map(x => x.id));
+    const warnings = [];
+    for (const x of inputs) { if (x.unchanged) { x.w = []; continue; } clashCheck(e, { ...x.f, work_date: date, hour_type: 'x' }, others); x.w = safetyCheck(req, e, x.f); warnings.push(...x.w); }
+    const planned = scheduledMinutes(e, date), total = inputs.filter(x => x.f.hour_type === 'ordinaria').reduce((t, x) => t + x.f.minutes, 0);
+    if (total > planned) warnings.push(`Il ${itDate(date)} le ore ordinarie sono ${hours(total)} h contro ${hours(planned)} h di orario: se è straordinario, indicalo come tipo d'ora.`);
+    const keep = new Set(inputs.map(x => x.id).filter(Boolean));
+    const ids = events.transaction(() => {
+      for (const x of current.filter(r => !keep.has(r.id))) {
+        db.prepare('DELETE FROM timesheet_proposal_decisions WHERE entry_id = ?').run(x.id); // la proposta torna disponibile
+        db.prepare('DELETE FROM timesheet_entries WHERE id = ?').run(x.id);
+      }
+      return inputs.map(({ id, f, w, unchanged }) => {
+        if (unchanged) return id;
+        if (!id) { const nid = insertEntry(req, e, f, { origin: 'manuale' }); notifyLimitations(e, w, nid); return nid; }
+        db.prepare('UPDATE timesheet_entries SET start_time = ?, end_time = ?, minutes = ?, hour_type = ?, note = ?, updated_at = ? WHERE id = ?').run(f.start_time, f.end_time, f.minutes, f.hour_type, f.note, now(), id);
+        db.prepare('DELETE FROM timesheet_allocations WHERE entry_id = ?').run(id);
+        const ins = db.prepare('INSERT INTO timesheet_allocations (entry_id, cost_center_id, cost_object_id, minutes) VALUES (?, ?, ?, ?)');
+        for (const a of f.allocations) ins.run(id, a.cost_center_id, a.cost_object_id, a.minutes);
+        notifyLimitations(e, w, id);
+        return id;
+      });
+    });
+    audit(req, 'timesheet.day_saved', { entity: 'employee', entityId: e.id, after: { work_date: date, entries: ids, minutes: inputs.reduce((t, x) => t + x.f.minutes, 0) } });
+    return { success: true, ids, warnings: uniq(warnings) };
   });
   r.patch('/timesheet/entries/:id', req => {
     const x = entry(req.params.id);
@@ -415,6 +480,8 @@ module.exports = function registerHrTimesheet(app, deps) {
       can_edit: editable, can_submit: editable, can_approve: status === 'inviato' && canApproveMonth(req, e, m),
       can_adjust: status === 'approvato' && (hasAccessLevel(req, 'personale') || canApproveMonth(req, e, m)),
       proposals: editable ? proposals(e, period) : [],
+      recent: editable ? db.prepare(`SELECT al.cost_center_id, al.cost_object_id, MAX(t.work_date || t.start_time) AS last FROM timesheet_allocations al JOIN timesheet_entries t ON t.id = al.entry_id
+        JOIN cost_centers c ON c.id = al.cost_center_id AND c.active = 1 WHERE t.employee_id = ? AND t.voided_by_adjustment_id IS NULL GROUP BY al.cost_center_id, al.cost_object_id ORDER BY last DESC LIMIT 4`).all(e.id) : [],
       conflicts: db.prepare(`SELECT c.*, at.name AS absence_type FROM timesheet_conflicts c LEFT JOIN absences a ON a.id = c.absence_id LEFT JOIN absence_types at ON at.id = a.absence_type_id
         WHERE c.employee_id = ? AND c.work_date BETWEEN ? AND ? AND c.resolved_at IS NULL ORDER BY c.work_date`).all(e.id, first, last),
       adjustments: db.prepare('SELECT * FROM timesheet_adjustments WHERE employee_id = ? AND period = ? ORDER BY id').all(e.id, period),
@@ -461,6 +528,21 @@ module.exports = function registerHrTimesheet(app, deps) {
       notifyAll(u ? [u] : hrFile.hrRecipients(), { kind: 'hr.timesheet.submitted', title: `Presenze di ${monthLabel(period)} da approvare: ${fullName(e)}`, body: `Inviate da ${actor(req)}.`, link: LINK_REVIEW, dedupeKey: `ts-month:${m.id}:submitted:${now()}` });
     });
     audit(req, 'timesheet.month_submitted', { entity: 'employee', entityId: e.id, after: { period } });
+    return { success: true };
+  });
+  // Riapri: chi ha inviato il mese lo ritira, finché non è approvato; chi doveva approvarlo è avvisato.
+  r.post('/timesheet/months/withdraw', req => {
+    const b = req.body || {};
+    const e = selfEmployee(req, b);
+    const period = checkPeriod(b.period);
+    const m = monthRow(e.id, period);
+    if (m?.status !== 'inviato') throw new HttpError(409, m?.status === 'approvato' ? 'Il mese è già approvato: le correzioni si fanno con una rettifica.' : 'Il mese non è stato inviato.');
+    events.transaction(() => {
+      db.prepare("UPDATE timesheet_months SET status = 'aperto', submitted_at = NULL, submitted_by = NULL WHERE id = ?").run(m.id);
+      const u = userOfEmployee(m.approver_employee_id);
+      notifyAll(u ? [u] : hrFile.hrRecipients(), { kind: 'hr.timesheet.withdrawn', title: `${fullName(e)} ha riaperto il Timesheet di ${monthLabel(period)}`, body: 'Lo invierà di nuovo quando è completo.', link: LINK_REVIEW, dedupeKey: `ts-month:${m.id}:withdrawn:${now()}` });
+    });
+    audit(req, 'timesheet.month_withdrawn', { entity: 'employee', entityId: e.id, after: { period } });
     return { success: true };
   });
   r.post('/timesheet/months/approve', req => {

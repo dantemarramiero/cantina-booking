@@ -5298,6 +5298,7 @@ const hrFile = require('./modules/hr-file')(app, { db, authAdmin, audit, events,
 const hrSafety = require('./modules/hr-safety')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile });
 const hrAbsences = require('./modules/hr-absences')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety });
 const hrTimesheet = require('./modules/hr-timesheet')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety, hrAbsences, finance });
+const hrJustifications = require('./modules/hr-justifications')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, hrFile, secureStore });
 const hrServices = require('./modules/hr-services')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety, hrTimesheet, secureStore });
 
 // ── Magazzino valorizzato (Fase 3) ────────────────────────────────────────────
@@ -5336,4 +5337,4 @@ if (require.main === module) {
   scheduler.start();
 }
 
-module.exports = { app, db, authz, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, hrTimesheet, hrServices, stock, prd, secureStore };
+module.exports = { app, db, authz, events, scheduler, sessions, signer, notifications, audit, finance, hr, hrFile, hrSafety, hrAbsences, hrTimesheet, hrJustifications, hrServices, stock, prd, secureStore };

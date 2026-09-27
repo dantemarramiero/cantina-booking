@@ -303,6 +303,27 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - Nessuno scrive più nel foglio di un altro: né il responsabile, né l'ufficio del personale, né la chiave master. Tolte le **ore di squadra**. Un mese inviato non lo corregge nemmeno chi approva: lo rimanda indietro e corregge il dipendente. Resta l'eccezione della **rettifica** di un mese approvato, con motivo obbligatorio.
 - Le notifiche per chi approva (mese da approvare, mesi non inviati, conflitti, limitazioni) aprono Presenze; quelle per il dipendente aprono il suo Timesheet.
 
+**People — Timesheet sul design MyWinery** (handoff «Timesheet, centri di costo, ferie e permessi»; in locale, da approvare)
+- **Le mie ore:** riepilogo del mese (ore previste, registrate, differenza, «Da completare» che filtra i giorni), giorni per settimana in vista sintetica o dettagliata, righe espandibili, ore per centro di costo con i colori del gruppo (l'aggregato padre del centro: Vigneto, Produttivi, Commerciali…).
+- **Editor del giorno** in un pannello laterale: più fasce orarie al giorno, ognuna su un centro (obbligatorio) e un'attività o lotto; centri recenti, «Giornata tipo», «Copia ultimo giorno», «Salva e avanti». Il giorno si salva tutto insieme (`PUT /timesheet/day`), tutto o niente. Sostituisce «Dividi su più centri».
+- **Invio** con avviso se ci sono giorni incompleti; **Riapri** ritira l'invio finché il mese non è approvato (chi approva è avvisato).
+- **Ferie e permessi** (scheda del Timesheet): saldi disponibili, nuova richiesta (Ferie, Permesso = ROL, Malattia con protocollo, Altro per gli altri tipi), le proprie richieste con motivo del rifiuto e annullamento.
+- **Richieste del team** (responsabili, delegati, ufficio del personale): calendario delle assenze delle prossime 4 settimane, avviso di sovrapposizione, approva, rifiuta con motivo, presa visione delle comunicazioni. Le notifiche delle assenze portano qui (o alla scheda Ferie e permessi del dipendente).
+- **Tolte le sovrapposizioni:** la scheda «Ferie e permessi» di Il mio spazio e la vista «Da decidere» di People → Assenze (che resta il registro: elenco e contatori). Le assenze non si inseriscono come fasce nel Timesheet: entrano solo da una richiesta approvata o comunicata.
+
+**People — Giustificativi delle assenze** (handoff «Giustificativi»; in locale, da approvare)
+- Il «motivo» è il tipo di assenza: i tipi hanno una categoria (Ferie, Permesso, Malattia, Congedo: i pulsanti della richiesta) e il giustificativo richiesto (documento, entro quanti giorni dalla fine, file o numero di protocollo, autocertificazione, suggerimento), configurabili in People → Configurazione. Aggiunti i tipi che mancavano: visita medica, diritto allo studio, testimonianza, malattia del figlio, seggio elettorale (migrazione 0040).
+- **Timesheet → Giustificativi:** elenco con scadenze (da caricare, in verifica, accettati), caricamento di PDF/JPG/PNG/HEIC (max 10 MB, fino a 5), numero di protocollo per la malattia, autocertificazione con modulo precompilato (DPR 445/2000), guida «Quali documenti servono». Le richieste mostrano lo stato del giustificativo.
+- **People → Assenze → Giustificativi:** l'ufficio personale accetta o chiede di ricaricare con un motivo; il dipendente è avvisato.
+- **Privacy:** i file vanno nell'archivio HR cifrato; quelli sanitari solo a chi ha il livello «sanitario» (non il responsabile), con registro degli accessi. Ricaricando, i file precedenti si cancellano. Niente diagnosi (Garante, linee guida lavoratori e provvedimento del 30/01/2025).
+- **Promemoria** due giorni prima, il giorno della scadenza e il giorno dopo; i mancanti sono nello scadenzario HR.
+
+**People — Menu più pulito e conteggio ferie** (in locale, da approvare)
+- Assenze, Presenze e Richieste non sono più voci del menu: sono sezioni del Timesheet (Richieste del team → Assenze, Presenze, Modifiche dati; Registro → elenco, giustificativi, contatori).
+- **Spettanze standard per contratto** (People → Configurazione): agricoltura (OTI 26 giorni; OTD e stagionali 0, ferie in retribuzione; impiegati e quadri 26) e commercio (26 giorni, 72 h ROL, 32 h ex festività). Si applicano da sole ogni anno secondo CCNL e tipo di contratto; la spettanza della persona resta come eccezione. Valori da verificare con il consulente.
+- **Ratei** a fine mese nei mesi con almeno 15 giorni di servizio, da assunzione a cessazione; ROL ed ex festività in proporzione al part-time.
+- **Alla registrazione**: nuovo assunto (spettanze standard) o già in forza (residuo dell'ultimo cedolino). **Allinea al cedolino** nella scheda del dipendente; chi era in forza prima e non ha ancora il residuo è segnalato «da allineare».
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

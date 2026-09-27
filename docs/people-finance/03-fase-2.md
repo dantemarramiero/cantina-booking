@@ -434,6 +434,8 @@ Esito: **90 test, 90 superati** (14 nuovi del blocco 2C).
 
 ## 2D — Presenze (oggi «Timesheet»)
 
+> **Aggiornamento del 27/09/2026 — design MyWinery del Timesheet.** Il Timesheet ha tre schede: **Le mie ore** (giorni per settimana, editor del giorno a più fasce, ore per centro di costo), **Ferie e permessi** (le proprie richieste, dal modulo Assenze) e **Richieste del team** (decisioni sulle assenze per chi le approva). API nuove: `PUT /timesheet/day` (le fasce di un giorno, tutto o niente; il centro è obbligatorio; `unchanged` lascia com'è una vecchia riga ripartita), `POST /timesheet/months/withdraw` («Riapri»), `recent` nel foglio del mese, gruppo e colore dei centri nelle opzioni. Le notifiche delle assenze portano a `sub=people-timesheet&tab=team` (chi decide) o `&tab=ferie` (il dipendente). Tolte: la scheda Ferie e permessi di Il mio spazio e la vista «Da decidere» di People → Assenze. Nel Timesheet le assenze non si inseriscono come fasce.
+>
 > **Aggiornamento del 27/09/2026 — Timesheet personale.** Due schermate sullo stesso foglio del mese:
 > - **People → Timesheet**: il proprio foglio, per ogni utente collegato a una scheda. Si scrivono **solo le proprie ore** (`selfEmployee`: un `employee_id` diverso dal proprio → 403), si confermano le proprie proposte, si invia il mese.
 > - **People → Presenze**: controllo di HR e responsabili (`supervises` nelle opzioni, `supervisesEmployees` in `/api/admin/me` per chi non ha People). Fogli in sola lettura, approvazione, rinvio, rettifiche, export.
