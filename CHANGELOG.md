@@ -303,6 +303,10 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - **Ratei** a fine mese nei mesi con almeno 15 giorni di servizio, da assunzione a cessazione; ROL ed ex festività in proporzione al part-time.
 - **Alla registrazione**: nuovo assunto (spettanze standard) o già in forza (residuo dell'ultimo cedolino). **Allinea al cedolino** nella scheda del dipendente; chi era in forza prima e non ha ancora il residuo è segnalato «da allineare».
 
+**People — Orario con la pausa e straordinari da approvare** (in locale, da approvare)
+- **Orario a fasce:** nella scheda del dipendente HR scrive per ogni giorno le ore («8») o le fasce con la pausa («8-12, 13-17»). Il Timesheet propone quell'orario in «Giornata tipo»; una fascia che copre la pausa si divide da sola al salvataggio (salvo «ho lavorato anche in pausa»). Avviso per le fasce oltre 6 ore senza pausa (D.Lgs. 66/2003).
+- **Straordinari:** ogni ora segnata come straordinario resta «da approvare» ed è in evidenza nel foglio; il responsabile la approva o la rifiuta con un motivo in Richieste del team → Straordinari (notifica diretta). Finché non è approvata non conta nel mese, nell'export per il consulente e per Finance; il mese non si approva con straordinari in sospeso. Quelli già registrati restano approvati (migrazione 0042).
+
 ## Come continuare questo changelog
 
 Ad ogni nuova funzionalità o modifica rilevante, aggiungi una voce sotto la data corrente (nuova sezione `## AAAA-MM-GG — Titolo breve` se è un giorno nuovo). Tienilo breve: cosa è cambiato e perché, non il dettaglio implementativo (quello lo racconta git).

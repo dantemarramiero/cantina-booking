@@ -61,6 +61,7 @@ module.exports = function registerHrTimesheet(app, deps) {
   // Due schermate: il Timesheet personale (dove ognuno inserisce le proprie ore) e Presenze (controllo di HR e responsabili).
   const LINK = '/portal.html?workspace=people&sub=people-timesheet';
   const LINK_REVIEW = '/portal.html?workspace=people&sub=people-timesheet&tab=team&seg=presenze';
+  const LINK_OVERTIME = '/portal.html?workspace=people&sub=people-timesheet&tab=team&seg=straordinari';
 
   // ── Impostazioni ────────────────────────────────────────────────────────────
   function tsSettings() {
@@ -163,6 +164,29 @@ module.exports = function registerHrTimesheet(app, deps) {
     const s = hr.currentSchedule(e.id, date);
     return s ? s.days[weekday(date)] || 0 : weekday(date) <= 5 ? DEFAULT_DAY_MINUTES : 0;
   };
+  // Fasce dell'orario di quel giorno: quelle impostate da HR, altrimenti dalle 8 con un'ora di pausa alle 12
+  // (se il giorno supera le 6 ore). { slots, standard } — standard = impostate da HR.
+  function scheduleSlots(e, date, minutes = scheduledMinutes(e, date)) {
+    const s = hr.currentSchedule(e.id, date);
+    const set = s?.slots?.[weekday(date)] || [];
+    if (set.length) return { slots: set, standard: true };
+    if (!minutes) return { slots: [], standard: false };
+    if (minutes <= 360) return { slots: [{ start: '08:00', end: fromMin(480 + minutes) }], standard: false };
+    return { slots: [{ start: '08:00', end: '12:00' }, { start: '13:00', end: fromMin(780 + minutes - 240) }], standard: false };
+  }
+  // Straordinario: vale solo dopo l'approvazione. Una riga di straordinario nuova o cambiata torna da approvare;
+  // le rettifiche (registrate da chi approva o dall'ufficio del personale) valgono subito.
+  const overtimeStatus = (f, prev = null, origin = 'manuale') => {
+    if (f.hour_type !== 'straordinaria') return null;
+    if (origin === 'rettifica') return 'approvato';
+    if (prev && prev.hour_type === 'straordinaria' && prev.overtime_status === 'approvato' && prev.start_time === f.start_time && prev.end_time === f.end_time) return 'approvato';
+    return 'da_approvare';
+  };
+  const COUNTED = "(t.overtime_status IS NULL OR t.overtime_status = 'approvato')"; // ore che contano (niente straordinari in sospeso o rifiutati)
+  function notifyOvertime(e, date, minutes) {
+    if (!minutes) return;
+    notifyAll(managerUsers(e), { kind: 'hr.timesheet.overtime', title: `Straordinario da approvare: ${fullName(e)}`, body: `${hours(minutes)} h il ${itDate(date)}.`, link: LINK_OVERTIME, dedupeKey: `ts-ot:${e.id}:${date}:${now()}` });
+  }
   function entryInput(e, b) {
     const g = tsSettings().granularity;
     const f = { work_date: checkDate(b.work_date, 'la data', true), start_time: text(b.start_time), end_time: text(b.end_time), hour_type: b.hour_type || 'ordinaria', note: text(b.note) };
@@ -225,9 +249,11 @@ module.exports = function registerHrTimesheet(app, deps) {
     if (hits.length) notifyAll(managerUsers(e), { kind: 'hr.timesheet.limitations', title: `${fullName(e)}: ore su un'attività incompatibile con le limitazioni`, body: hits.join(' '), link: LINK_REVIEW, dedupeKey: `ts-limit:${entryId}` });
   }
   function insertEntry(req, e, f, extra = {}) {
+    const ot = overtimeStatus(f, null, extra.origin || 'manuale');
     const id = Number(db.prepare(`INSERT INTO timesheet_entries (employee_id, work_date, start_time, end_time, minutes, hour_type, origin, team_id, batch_id, source_booking_id, source_fair_id,
-      adjustment_id, note, created_at, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(e.id, f.work_date, f.start_time, f.end_time, f.minutes, f.hour_type,
-      extra.origin || 'manuale', extra.team_id ?? null, extra.batch_id ?? null, extra.source_booking_id ?? null, extra.source_fair_id ?? null, extra.adjustment_id ?? null, f.note, now(), actor(req), now()).lastInsertRowid);
+      adjustment_id, note, created_at, created_by, updated_at, overtime_status, overtime_decided_at, overtime_decided_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(e.id, f.work_date, f.start_time, f.end_time, f.minutes, f.hour_type,
+      extra.origin || 'manuale', extra.team_id ?? null, extra.batch_id ?? null, extra.source_booking_id ?? null, extra.source_fair_id ?? null, extra.adjustment_id ?? null, f.note, now(), actor(req), now(),
+      ot, ot === 'approvato' ? now() : null, ot === 'approvato' ? actor(req) : null).lastInsertRowid);
     const ins = db.prepare('INSERT INTO timesheet_allocations (entry_id, cost_center_id, cost_object_id, minutes) VALUES (?, ?, ?, ?)');
     for (const a of f.allocations) ins.run(id, a.cost_center_id, a.cost_object_id, a.minutes);
     return id;
@@ -245,7 +271,7 @@ module.exports = function registerHrTimesheet(app, deps) {
     const f = entryInput(e, b);
     assertWritable(req, e, f.work_date);
     const warnings = [...clashCheck(e, f), ...safetyCheck(req, e, f)];
-    const id = events.transaction(() => { const eid = insertEntry(req, e, f, { origin: 'manuale' }); notifyLimitations(e, warnings, eid); return eid; });
+    const id = events.transaction(() => { const eid = insertEntry(req, e, f, { origin: 'manuale' }); notifyLimitations(e, warnings, eid); if (f.hour_type === 'straordinaria') notifyOvertime(e, f.work_date, f.minutes); return eid; });
     audit(req, 'timesheet.entry_added', { entity: 'employee', entityId: e.id, after: { entry_id: id, work_date: f.work_date, minutes: f.minutes } });
     return { success: true, id, warnings };
   });
@@ -277,6 +303,7 @@ module.exports = function registerHrTimesheet(app, deps) {
     const others = new Set(current.map(x => x.id));
     const warnings = [];
     for (const x of inputs) { if (x.unchanged) { x.w = []; continue; } clashCheck(e, { ...x.f, work_date: date, hour_type: 'x' }, others); x.w = safetyCheck(req, e, x.f); warnings.push(...x.w); }
+    for (const x of inputs) if (!x.unchanged && x.f.minutes > 360) warnings.push(`La fascia ${x.f.start_time}–${x.f.end_time} supera le 6 ore senza pausa (D.Lgs. 66/2003): se hai fatto la pausa, dividila in due fasce.`);
     const planned = scheduledMinutes(e, date), total = inputs.filter(x => x.f.hour_type === 'ordinaria').reduce((t, x) => t + x.f.minutes, 0);
     if (total > planned) warnings.push(`Il ${itDate(date)} le ore ordinarie sono ${hours(total)} h contro ${hours(planned)} h di orario: se è straordinario, indicalo come tipo d'ora.`);
     const keep = new Set(inputs.map(x => x.id).filter(Boolean));
@@ -288,7 +315,9 @@ module.exports = function registerHrTimesheet(app, deps) {
       return inputs.map(({ id, f, w, unchanged }) => {
         if (unchanged) return id;
         if (!id) { const nid = insertEntry(req, e, f, { origin: 'manuale' }); notifyLimitations(e, w, nid); return nid; }
-        db.prepare('UPDATE timesheet_entries SET start_time = ?, end_time = ?, minutes = ?, hour_type = ?, note = ?, updated_at = ? WHERE id = ?').run(f.start_time, f.end_time, f.minutes, f.hour_type, f.note, now(), id);
+        const ot = overtimeStatus(f, byId.get(id));
+        db.prepare('UPDATE timesheet_entries SET start_time = ?, end_time = ?, minutes = ?, hour_type = ?, note = ?, updated_at = ?, overtime_status = ?, overtime_decided_at = CASE WHEN ? = overtime_status THEN overtime_decided_at END, overtime_decided_by = CASE WHEN ? = overtime_status THEN overtime_decided_by END, overtime_note = CASE WHEN ? = overtime_status THEN overtime_note END WHERE id = ?')
+          .run(f.start_time, f.end_time, f.minutes, f.hour_type, f.note, now(), ot, ot, ot, ot, id);
         db.prepare('DELETE FROM timesheet_allocations WHERE entry_id = ?').run(id);
         const ins = db.prepare('INSERT INTO timesheet_allocations (entry_id, cost_center_id, cost_object_id, minutes) VALUES (?, ?, ?, ?)');
         for (const a of f.allocations) ins.run(id, a.cost_center_id, a.cost_object_id, a.minutes);
@@ -296,6 +325,8 @@ module.exports = function registerHrTimesheet(app, deps) {
         return id;
       });
     });
+    const pendingOt = db.prepare(`SELECT COALESCE(SUM(minutes), 0) AS m FROM timesheet_entries WHERE employee_id = ? AND work_date = ? AND overtime_status = 'da_approvare' AND id NOT IN (${current.filter(x => x.overtime_status === 'da_approvare').map(x => x.id).join(',') || 0})`).get(e.id, date).m;
+    notifyOvertime(e, date, pendingOt);
     audit(req, 'timesheet.day_saved', { entity: 'employee', entityId: e.id, after: { work_date: date, entries: ids, minutes: inputs.reduce((t, x) => t + x.f.minutes, 0) } });
     return { success: true, ids, warnings: uniq(warnings) };
   });
@@ -318,8 +349,10 @@ module.exports = function registerHrTimesheet(app, deps) {
     assertWritable(req, e, f.work_date);
     const warnings = [...clashCheck(e, f, new Set([x.id])), ...safetyCheck(req, e, f)];
     events.transaction(() => {
-      db.prepare('UPDATE timesheet_entries SET work_date = ?, start_time = ?, end_time = ?, minutes = ?, hour_type = ?, note = ?, updated_at = ? WHERE id = ?')
-        .run(f.work_date, f.start_time, f.end_time, f.minutes, f.hour_type, f.note, now(), x.id);
+      const ot = overtimeStatus(f, x);
+      db.prepare('UPDATE timesheet_entries SET work_date = ?, start_time = ?, end_time = ?, minutes = ?, hour_type = ?, note = ?, updated_at = ?, overtime_status = ? WHERE id = ?')
+        .run(f.work_date, f.start_time, f.end_time, f.minutes, f.hour_type, f.note, now(), ot, x.id);
+      if (ot === 'da_approvare' && x.overtime_status !== 'da_approvare') notifyOvertime(e, f.work_date, f.minutes);
       db.prepare('DELETE FROM timesheet_allocations WHERE entry_id = ?').run(x.id);
       const ins = db.prepare('INSERT INTO timesheet_allocations (entry_id, cost_center_id, cost_object_id, minutes) VALUES (?, ?, ?, ?)');
       for (const a of f.allocations) ins.run(x.id, a.cost_center_id, a.cost_object_id, a.minutes);
@@ -452,17 +485,19 @@ module.exports = function registerHrTimesheet(app, deps) {
     for (const x of rows) x.allocations = allocs.filter(a => a.entry_id === x.id);
     const t = today();
     const days = [];
-    const totals = { ordinaria: 0, straordinaria: 0, notturna: 0, festiva: 0, absences: {}, worked_days: 0, scheduled: 0, centers: {} };
+    const totals = { ordinaria: 0, straordinaria: 0, notturna: 0, festiva: 0, overtime_pending: 0, overtime_rejected: 0, absences: {}, worked_days: 0, scheduled: 0, centers: {} };
     for (let d = first; d <= last; d = addDays(d, 1)) {
       const holiday = holidays.get(d) || null;
       const scheduled = holiday ? 0 : scheduledMinutes(e, d);
       const list = rows.filter(x => x.work_date === d);
       const live = list.filter(x => !x.voided_by_adjustment_id);
-      const worked = live.filter(x => x.origin !== 'assenza').reduce((s, x) => s + x.minutes, 0);
+      const worked = live.filter(x => x.origin !== 'assenza' && x.overtime_status !== 'rifiutato').reduce((s, x) => s + x.minutes, 0);
       const absent = live.filter(x => x.origin === 'assenza').reduce((s, x) => s + x.minutes, 0);
       for (const x of live) {
         if (x.origin === 'assenza') totals.absences[x.absence_type] = (totals.absences[x.absence_type] || 0) + x.minutes;
         else {
+          if (x.overtime_status === 'da_approvare') { totals.overtime_pending += x.minutes; continue; }
+          if (x.overtime_status === 'rifiutato') { totals.overtime_rejected += x.minutes; continue; }
           totals[x.hour_type] += x.minutes;
           for (const a of x.allocations) totals.centers[`${a.center_code} ${a.center_name}`] = (totals.centers[`${a.center_code} ${a.center_name}`] || 0) + a.minutes;
         }
@@ -470,7 +505,8 @@ module.exports = function registerHrTimesheet(app, deps) {
       if (worked) totals.worked_days++;
       totals.scheduled += scheduled;
       const diff = worked + absent - scheduled;
-      days.push({ date: d, weekday: weekday(d), holiday, scheduled, worked, absent, diff, entries: list, flag: scheduled && d <= t && diff < 0 ? 'mancano' : diff > 0 ? 'oltre' : null });
+      const sl = holiday ? { slots: [], standard: false } : scheduleSlots(e, d, scheduled);
+      days.push({ date: d, weekday: weekday(d), holiday, scheduled, worked, absent, diff, entries: list, slots: sl.slots, slots_standard: sl.standard, flag: scheduled && d <= t && diff < 0 ? 'mancano' : diff > 0 ? 'oltre' : null });
     }
     const m = monthRow(e.id, period);
     const status = m?.status || 'aperto';
@@ -501,7 +537,7 @@ module.exports = function registerHrTimesheet(app, deps) {
       .map(e => {
         const v = monthView(req, e, period);
         return { employee_id: e.id, name: fullName(e), status: v.status, worked: v.days.reduce((s, d) => s + d.worked, 0), absent: v.days.reduce((s, d) => s + d.absent, 0),
-          scheduled: v.totals.scheduled, missing_days: v.days.filter(d => d.flag === 'mancano').length, conflicts: v.conflicts.length, proposals: v.proposals.length, can_approve: v.can_approve };
+          scheduled: v.totals.scheduled, missing_days: v.days.filter(d => d.flag === 'mancano').length, conflicts: v.conflicts.length, proposals: v.proposals.length, can_approve: v.can_approve, overtime_pending: v.totals.overtime_pending };
       });
   });
   r.post('/timesheet/conflicts/:id/resolve', req => {
@@ -530,6 +566,38 @@ module.exports = function registerHrTimesheet(app, deps) {
     audit(req, 'timesheet.month_submitted', { entity: 'employee', entityId: e.id, after: { period } });
     return { success: true };
   });
+  // ── Straordinari da approvare ───────────────────────────────────────────────
+  // Chi approva i mesi (responsabile, delegato, ufficio del personale) vede e decide gli straordinari dei collaboratori.
+  r.get('/timesheet/overtime', req => {
+    const state = req.query.state || 'da_approvare';
+    const rows = db.prepare(`SELECT t.*, e.first_name, e.last_name, e.job_title FROM timesheet_entries t JOIN employees e ON e.id = t.employee_id
+      WHERE t.hour_type = 'straordinaria' AND t.voided_by_adjustment_id IS NULL AND (? = 'all' OR t.overtime_status = ?) AND (? <> 'all' OR t.work_date >= ?)
+      ORDER BY t.work_date DESC, t.start_time LIMIT 300`).all(state, state, state, addDays(today(), -120));
+    return rows.filter(x => { const e = employee(x.employee_id); return !isSelf(req, e) && canApproveMonth(req, e); }).map(x => ({
+      id: x.id, employee_id: x.employee_id, employee_name: fullName(x), employee_job_title: x.job_title, work_date: x.work_date, start_time: x.start_time, end_time: x.end_time, minutes: x.minutes,
+      note: x.note, status: x.overtime_status, decided_by: x.overtime_decided_by, decided_at: x.overtime_decided_at, decision_note: x.overtime_note, month_status: monthStatus(x.employee_id, periodOf(x.work_date)),
+      allocations: db.prepare('SELECT al.minutes, c.code AS center_code, c.name AS center_name, o.code AS object_code, o.name AS object_name FROM timesheet_allocations al JOIN cost_centers c ON c.id = al.cost_center_id LEFT JOIN cost_objects o ON o.id = al.cost_object_id WHERE al.entry_id = ?').all(x.id),
+    }));
+  });
+  function decideOvertime(req, status) {
+    const x = entry(req.params.id);
+    const e = employee(x.employee_id);
+    if (x.hour_type !== 'straordinaria' || x.voided_by_adjustment_id) throw new HttpError(400, 'Non è una riga di straordinario.');
+    if (isSelf(req, e) || !canApproveMonth(req, e)) throw new HttpError(403, 'Lo straordinario lo approva il responsabile (non il proprio).');
+    if (monthStatus(e.id, periodOf(x.work_date)) === 'approvato') throw new HttpError(409, 'Il mese è approvato: si cambia con una rettifica.');
+    const note = text(req.body?.note);
+    if (status === 'rifiutato' && !note) throw new HttpError(400, 'Scrivi il motivo del rifiuto: lo legge il dipendente.');
+    events.transaction(() => {
+      db.prepare('UPDATE timesheet_entries SET overtime_status = ?, overtime_decided_at = ?, overtime_decided_by = ?, overtime_note = ? WHERE id = ?').run(status, now(), actor(req), note, x.id);
+      notifyAll([userOfEmployee(e.id)].filter(Boolean), { kind: 'hr.timesheet.overtime_decided', title: `Straordinario del ${itDate(x.work_date)} ${status === 'approvato' ? 'approvato' : 'non approvato'}`,
+        body: `${x.start_time}–${x.end_time} (${hours(x.minutes)} h).${note ? ` ${note}` : ''}`, link: LINK, dedupeKey: `ts-ot:${x.id}:${status}:${now()}` });
+    });
+    audit(req, `timesheet.overtime_${status === 'approvato' ? 'approved' : 'rejected'}`, { entity: 'employee', entityId: e.id, after: { entry_id: x.id, minutes: x.minutes } });
+    return { success: true };
+  }
+  r.post('/timesheet/entries/:id/overtime/approve', req => decideOvertime(req, 'approvato'));
+  r.post('/timesheet/entries/:id/overtime/reject', req => decideOvertime(req, 'rifiutato'));
+
   // Riapri: chi ha inviato il mese lo ritira, finché non è approvato; chi doveva approvarlo è avvisato.
   r.post('/timesheet/months/withdraw', req => {
     const b = req.body || {};
@@ -554,8 +622,10 @@ module.exports = function registerHrTimesheet(app, deps) {
     if (!canApproveMonth(req, e, m)) throw new HttpError(403, 'Questo mese non lo puoi approvare tu.');
     const open = db.prepare("SELECT COUNT(*) AS c FROM timesheet_conflicts WHERE employee_id = ? AND substr(work_date, 1, 7) = ? AND resolved_at IS NULL").get(e.id, period).c;
     if (open) throw new HttpError(409, `Ci sono ${open} conflitti tra ore e assenze da risolvere prima di approvare.`);
+    const ot = db.prepare("SELECT COALESCE(SUM(minutes), 0) AS m FROM timesheet_entries WHERE employee_id = ? AND substr(work_date, 1, 7) = ? AND overtime_status = 'da_approvare' AND voided_by_adjustment_id IS NULL").get(e.id, period).m;
+    if (ot) throw new HttpError(409, `Ci sono ${hours(ot)} h di straordinario da approvare o rifiutare prima di approvare il mese.`);
     const byCenter = db.prepare(`SELECT al.cost_center_id, SUM(al.minutes) AS minutes FROM timesheet_allocations al JOIN timesheet_entries t ON t.id = al.entry_id
-      WHERE t.employee_id = ? AND substr(t.work_date, 1, 7) = ? AND t.voided_by_adjustment_id IS NULL GROUP BY al.cost_center_id`).all(e.id, period);
+      WHERE t.employee_id = ? AND substr(t.work_date, 1, 7) = ? AND t.voided_by_adjustment_id IS NULL AND ${COUNTED} GROUP BY al.cost_center_id`).all(e.id, period);
     events.transaction(() => {
       db.prepare("UPDATE timesheet_months SET status = 'approvato', approved_at = ?, approved_by = ? WHERE id = ?").run(now(), actor(req), m.id);
       events.emit('timesheet.month_approved', { sourceTable: 'timesheet_months', sourceId: m.id, payload: { employee_id: e.id, period, minutes_by_center: byCenter } });
@@ -674,7 +744,7 @@ module.exports = function registerHrTimesheet(app, deps) {
   // ── Finance: driver "Ore lavorate" dalle presenze approvate ─────────────────
   function syncHoursDriver(period, eventId) {
     const rows = db.prepare(`SELECT al.cost_center_id AS centerId, SUM(al.minutes) AS minutes FROM timesheet_allocations al JOIN timesheet_entries t ON t.id = al.entry_id
-      JOIN timesheet_months m ON m.employee_id = t.employee_id AND m.period = ? WHERE m.status = 'approvato' AND substr(t.work_date, 1, 7) = ? AND t.voided_by_adjustment_id IS NULL
+      JOIN timesheet_months m ON m.employee_id = t.employee_id AND m.period = ? WHERE m.status = 'approvato' AND substr(t.work_date, 1, 7) = ? AND t.voided_by_adjustment_id IS NULL AND ${COUNTED}
       GROUP BY al.cost_center_id`).all(period, period);
     const res = finance.setComputedDriverValues('ore_lavorate', period, rows.map(x => ({ centerId: x.centerId, quantityMilli: Math.round(x.minutes * 1000 / 60) })), 'people');
     if (res.locked) {
@@ -697,7 +767,7 @@ module.exports = function registerHrTimesheet(app, deps) {
     for (const e of people) {
       const contract = hrFile.contractAt(e.id, last);
       const rows = db.prepare(`SELECT t.*, at.name AS absence_type FROM timesheet_entries t LEFT JOIN absences a ON a.id = t.absence_id LEFT JOIN absence_types at ON at.id = a.absence_type_id
-        WHERE t.employee_id = ? AND t.work_date BETWEEN ? AND ? AND t.voided_by_adjustment_id IS NULL ORDER BY t.work_date`).all(e.id, first, last);
+        WHERE t.employee_id = ? AND t.work_date BETWEEN ? AND ? AND t.voided_by_adjustment_id IS NULL AND ${COUNTED} ORDER BY t.work_date`).all(e.id, first, last);
       for (const d of uniq(rows.map(x => x.work_date))) {
         const day = rows.filter(x => x.work_date === d);
         const work = day.filter(x => x.origin !== 'assenza');

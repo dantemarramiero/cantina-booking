@@ -123,13 +123,13 @@ function hrTabOrganization(e) {
       <dt>Squadre</dt><dd>${e.teams.length ? e.teams.map(t => `${esc(t.name)}${t.is_leader ? ' (caposquadra)' : ''}`).join(', ') : '—'}</dd>
     </dl>
     ${e.can_see_schedule ? `
-      <div class="mod-section-title" style="margin-top:24px">Orario contrattuale (ore per giorno)</div>
-      <div class="mod-week" id="hr-week">${Object.entries(PPL_WEEKDAYS).map(([d, l]) => `<div class="field" style="margin:0"><label>${l}</label><input inputmode="decimal" data-day="${d}" value="${s ? UI.decimal((s.days[d] || 0) / 60) : ''}" placeholder="0"></div>`).join('')}</div>
+      <div class="mod-section-title" style="margin-top:24px">Orario contrattuale (ore o fasce per giorno)</div>
+      <div class="mod-week" id="hr-week">${Object.entries(PPL_WEEKDAYS).map(([d, l]) => `<div class="field" style="margin:0"><label>${l}</label><input inputmode="decimal" data-day="${d}" value="${s ? (s.slots?.[d]?.length ? s.slots[d].map(x => `${x.start}-${x.end}`).join(', ') : UI.decimal((s.days[d] || 0) / 60)) : ''}" placeholder="0"></div>`).join('')}</div>
       <div class="field-row" style="margin-top:10px;align-items:end">
         <div class="field" style="margin:0"><label>In vigore dal</label><input type="date" id="hr-week-from" value="${today}"></div>
         <div><button class="btn secondary small" type="button" onclick="saveHrSchedule(${e.id})">Salva orario</button></div>
       </div>
-      <p class="mod-note">${s ? `Orario attuale dal ${UI.date(s.valid_from)}: ${UI.decimal(s.weekly_minutes / 60)} ore a settimana.` : 'Nessun orario impostato.'} Un nuovo orario vale dalla data indicata; lo storico resta.</p>
+      <p class="mod-note">${s ? `Orario attuale dal ${UI.date(s.valid_from)}: ${UI.decimal(s.weekly_minutes / 60)} ore a settimana.` : 'Nessun orario impostato.'} Un nuovo orario vale dalla data indicata; lo storico resta. Per ogni giorno scrivi le ore («8») o le fasce con la pausa («8-12, 13-17»): con le fasce il Timesheet propone quell'orario e toglie da solo la pausa.</p>
       <div id="hr-week-msg"></div>` : ''}
     ${e.can_see_costs ? `
       <div class="mod-section-title" style="margin-top:24px">Costo orario standard <span class="badge grey">riservato</span></div>
