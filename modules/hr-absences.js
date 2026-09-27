@@ -221,41 +221,108 @@ module.exports = function registerHrAbsences(app, deps) {
   const allowance = (employeeId, counter, year) => db.prepare('SELECT * FROM absence_allowances WHERE employee_id = ? AND counter = ? AND year = ?').get(employeeId, counter, year) || null;
   const usageRows = (employeeId, counter, year) => db.prepare(`SELECT a.* FROM absences a JOIN absence_types t ON t.id = a.absence_type_id
     WHERE a.employee_id = ? AND t.counter = ? AND substr(a.start_date, 1, 4) = ? AND a.status IN ('richiesta', 'approvata', 'comunicata', 'presa_visione')`).all(employeeId, counter, String(year));
-  function balance(employeeId, counter, year, date = today(), depth = 0) {
+  // ── Spettanze: della persona (absence_allowances) o standard del contratto (absence_plans) ──
+  // Come negli altri software HR: la spettanza standard dipende dal contratto in vigore (CCNL e tipo), matura
+  // a fine mese nei mesi con almeno 15 giorni di servizio (assunzione e cessazione comprese) e, per ROL ed ex
+  // festività, in proporzione al part-time. Un «saldo alla data» (dal cedolino) fa da punto di partenza.
+  const pad2 = n => String(n).padStart(2, '0');
+  const daysIn = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const dayDiff = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 864e5);
+  const ccnlKey = v => { const t = String(v || '').toLowerCase(); return /agric/.test(t) ? 'agricoltura' : /commerc|terziar/.test(t) ? 'commercio' : null; };
+  const contractFor = (employeeId, year) => db.prepare('SELECT * FROM employment_contracts WHERE employee_id = ? AND effective_from <= ? ORDER BY effective_from DESC, version DESC LIMIT 1').get(employeeId, `${year}-12-31`) || null;
+  function planFor(employeeId, year) {
+    const c = contractFor(employeeId, year);
+    if (!c) return null;
+    const key = ccnlKey(c.ccnl);
+    const plan = db.prepare('SELECT * FROM absence_plans WHERE active = 1 ORDER BY priority, id').all()
+      .find(x => (x.ccnl == null || x.ccnl === key) && (!x.contract_types || JSON.parse(x.contract_types).includes(c.contract_type)));
+    return plan ? { ...plan, contract: c } : null;
+  }
+  function entitlement(employeeId, counter, year) {
     const al = allowance(employeeId, counter, year);
-    const annual = al?.annual_amount ?? 0;
-    const y = Number(date.slice(0, 4));
-    const months = year < y ? 12 : year > y ? 0 : Number(date.slice(5, 7)) - 1; // la quota del mese matura a fine mese
-    const accrued = !al ? 0 : al.accrual === 'annuale' ? (year <= y ? annual : 0) : Math.floor(annual * months / 12);
-    let opening = al?.opening_balance ?? null;
-    // Riporto = residuo di fine anno precedente, a maturazione completa (valutato al 1° gennaio).
-    if (opening == null) opening = depth < 30 && allowance(employeeId, counter, year - 1) ? balance(employeeId, counter, year - 1, `${year}-01-01`, depth + 1).remaining : 0;
-    const rows = usageRows(employeeId, counter, year);
-    const sum = pred => rows.filter(pred).reduce((s, a) => s + a.amount, 0);
+    if (al) return { annual: al.annual_amount, accrual: al.accrual, opening: al.opening_balance, source: 'persona', plan: null };
+    const pl = planFor(employeeId, year);
+    if (!pl) return { annual: 0, accrual: null, opening: null, source: null, plan: null };
+    const pct = counter !== 'ferie' && pl.contract.part_time_pct ? pl.contract.part_time_pct / 100 : 1;
+    return { annual: Math.round(pl[counter] * pct), accrual: pl.accrual, opening: null, source: 'standard', plan: pl.name };
+  }
+  // Mesi dell'anno con almeno 15 giorni di servizio (senza contratto registrato: tutto l'anno).
+  function serviceMonths(employeeId, year) {
+    const c = contractFor(employeeId, year);
+    const from = c?.hire_date || null;
+    const until = [c?.termination_date, c?.end_date].filter(Boolean).sort()[0] || null;
+    return Array.from({ length: 12 }, (_, i) => {
+      const first = `${year}-${pad2(i + 1)}-01`, last = `${year}-${pad2(i + 1)}-${pad2(daysIn(year, i + 1))}`;
+      const a = from && from > first ? from : first, b = until && until < last ? until : last;
+      return a <= b && dayDiff(a, b) + 1 >= 15;
+    });
+  }
+  const anchorIn = (employeeId, counter, year, date) => db.prepare(`SELECT * FROM absence_balance_anchors WHERE employee_id = ? AND counter = ? AND substr(as_of, 1, 4) = ? AND as_of <= ?
+    ORDER BY as_of DESC, id DESC LIMIT 1`).get(employeeId, counter, String(year), date < `${year}-12-31` ? date : `${year}-12-31`) || null;
+  // Primo anno che si conta: il primo saldo alla data o la prima spettanza della persona; altrimenti
+  // l'avvio delle spettanze standard (o l'assunzione, se dopo). Prima non si calcolano riporti.
+  function startYear(employeeId, counter) {
+    const years = [db.prepare('SELECT MIN(year) AS y FROM absence_allowances WHERE employee_id = ? AND counter = ?').get(employeeId, counter).y,
+      Number(db.prepare('SELECT MIN(substr(as_of, 1, 4)) AS y FROM absence_balance_anchors WHERE employee_id = ? AND counter = ?').get(employeeId, counter).y) || null].filter(Boolean);
+    if (years.length) return Math.min(...years);
+    const since = Number((db.prepare("SELECT value FROM settings WHERE key = 'absence_plans_since'").get()?.value || today()).slice(0, 4));
+    const hire = Number(db.prepare('SELECT MIN(hire_date) AS d FROM employment_contracts WHERE employee_id = ?').get(employeeId).d?.slice(0, 4)) || 0;
+    return Math.max(since, hire);
+  }
+  function balance(employeeId, counter, year, date = today(), depth = 0) {
+    const ent = entitlement(employeeId, counter, year);
+    const y = Number(date.slice(0, 4)), dm = Number(date.slice(5, 7));
+    const svc = serviceMonths(employeeId, year);
+    const done = m => year < y || (year === y && m < dm); // la quota del mese matura a fine mese
+    const anchor = anchorIn(employeeId, counter, year, date);
+    const am = anchor ? Number(anchor.as_of.slice(5, 7)) : 0;
+    const months = pred => svc.filter((on, i) => on && i + 1 > am && pred(i + 1)).length;
+    const accruedMonths = months(done), yearMonths = months(() => true);
+    let accrued, projected;
+    if (ent.accrual === 'annuale') {
+      const whole = anchor ? 0 : svc.every(Boolean) ? ent.annual : Math.floor(ent.annual * yearMonths / 12);
+      accrued = year <= y ? whole : 0; projected = whole;
+    } else {
+      accrued = Math.floor(ent.annual * accruedMonths / 12); projected = Math.floor(ent.annual * yearMonths / 12);
+    }
+    let opening;
+    if (anchor) opening = anchor.amount;
+    else if (ent.opening != null) opening = ent.opening;
+    // Riporto = residuo di fine anno precedente (valutato al 1° gennaio), se quell'anno si contava.
+    else opening = depth < 30 && year - 1 >= startYear(employeeId, counter) ? balance(employeeId, counter, year - 1, `${year}-01-01`, depth + 1).remaining : 0;
+    const rows = usageRows(employeeId, counter, year).filter(a => !anchor || a.start_date > anchor.as_of);
+    const sum = pred => rows.filter(pred).reduce((t, a) => t + a.amount, 0);
     const taken = sum(a => VALID.includes(a.status) && a.start_date <= date);
     const planned = sum(a => VALID.includes(a.status) && a.start_date > date);
     const pending = sum(a => a.status === 'richiesta');
-    return { counter, label: COUNTERS[counter], unit: counterUnit(counter), year, annual, accrual: al?.accrual ?? null, opening, accrued, taken, planned, pending,
-      remaining: opening + accrued - taken, available: opening + annual - taken - planned - pending };
+    // Da allineare: spettanza standard, assunto prima dell'avvio e nessun saldo dal cedolino (il goduto di prima non è qui).
+    const hire = db.prepare('SELECT MIN(hire_date) AS d FROM employment_contracts WHERE employee_id = ?').get(employeeId).d;
+    const since = db.prepare("SELECT value FROM settings WHERE key = 'absence_plans_since'").get()?.value || '';
+    const toAlign = ent.source === 'standard' && !!hire && hire < since && !db.prepare('SELECT 1 FROM absence_balance_anchors WHERE employee_id = ? AND counter = ?').get(employeeId, counter);
+    return { counter, label: COUNTERS[counter], unit: counterUnit(counter), year, annual: ent.annual, accrual: ent.accrual, source: ent.source, plan: ent.plan, to_align: toAlign,
+      anchor: anchor ? { as_of: anchor.as_of, amount: anchor.amount } : null, opening, accrued, projected, taken, planned, pending,
+      remaining: opening + accrued - taken, available: opening + projected - taken - planned - pending };
   }
   const balances = (employeeId, year) => Object.keys(COUNTERS).map(c => balance(employeeId, c, year)).filter(b => b.annual || b.opening || b.taken || b.planned || b.pending);
   const fmtAmount = (amount, unit) => (unit === 'giorni' ? `${(amount / 1000).toLocaleString('it-IT', { maximumFractionDigits: 3 })} gg` : `${(amount / 60).toLocaleString('it-IT', { maximumFractionDigits: 2 })} h`);
 
   // Ferie arretrate: si consumano dalla più vecchia; quelle dell'anno Y vanno godute entro il 30/06 dell'anno Y+2.
+  // Le «vasche» sono il saldo di partenza (saldo alla data o riporto iniziale) e il maturato di ogni anno.
   function vacationArrears(employeeId, date = today()) {
-    const years = db.prepare("SELECT * FROM absence_allowances WHERE employee_id = ? AND counter = 'ferie' ORDER BY year").all(employeeId);
-    if (!years.length) return [];
-    const first = years[0].year;
-    const pools = [{ year: first - 1, amount: years[0].opening_balance || 0 }, ...years.map(a => ({ year: a.year, amount: a.annual_amount }))];
-    let used = db.prepare(`SELECT COALESCE(SUM(a.amount), 0) AS s FROM absences a JOIN absence_types t ON t.id = a.absence_type_id
-      WHERE a.employee_id = ? AND t.counter = 'ferie' AND a.status IN ('approvata', 'comunicata', 'presa_visione') AND a.start_date >= ?`).get(employeeId, `${first}-01-01`).s;
     const cur = Number(date.slice(0, 4));
+    const anchor = db.prepare("SELECT * FROM absence_balance_anchors WHERE employee_id = ? AND counter = 'ferie' AND as_of <= ? ORDER BY as_of DESC, id DESC LIMIT 1").get(employeeId, date) || null;
+    const first = anchor ? Number(anchor.as_of.slice(0, 4)) : startYear(employeeId, 'ferie');
+    if (first > cur) return [];
+    const pools = [{ year: anchor ? first : first - 1, amount: anchor ? Math.max(0, anchor.amount) : (entitlement(employeeId, 'ferie', first).opening || 0) }];
+    for (let yr = first; yr <= cur; yr++) pools.push({ year: yr, amount: balance(employeeId, 'ferie', yr, `${yr}-12-31`).projected });
+    let used = db.prepare(`SELECT COALESCE(SUM(a.amount), 0) AS s FROM absences a JOIN absence_types t ON t.id = a.absence_type_id
+      WHERE a.employee_id = ? AND t.counter = 'ferie' AND a.status IN ('approvata', 'comunicata', 'presa_visione') AND a.start_date > ?`).get(employeeId, anchor ? anchor.as_of : `${first - 1}-12-31`).s;
     const out = [];
-    for (const p of pools) {
-      const take = Math.min(p.amount, used);
+    for (const pl of pools) {
+      const take = Math.min(pl.amount, used);
       used -= take;
-      const left = p.amount - take;
-      if (left > 0 && p.year < cur) out.push({ year: p.year, amount: left, due_date: `${p.year + 2}-06-30` });
+      const left = pl.amount - take;
+      if (left > 0 && pl.year < cur) out.push({ year: pl.year, amount: left, due_date: `${pl.year + 2}-06-30` });
     }
     return out;
   }
@@ -267,7 +334,8 @@ module.exports = function registerHrAbsences(app, deps) {
     const e = employee(req.params.id);
     if (!canSeeAbsences(req, e)) throw new HttpError(403, 'Non puoi vedere i contatori di questa persona.');
     const year = parseInt(req.query.year) || Number(today().slice(0, 4));
-    return { year, allowances: db.prepare('SELECT * FROM absence_allowances WHERE employee_id = ? ORDER BY year DESC, counter').all(e.id), balances: Object.keys(COUNTERS).map(c => balance(e.id, c, year)), arrears: vacationArrears(e.id) };
+    return { year, anchors: db.prepare('SELECT * FROM absence_balance_anchors WHERE employee_id = ? ORDER BY as_of DESC, id DESC').all(e.id), plan: planFor(e.id, year)?.name || null, contract: contractFor(e.id, year),
+      allowances: db.prepare('SELECT * FROM absence_allowances WHERE employee_id = ? ORDER BY year DESC, counter').all(e.id), balances: Object.keys(COUNTERS).map(c => balance(e.id, c, year)), arrears: vacationArrears(e.id) };
   });
   r.put('/employees/:id/allowances', req => {
     if (!hasAccessLevel(req, 'personale')) throw new HttpError(403, 'Le spettanze le imposta l\'ufficio del personale.');
@@ -293,6 +361,61 @@ module.exports = function registerHrAbsences(app, deps) {
       .run(e.id, b.counter, year, annual, accrual, opening, text(b.note));
     audit(req, 'absence_allowance.set', { entity: 'employee', entityId: e.id, after: { counter: b.counter, year, annual_amount: annual, accrual, opening_balance: opening } });
     return { success: true, balance: balance(e.id, b.counter, year) };
+  });
+
+  // Saldo alla data (dal cedolino): alla registrazione di chi è già in forza e per riallineare quando serve.
+  r.post('/employees/:id/balance-anchors', req => {
+    if (!hasAccessLevel(req, 'personale')) throw new HttpError(403, 'I saldi li imposta l\'ufficio del personale.');
+    const e = employee(req.params.id);
+    const b = req.body || {};
+    if (!DATE.test(b.as_of || '')) throw new HttpError(400, 'Indica la data del saldo (di solito l\'ultimo giorno del mese del cedolino).');
+    if (b.as_of > today()) throw new HttpError(400, 'La data del saldo non può essere nel futuro.');
+    const conv = (v, unit) => { if (v === '' || v == null) return null; const n = Number(String(v).replace(',', '.')); if (!Number.isFinite(n) || Math.abs(n) > 1000) throw new HttpError(400, `Valore non valido: ${v}`); return Math.round(n * (unit === 'giorni' ? 1000 : 60)); };
+    const rows = Object.keys(COUNTERS).map(c => ({ counter: c, amount: conv(b[c], counterUnit(c)) })).filter(x => x.amount != null);
+    if (!rows.length) throw new HttpError(400, 'Indica almeno un residuo (ferie, ROL o ex festività).');
+    const ins = db.prepare('INSERT INTO absence_balance_anchors (employee_id, counter, as_of, amount, note, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    events.transaction(() => { for (const x of rows) ins.run(e.id, x.counter, b.as_of, x.amount, text(b.note), now(), actor(req)); });
+    audit(req, 'absence_balance.anchored', { entity: 'employee', entityId: e.id, after: { as_of: b.as_of, counters: rows.map(x => x.counter), note: text(b.note) } });
+    return { success: true, balances: Object.keys(COUNTERS).map(c => balance(e.id, c, Number(b.as_of.slice(0, 4)))) };
+  });
+  r.delete('/balance-anchors/:id', req => {
+    if (!hasAccessLevel(req, 'personale')) throw new HttpError(403, 'I saldi li imposta l\'ufficio del personale.');
+    const x = db.prepare('SELECT * FROM absence_balance_anchors WHERE id = ?').get(req.params.id);
+    if (!x) throw new HttpError(404, 'Saldo non trovato.');
+    db.prepare('DELETE FROM absence_balance_anchors WHERE id = ?').run(x.id);
+    audit(req, 'absence_balance.anchor_deleted', { entity: 'employee', entityId: x.employee_id, before: { counter: x.counter, as_of: x.as_of, amount: x.amount } });
+    return { success: true };
+  });
+  // Spettanze standard per contratto (People → Configurazione).
+  r.get('/absence-plans', () => db.prepare('SELECT * FROM absence_plans ORDER BY priority, id').all().map(x => ({ ...x, contract_types: x.contract_types ? JSON.parse(x.contract_types) : null })));
+  function planFields(b, existing = {}) {
+    const pick = k => (b[k] !== undefined ? b[k] : existing[k]);
+    const conv = (v, k) => { if (v === '' || v == null) return 0; const n = Number(String(v).replace(',', '.')); if (!Number.isFinite(n) || n < 0 || n > 1000) throw new HttpError(400, `Valore non valido: ${v}`); return Math.round(n * k); };
+    const f = { name: text(pick('name')), ccnl: pick('ccnl') || null, contract_types: Array.isArray(pick('contract_types')) && pick('contract_types').length ? JSON.stringify(pick('contract_types')) : null,
+      ferie: b.ferie !== undefined ? conv(b.ferie, 1000) : existing.ferie ?? 0, rol: b.rol !== undefined ? conv(b.rol, 60) : existing.rol ?? 0, ex_festivita: b.ex_festivita !== undefined ? conv(b.ex_festivita, 60) : existing.ex_festivita ?? 0,
+      accrual: pick('accrual') || 'mensile', priority: parseInt(pick('priority')) || 100, active: b.active !== undefined ? (b.active ? 1 : 0) : existing.active ?? 1, note: text(pick('note')) };
+    if (!f.name) throw new HttpError(400, 'Il nome è obbligatorio.');
+    if (f.ccnl && !['agricoltura', 'commercio'].includes(f.ccnl)) throw new HttpError(400, 'CCNL: agricoltura o commercio.');
+    if (!['mensile', 'annuale'].includes(f.accrual)) throw new HttpError(400, 'Maturazione: mensile oppure annuale.');
+    return f;
+  }
+  r.post('/absence-plans', req => {
+    if (!hasAccessLevel(req, 'personale')) throw new HttpError(403, 'Serve il livello "personale".');
+    const f = planFields(req.body || {});
+    const id = Number(db.prepare('INSERT INTO absence_plans (name, ccnl, contract_types, ferie, rol, ex_festivita, accrual, priority, active, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(f.name, f.ccnl, f.contract_types, f.ferie, f.rol, f.ex_festivita, f.accrual, f.priority, f.active, f.note).lastInsertRowid);
+    audit(req, 'absence_plan.created', { entity: 'absence_plan', entityId: id, after: f });
+    return { success: true, id };
+  });
+  r.patch('/absence-plans/:id', req => {
+    if (!hasAccessLevel(req, 'personale')) throw new HttpError(403, 'Serve il livello "personale".');
+    const x = db.prepare('SELECT * FROM absence_plans WHERE id = ?').get(req.params.id);
+    if (!x) throw new HttpError(404, 'Spettanza non trovata.');
+    const f = planFields(req.body || {}, x);
+    db.prepare('UPDATE absence_plans SET name = ?, ccnl = ?, contract_types = ?, ferie = ?, rol = ?, ex_festivita = ?, accrual = ?, priority = ?, active = ?, note = ? WHERE id = ?')
+      .run(f.name, f.ccnl, f.contract_types, f.ferie, f.rol, f.ex_festivita, f.accrual, f.priority, f.active, f.note, x.id);
+    audit(req, 'absence_plan.updated', { entity: 'absence_plan', entityId: x.id, before: x, after: f });
+    return { success: true };
   });
 
   // ── Chi vede e chi decide ───────────────────────────────────────────────────

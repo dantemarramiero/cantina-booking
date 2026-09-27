@@ -40,6 +40,29 @@ async function loadHrEmployees() {
   </div>`;
 }
 
+// Ferie e permessi alla registrazione: nuovo assunto (valgono le spettanze standard del contratto dalla data di
+// assunzione) oppure già in forza (residuo di ferie, ROL ed ex festività all'ultimo cedolino).
+function hrLastMonthEnd() { const d = new Date(); d.setDate(0); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function hrLeaveStartFields() {
+  return `<div class="mod-section-title" style="margin-top:14px">Ferie e permessi</div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:4px 0"><input type="radio" name="leave_start" value="new" checked onchange="document.getElementById('hr-leave-existing').style.display = 'none'"> Nuovo assunto: valgono le spettanze standard del contratto dalla data di assunzione</label>
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:4px 0"><input type="radio" name="leave_start" value="existing" onchange="document.getElementById('hr-leave-existing').style.display = ''"> Già in forza: indico il residuo dell'ultimo cedolino</label>
+    <div id="hr-leave-existing" style="display:none">
+      <div class="field-row">
+        <div class="field"><label>Residuo al</label><input type="date" name="as_of" value="${hrLastMonthEnd()}"></div>
+        <div class="field"><label>Ferie (giorni)</label><input name="ferie" inputmode="decimal" placeholder="es. 12,5"></div>
+        <div class="field"><label>ROL (ore)</label><input name="rol" inputmode="decimal"></div>
+        <div class="field"><label>Ex festività (ore)</label><input name="ex_festivita" inputmode="decimal"></div>
+      </div>
+    </div>
+    <p class="mod-note">Le spettanze standard dipendono dal contratto (CCNL e tipo) che inserisci nella scheda → Rapporto di lavoro. Da lì i ratei maturano a fine mese.</p>`;
+}
+function hrLeaveStartBody(b) {
+  if (b.querySelector('[name="leave_start"]:checked')?.value !== 'existing') return null;
+  const body = { as_of: UI.val(b, 'as_of'), note: 'Residuo alla registrazione (cedolino)' };
+  for (const k of ['ferie', 'rol', 'ex_festivita']) body[k] = UI.val(b, k);
+  return ['ferie', 'rol', 'ex_festivita'].some(k => body[k] !== '') ? body : null;
+}
 async function openHrEmployeeModal(id) {
   if (!HR.employees.length || !HR.sites.length) await hrLoadBasics();
   const e = id ? await api(`/api/admin/hr/employees/${id}`) : null;
@@ -68,11 +91,14 @@ async function openHrEmployeeModal(id) {
       </div>
       <div class="field"><label>Accesso al portale (facoltativo)</label><select name="portal_user_id">${UI.options(portalUsers.filter(u => !u.employee_id || u.employee_id === id), e?.portal_user_id, { empty: '— Nessuno: non usa il portale —', label: u => `${u.name} (@${u.username})` })}</select></div>
       <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" name="active" ${!e || e.active ? 'checked' : ''}> Attivo</label>
-      <p class="mod-note">Gli stagionali possono non avere l'accesso al portale. Chi ha l'accesso compare anche tra gli operatori dell'Enoturismo, come oggi.</p>`,
+      <p class="mod-note">Gli stagionali possono non avere l'accesso al portale. Chi ha l'accesso compare anche tra gli operatori dell'Enoturismo, come oggi.</p>
+      ${e ? '' : hrLeaveStartFields()}`,
     onSave: async b => {
       const body = {};
       for (const k of ['first_name', 'last_name', 'job_title', 'work_email', 'work_phone', 'site_id', 'cost_center_id', 'manager_id', 'delegate_id', 'portal_user_id', 'active']) body[k] = UI.val(b, k);
+      const start = e ? null : hrLeaveStartBody(b);
       const res = await api('/api/admin/hr/employees' + (e ? `/${e.id}` : ''), { method: e ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+      if (start) await api(`/api/admin/hr/employees/${res.id}/balance-anchors`, { method: 'POST', body: JSON.stringify(start) }).catch(err => alert(`Dipendente creato, ma il residuo non è stato salvato: ${err.message}`));
       await hrLoadBasics();
       openHrRecord(e ? e.id : res.id);
     },

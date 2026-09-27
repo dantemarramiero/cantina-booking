@@ -138,7 +138,7 @@ async function loadHrAbsenceCounters(root, tabs, head) {
   const year = ABS.year || new Date().getFullYear();
   const people = HR.employees.filter(e => e.active);
   const data = await Promise.all(people.map(e => api(`/api/admin/hr/absences/balances?employee_id=${e.id}&year=${year}`).then(d => ({ e, d })).catch(() => null)));
-  const cell = b => (b && (b.annual || b.opening || b.taken || b.planned) ? `<b style="${b.remaining < 0 ? 'color:var(--bad)' : ''}">${absAmount(b.remaining, b.unit)}</b><br><span class="mod-note" style="margin:0">goduti ${absAmount(b.taken, b.unit)}${b.planned ? ` · pian. ${absAmount(b.planned, b.unit)}` : ''}</span>` : '—');
+  const cell = b => (b && (b.annual || b.opening || b.taken || b.planned) ? `${b.to_align ? '<span class="badge yellow" title="Saldo da allineare al cedolino">da allineare</span><br>' : ''}<b style="${b.remaining < 0 ? 'color:var(--bad)' : ''}">${absAmount(b.remaining, b.unit)}</b><br><span class="mod-note" style="margin:0">goduti ${absAmount(b.taken, b.unit)}${b.planned ? ` · pian. ${absAmount(b.planned, b.unit)}` : ''}</span>` : '—');
   root.innerHTML = `<div class="list-card">${tabs}${head('Contatori', 'Residuo ad oggi: riporto + maturato − goduto. Sotto, goduto e pianificato. Le spettanze si impostano nella scheda del dipendente.',
     `<div class="mod-toolbar-fields"><select onchange="ABS.year = parseInt(this.value); loadHrAbsences()">${[year - 1, year, year + 1].map(v => `<option ${v === year ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`)}
     <div class="mod-table-wrap"><table class="mod-table"><thead><tr><th>Dipendente</th>${Object.values(ABS_COUNTERS).map(l => `<th>${l}</th>`).join('')}<th>Ferie arretrate</th></tr></thead><tbody>
@@ -165,16 +165,44 @@ function hrTabAbsences() {
   return `
     <div class="mod-section-title">Contatori ${s.allow.year}</div>
     <div class="mod-table-wrap"><table class="mod-table" style="min-width:0"><thead><tr><th></th><th class="num">Spettanza</th><th class="num">Riporto</th><th class="num">Maturato</th><th class="num">Goduto</th><th class="num">Pianificato</th><th class="num">In attesa</th><th class="num">Residuo</th><th></th></tr></thead><tbody>
-      ${bal.map(b => `<tr><td><b>${ABS_COUNTERS[b.counter]}</b>${b.accrual ? `<br><span class="mod-note" style="margin:0">maturazione ${b.accrual}</span>` : ''}</td><td class="num">${absAmount(b.annual, b.unit)}</td><td class="num">${absAmount(b.opening, b.unit)}</td>
+      ${bal.map(b => `<tr><td><b>${ABS_COUNTERS[b.counter]}</b><br><span class="mod-note" style="margin:0">${b.source === 'persona' ? 'spettanza della persona' : b.source === 'standard' ? `standard: ${esc(b.plan)}` : 'nessuna spettanza'}${b.accrual ? ` · ${b.accrual}` : ''}${b.anchor ? ` · saldo al ${UI.date(b.anchor.as_of)}` : ''}</span></td><td class="num">${absAmount(b.annual, b.unit)}</td><td class="num">${absAmount(b.opening, b.unit)}</td>
         <td class="num">${absAmount(b.accrued, b.unit)}</td><td class="num">${absAmount(b.taken, b.unit)}</td><td class="num">${absAmount(b.planned, b.unit)}</td><td class="num">${absAmount(b.pending, b.unit)}</td>
         <td class="num"><b style="${b.remaining < 0 ? 'color:var(--bad)' : ''}">${absAmount(b.remaining, b.unit)}</b></td>
         <td>${canEdit ? `<button class="btn-outline-pill" onclick="openAllowanceModal('${b.counter}', ${s.allow.year})">Spettanza</button>` : ''}</td></tr>`).join('')}
     </tbody></table></div>
     ${s.allow.arrears.length ? `<div class="mod-warn" style="margin-top:12px">Ferie arretrate: ${s.allow.arrears.map(v => `${v.year} — ${absAmount(v.amount, 'giorni')} da godere entro il ${UI.date(v.due_date)}`).join('; ')}.</div>` : ''}
-    <p class="mod-note">Residuo = riporto + maturato − goduto. Le ferie si consumano dalle più vecchie; quelle di un anno vanno godute entro il 30 giugno del secondo anno successivo.</p>
+    ${!s.allow.contract ? '<div class="mod-warn" style="margin-top:12px">Manca il contratto: le spettanze standard si applicano quando inserisci CCNL e tipo di contratto in Rapporto di lavoro.</div>'
+      : !s.allow.plan && bal.every(b => b.source !== 'persona') ? `<div class="mod-warn" style="margin-top:12px">Il CCNL del contratto («${esc(s.allow.contract.ccnl || 'non indicato')}») non corrisponde a una spettanza standard: indica agricoltura o commercio, oppure imposta la spettanza della persona.</div>` : ''}
+    <p class="mod-note">Residuo = partenza (riporto o saldo al cedolino) + maturato − goduto. I ratei maturano a fine mese nei mesi con almeno 15 giorni di servizio. Le ferie si consumano dalle più vecchie; quelle di un anno vanno godute entro il 30 giugno del secondo anno successivo.</p>
+    ${bal.some(b => b.to_align) ? '<div class="mod-warn" style="margin:0 0 10px">Saldo da allineare al cedolino: la persona era già in forza prima dell&#39;avvio del conteggio, e le ferie godute prima non sono qui. Indica il residuo dell&#39;ultimo cedolino.</div>' : ''}
+    ${canEdit ? `<button class="btn secondary small" onclick="openBalanceAnchorModal()">Allinea al cedolino</button>` : ''}
+    ${s.allow.anchors.length ? `<div class="mod-section-title" style="margin-top:18px">Saldi dal cedolino</div>${s.allow.anchors.map(x => `<div class="dl-item"><div class="mod-row-main"><div class="mod-row-title">${ABS_COUNTERS[x.counter]}: ${absAmount(x.amount, x.counter === 'ferie' ? 'giorni' : 'ore')} al ${UI.date(x.as_of)}</div>
+      <div class="mod-row-sub">${esc(x.note || '')}${x.created_by ? ` · ${esc(x.created_by)}` : ''}</div></div>${canEdit ? `<button class="btn-outline-pill danger" title="Elimina" onclick="deleteBalanceAnchor(${x.id})">${UI.icon.trash}</button>` : ''}</div>`).join('')}` : ''}
     <div class="mod-section-title" style="margin-top:26px">Assenze</div>
     <div class="list-card" style="margin:0;box-shadow:none">${s.list.map(a => absRow(a, { withName: false })).join('') || '<div class="mod-empty">Nessuna assenza.</div>'}</div>
     <button class="btn secondary small" style="margin-top:10px" onclick="openAbsenceModal(${REC.id})">+ Nuova assenza</button>`;
+}
+function openBalanceAnchorModal() {
+  UI.modal({
+    id: 'abs-anchor-modal', title: 'Allinea al cedolino', width: 520, saveLabel: 'Salva il residuo',
+    body: `<div class="field-row">
+        <div class="field"><label>Residuo al</label><input type="date" name="as_of" value="${hrLastMonthEnd()}"></div>
+        <div class="field"><label>Ferie (giorni)</label><input name="ferie" inputmode="decimal"></div>
+        <div class="field"><label>ROL (ore)</label><input name="rol" inputmode="decimal"></div>
+        <div class="field"><label>Ex festività (ore)</label><input name="ex_festivita" inputmode="decimal"></div>
+      </div>
+      <div class="field"><label>Nota</label><input name="note" placeholder="es. cedolino di agosto"></div>
+      <p class="mod-note">Indica i residui come li riporta il cedolino a quella data (lascia vuoto quello che non cambi). Dal giorno dopo il saldo prosegue con i ratei e le assenze registrate qui.</p>`,
+    onSave: async b => {
+      const body = { as_of: UI.val(b, 'as_of'), note: UI.val(b, 'note') };
+      for (const k of ['ferie', 'rol', 'ex_festivita']) body[k] = UI.val(b, k);
+      await api(`/api/admin/hr/employees/${REC.id}/balance-anchors`, { method: 'POST', body: JSON.stringify(body) });
+      openHrRecord(REC.id, 'assenze');
+    },
+  });
+}
+function deleteBalanceAnchor(id) {
+  UI.confirmDo('Eliminare questo saldo? Il conteggio torna a quello di prima.', () => api(`/api/admin/hr/balance-anchors/${id}`, { method: 'DELETE' }), () => openHrRecord(REC.id, 'assenze'));
 }
 function openAllowanceModal(counter, year) {
   const b = REC.absences.allow.balances.find(x => x.counter === counter);
@@ -203,7 +231,16 @@ async function loadHrAbsenceConfig() {
   ABS.types = [];
   const [types, periods, settings, sites, teams] = await Promise.all([absTypes(), api('/api/admin/hr/absence-block-periods'), api('/api/admin/hr/absence-settings'), api('/api/admin/hr/sites'), api('/api/admin/hr/teams')]);
   ABS.periods = periods; ABS.sites = sites; ABS.teams = teams;
+  ABS.plans = await api('/api/admin/hr/absence-plans').catch(() => []);
+  const gg = v => UI.decimal(v / 1000), hh = v => UI.decimal(v / 60);
   box.innerHTML = `
+    <div class="list-card">
+      <div class="list-toolbar"><div class="list-toolbar-title"><h3>Spettanze standard</h3><p class="mod-intro">Ferie, ROL ed ex festività per CCNL e tipo di contratto: valgono per ogni dipendente, anno per anno, dalla data di assunzione (ratei a fine mese, con almeno 15 giorni di servizio nel mese). ROL ed ex festività in proporzione al part-time. Vince la prima per priorità; la spettanza della singola persona resta come eccezione. Valori da verificare con il consulente del lavoro.</p></div>
+        <div class="list-spacer"></div><button class="btn-generate" onclick="openAbsPlanModal()">${UI.icon.plus} Nuova</button></div>
+      ${ABS.plans.map(x => `<div class="mod-row ${x.active ? '' : 'cc-inactive'}"><div class="mod-row-main"><div class="mod-row-title">${esc(x.name)}</div>
+        <div class="mod-row-sub">${x.ccnl ? `CCNL ${x.ccnl}` : 'Qualsiasi CCNL'} · ${x.contract_types ? x.contract_types.map(c => HR_CONTRACT_TYPES[c] || c).join(', ') : 'tutti i contratti'} · ferie ${gg(x.ferie)} gg · ROL ${hh(x.rol)} h · ex festività ${hh(x.ex_festivita)} h · maturazione ${x.accrual}${x.note ? ` · ${esc(x.note)}` : ''}</div></div>
+        <button class="btn-outline-pill" onclick="openAbsPlanModal(${x.id})">Modifica</button></div>`).join('') || '<div class="mod-empty">Nessuna spettanza standard.</div>'}
+    </div>
     <div class="list-card">
       <div class="list-toolbar"><div class="list-toolbar-title"><h3>Tipi di assenza</h3><p class="mod-intro">Con approvazione (bozza → richiesta → approvata) o con comunicazione (comunicata → presa visione). Il contatore indica cosa consumano.</p></div>
         <div class="list-spacer"></div><button class="btn-generate" onclick="openAbsTypeModal()">${UI.icon.plus} Nuovo tipo</button></div>
@@ -235,6 +272,35 @@ async function saveAbsSettings() {
     await api('/api/admin/hr/absence-settings', { method: 'PUT', body: JSON.stringify({ escalation_days: document.getElementById('abs-set-days').value, over_balance: document.getElementById('abs-set-over').value }) });
     UI.msg(document.getElementById('abs-set-msg'), 'Salvato.', 'success');
   } catch (e) { UI.msg(document.getElementById('abs-set-msg'), e.message); }
+}
+function openAbsPlanModal(id) {
+  const x = (ABS.plans || []).find(p => p.id === id) || null;
+  const types = Object.entries(HR_CONTRACT_TYPES);
+  UI.modal({
+    id: 'abs-plan-modal', title: x ? `Modifica ${x.name}` : 'Nuova spettanza standard', width: 560,
+    body: `<div class="field"><label>Nome</label><input name="name" value="${UI.attr(x?.name)}"></div>
+      <div class="field-row">
+        <div class="field"><label>CCNL</label><select name="ccnl">${UI.options([{ id: 'agricoltura', name: 'Agricoltura' }, { id: 'commercio', name: 'Commercio e terziario' }], x?.ccnl, { empty: 'Qualsiasi' })}</select></div>
+        <div class="field"><label>Maturazione</label><select name="accrual">${UI.options([{ id: 'mensile', name: 'Mensile (a fine mese)' }, { id: 'annuale', name: 'Tutta a inizio anno' }], x?.accrual || 'mensile')}</select></div>
+        <div class="field"><label>Priorità</label><input name="priority" type="number" value="${UI.attr(x?.priority ?? 100)}"></div>
+      </div>
+      <div class="field"><label>Tipi di contratto (nessuno = tutti)</label><div class="mod-checklist">${types.map(([k, l]) => `<label><input type="checkbox" data-ct="${k}" ${x?.contract_types?.includes(k) ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div></div>
+      <div class="field-row">
+        <div class="field"><label>Ferie (giorni l'anno)</label><input name="ferie" inputmode="decimal" value="${x ? UI.attr(UI.decimal(x.ferie / 1000)) : ''}"></div>
+        <div class="field"><label>ROL (ore l'anno)</label><input name="rol" inputmode="decimal" value="${x ? UI.attr(UI.decimal(x.rol / 60)) : ''}"></div>
+        <div class="field"><label>Ex festività (ore l'anno)</label><input name="ex_festivita" inputmode="decimal" value="${x ? UI.attr(UI.decimal(x.ex_festivita / 60)) : ''}"></div>
+      </div>
+      <div class="field"><label>Nota</label><input name="note" value="${UI.attr(x?.note)}"></div>
+      ${x ? `<label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" name="active" ${x.active ? 'checked' : ''}> Attiva</label>` : ''}
+      <p class="mod-note">I giorni di ferie si contano sui giorni lavorativi dell'orario del dipendente: con una settimana di 5 giorni, 4 settimane sono 20 giorni.</p>`,
+    onSave: async b => {
+      const body = { contract_types: [...b.querySelectorAll('[data-ct]:checked')].map(c => c.dataset.ct) };
+      for (const k of ['name', 'ccnl', 'accrual', 'priority', 'ferie', 'rol', 'ex_festivita', 'note']) body[k] = UI.val(b, k);
+      if (x) body.active = UI.val(b, 'active');
+      await api('/api/admin/hr/absence-plans' + (x ? `/${x.id}` : ''), { method: x ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+      loadHrAbsenceConfig();
+    },
+  });
 }
 function openAbsTypeModal(id) {
   const x = ABS.types.find(t => t.id === id) || null;
