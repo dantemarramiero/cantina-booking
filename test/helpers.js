@@ -23,6 +23,10 @@ async function startApp() {
   console.log = log;
 
   const server = await new Promise(resolve => { const s = mod.app.listen(0, '127.0.0.1', () => resolve(s)); });
+  // Con tutta la suite in parallelo un processo può restare occupato per secondi: se il server chiude una
+  // connessione inattiva (5 s di default) proprio mentre fetch la riusa, la richiesta fallisce con ECONNRESET.
+  server.keepAliveTimeout = 120000;
+  server.headersTimeout = 121000;
   const base = `http://127.0.0.1:${server.address().port}`;
 
   async function request(method, p, { body, token, headers = {} } = {}) {
