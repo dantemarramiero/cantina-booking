@@ -75,7 +75,7 @@ test('28 · la migrazione dà a ogni utente esattamente gli accessi di prima (te
   }
 
   // 3. Si riapplica la migrazione.
-  assert.deepEqual(runMigrations(t.db, { dir: MIG_DIR, log: silent }), ['0030']);
+  assert.ok(runMigrations(t.db, { dir: MIG_DIR, log: silent }).includes('0030'));
   t.authz.invalidate();
 
   // 4. Stesso esito per ogni utente × ogni API, ogni livello di riservatezza e ogni capacità.

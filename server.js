@@ -11,7 +11,8 @@ const { runMigrations } = require('./lib/migrations');
 const { createAuthz } = require('./lib/authz');
 const { createEventBus } = require('./lib/events');
 const { createScheduler } = require('./lib/scheduler');
-const { createSessions, createSigner, createLoginThrottle, canAccess, safeEqual, ACCESS_LEVELS, PRD_CAPABILITIES } = require('./lib/security');
+const { createSessions, createSigner, createLoginThrottle, safeEqual, ACCESS_LEVELS, PRD_CAPABILITIES } = require('./lib/security');
+const { LEVEL_PERMISSIONS, CAPABILITY_PERMISSIONS } = require('./lib/permissions');
 const { createAudit } = require('./lib/audit');
 const { createNotifications } = require('./lib/notifications');
 const { createSecureStore, resolveKey } = require('./lib/secure-files');
@@ -1323,49 +1324,43 @@ function authAdmin(req, res, next) {
     }
     req.portalUser = user;
   }
-  if (!canAccess(permittedWorkspacesFor(req), req.method, req.path)) {
+  if (!authz.canRoute(req, req.method, req.path)) {
     return res.status(403).json({ error: 'Non hai i permessi per questa sezione.' });
   }
   next();
 }
 
-// null = accesso completo: solo la chiave master. Un utente senza ruolo (o con un ruolo che non esiste
-// più) non ha accesso a nessun modulo (decisione Q2 di docs/audit_permessi.md; la migrazione 0030 ha dato
-// "Accesso completo" a chi prima non aveva un ruolo).
-const roleOf = req => (req.portalUser?.role_id ? db.prepare('SELECT * FROM roles WHERE id = ?').get(req.portalUser.role_id) : null);
+// Permessi (Fase 2 di docs/audit_permessi.md): ogni controllo passa da authz.can(), che legge i permessi
+// effettivi (posizione → ruoli, concessioni nominative, deleghe). Le funzioni qui sotto traducono le domande
+// di sempre (moduli, livelli HR, capacità di Produzione) in permessi. null = tutto: solo la chiave master.
+// Un utente senza ruolo non ha permessi (decisione Q2).
+
+// Moduli da mostrare nell'interfaccia: quelli dei ruoli che l'utente ha oggi. Serve solo a comporre il menu:
+// il server blocca comunque ogni API senza il permesso.
 function permittedWorkspacesFor(req) {
   if (req.isMasterKey) return null;
-  const role = roleOf(req);
-  if (!role) return [];
-  try { return JSON.parse(role.workspaces); } catch { return []; }
+  const ws = new Set();
+  for (const r of authz.rolesOf(req)) { try { JSON.parse(r.workspaces).forEach(w => ws.add(w)); } catch {} }
+  return [...ws];
 }
-
-// Livelli di riservatezza dei dati HR (base, personale, retributivo, sanitario, disciplinare).
-// Come per i workspace: la chiave master vede tutto (null), un utente senza ruolo solo il livello "base".
+// Livelli di riservatezza dei dati HR: "base" ce l'hanno tutti, gli altri sono permessi
+// (personale per ruolo; retributivo, sanitario e disciplinare solo per concessione nominativa).
+function hasAccessLevel(req, level) {
+  return level === 'base' || (!!LEVEL_PERMISSIONS[level] && authz.can(req, LEVEL_PERMISSIONS[level]));
+}
 function accessLevelsFor(req) {
-  if (req.isMasterKey) return null;
-  const role = roleOf(req);
-  if (!role) return ['base'];
-  let levels = [];
-  try { levels = JSON.parse(role.access_levels || '[]'); } catch {}
-  return ['base', ...levels.filter(l => l !== 'base')];
+  return req.isMasterKey ? null : ACCESS_LEVELS.filter(l => hasAccessLevel(req, l));
 }
 // Chi ha fatto un'azione, come testo leggibile (registri e movimenti di magazzino).
 const actorName = req => (req?.portalUser ? req.portalUser.name : req?.isMasterKey ? 'Chiave master' : 'Sistema');
-function hasAccessLevel(req, level) {
-  const levels = accessLevelsFor(req);
-  return levels === null || levels.includes(level);
-}
-function hasWorkspace(req, workspace) {
-  const permitted = permittedWorkspacesFor(req);
-  return permitted === null || permitted.includes(workspace);
-}
-// Capacità dentro Produzione (enologo, cantiniere…). null = tutte (chiave master), [] = nessuna.
+// Capacità dentro Produzione (enologo, cantiniere…): i permessi produzione.prd.<capacità>. null = tutte.
+// "Sola lettura" vuol dire non averne nessuna (i permessi sono solo additivi): la si riporta comunque, se un
+// ruolo dell'utente la indica, perché la Produzione spieghi "sei in sola lettura" invece di "serve l'enologo".
 function capabilitiesFor(req) {
   if (req.isMasterKey) return null;
-  const role = roleOf(req);
-  if (!role) return [];
-  try { return JSON.parse(role.capabilities || '[]'); } catch { return []; }
+  const caps = Object.entries(CAPABILITY_PERMISSIONS).filter(([, code]) => authz.can(req, code)).map(([cap]) => cap);
+  const readOnly = authz.rolesOf(req).some(r => { try { return JSON.parse(r.capabilities || '[]').includes('sola_lettura'); } catch { return false; } });
+  return readOnly && !caps.length ? ['sola_lettura'] : caps;
 }
 
 // ── ERP helpers ───────────────────────────────────────────────────────────────
@@ -4995,7 +4990,7 @@ app.post('/api/admin/logout', authAdmin, (req, res) => {
 app.get('/api/admin/signed-url', authAdmin, (req, res) => {
   const target = String(req.query.path || '');
   if (!/^\/api\/admin\/[a-z0-9/_-]+$/i.test(target)) return res.status(400).json({ error: 'Percorso non valido.' });
-  if (!canAccess(permittedWorkspacesFor(req), 'GET', target)) return res.status(403).json({ error: 'Non hai i permessi per questa sezione.' });
+  if (!authz.canRoute(req, 'GET', target)) return res.status(403).json({ error: 'Non hai i permessi per questa sezione.' });
   res.json({ url: signer.signUrl(target, req.portalSession.id, 600) });
 });
 
@@ -5244,7 +5239,7 @@ const hr = require('./modules/hr')(app, { db, authAdmin, audit, hasAccessLevel, 
 // Archivio cifrato dei documenti HR sul volume persistente (chiave in HR_FILES_KEY).
 const hrFilesKey = resolveKey({ dataDir: DATA_DIR });
 const secureStore = createSecureStore({ dir: path.join(DATA_DIR, 'hr-files'), key: hrFilesKey.key });
-const hrFile = require('./modules/hr-file')(app, { db, authAdmin, audit, events, hasAccessLevel, hasWorkspace, notifications, scheduler, signer, secureStore, getSetting, setSetting, hr, finance });
+const hrFile = require('./modules/hr-file')(app, { db, authAdmin, audit, events, hasAccessLevel, can: authz.can, notifications, scheduler, signer, secureStore, getSetting, setSetting, hr, finance });
 const hrSafety = require('./modules/hr-safety')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, getSetting, setSetting, hr, hrFile });
 const hrAbsences = require('./modules/hr-absences')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety });
 const hrTimesheet = require('./modules/hr-timesheet')(app, { db, authAdmin, audit, events, hasAccessLevel, notifications, scheduler, getSetting, setSetting, hr, hrFile, hrSafety, hrAbsences, finance });

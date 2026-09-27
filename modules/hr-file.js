@@ -23,7 +23,7 @@ const intOrNull = v => (v === '' || v == null ? null : parseInt(v));
 const daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
 
 module.exports = function registerHrFile(app, deps) {
-  const { db, authAdmin, audit, events, hasAccessLevel, hasWorkspace, notifications, scheduler, signer, secureStore, getSetting, setSetting, hr, finance } = deps;
+  const { db, authAdmin, audit, events, hasAccessLevel, can, notifications, scheduler, signer, secureStore, getSetting, setSetting, hr, finance } = deps;
   const r = createRouter(app, '/api/admin/hr', authAdmin, [
     [/employee_personal.fiscal_code|idx_employee_personal_cf/, 'Questo codice fiscale è già di un altro dipendente.'],
     [/compensations/, 'Esiste già una retribuzione con questa decorrenza.'],
@@ -386,9 +386,9 @@ module.exports = function registerHrFile(app, deps) {
       const d = db.prepare('SELECT d.*, t.level, t.employee_visible FROM hr_documents d JOIN hr_document_types t ON t.code = d.type_code WHERE d.id = ?').get(req.params.id);
       if (!d) throw new HttpError(404, 'Documento non trovato.');
       const e = d.employee_id ? employee(d.employee_id) : null;
-      // Senza il workspace People si scaricano solo i propri documenti visibili al dipendente (self-service):
-      // né i documenti dei colleghi, neppure quelli di livello «base», né quelli dei livelli del ruolo.
-      const allowed = !hasWorkspace(req, 'people')
+      // Senza il permesso sui dipendenti (workspace People) si scaricano solo i propri documenti visibili al
+      // dipendente (self-service): né i documenti dei colleghi, neppure quelli di livello «base», né quelli dei livelli.
+      const allowed = !can(req, 'people.dipendenti.leggi')
         ? !!e && isSelf(req, e) && !!d.employee_visible && d.level !== 'disciplinare'
         : e ? canSee(req, e, d.level) && (!isSelf(req, e) || hasAccessLevel(req, d.level) || d.employee_visible) : hasAccessLevel(req, d.level);
       if (!allowed) throw new HttpError(403, 'Non puoi aprire questo documento.');
