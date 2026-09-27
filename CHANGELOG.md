@@ -258,6 +258,40 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - **Dati sensibili** (retribuzioni, idoneità, disciplinare): non si associano più a un ruolo. Chi li aveva dal ruolo li mantiene come concessione nominativa, con la motivazione "Migrazione dal ruolo X".
 - **Permessi effettivi** ricalcolati quando cambiano ruoli o utenti, e ogni ora: concessioni e deleghe scadono da sole.
 - **Test di parità:** ogni utente × ogni API × livelli e capacità dà lo stesso esito prima e dopo la migrazione. Per ora l'accesso lo decide ancora il sistema di prima.
+**Produzione — Fase 2: vigneto** (vedi `docs/produzione/02-fase-2.md`; in locale, da approvare)
+- **Interventi e trattamenti:**
+  - interventi su più parcelle, con esecutori e attrezzature: bozza, conferma, storno con motivo e «ripeti»;
+  - trattamenti con uno o più prodotti e tutti i controlli di legge (PRD-V01…V11): patentino e limitazioni del medico bloccanti da People, dose massima, applicazioni massime, biologico, carenza e rientro, registrazione tardiva, irroratrice non controllata.
+- **Stato delle parcelle oggi:** carenza, rientro, ultimo trattamento e interventi pianificati.
+- **Registro dei trattamenti:** CSV e stampa.
+- **Analisi:**
+  - analisi di maturazione, anche importate dal laboratorio (tutto o niente);
+  - curve per annata;
+  - previsione di vendemmia per destinazione, modificabile a mano.
+- **Pagina da campo** `/campo.html` per telefono e tablet: funziona anche senza rete; le bozze partono al ritorno della rete e quelle rifiutate si correggono o si scartano.
+- **Presenze:** l'intervento confermato propone la riga agli esecutori, con l'oggetto di costo della parcella per annata. Nuovo «Centro per le ore di vigneto».
+- **Magazzino:** il fitofarmaco gestito a magazzino si scarica per parcella; lo storno lo rimette.
+
+**People — Timesheet** (ex «Presenze»; in locale, da approvare)
+- People → Presenze diventa **People → Timesheet**: è l'unico posto dove si registrano le ore, su un centro di costo (e facoltativamente un oggetto di costo).
+- Lo vede **ogni utente collegato a una scheda dipendente**, anche senza il workspace People: in quel caso il workspace People mostra solo la voce Timesheet, con il proprio foglio.
+- **Utenza e scheda dipendente insieme:** in Impostazioni → Utenti, creando un'utenza si crea anche la scheda dipendente (nome, cognome, email, sede principale), oppure si collega a una scheda esistente, oppure «nessuna» per chi non è dipendente. Se la scheda non si collega, l'utenza non nasce. L'elenco utenti mostra la scheda collegata o «Senza scheda»; People → Dipendenti segnala chi non ha un'utenza.
+- **Promemoria:** al dipendente per il giorno lavorativo di ieri scoperto (dalle 9) e l'ultimo giorno del mese per inviarlo (dalle 15); dal 3 del mese al responsabile l'elenco di chi non ha inviato il mese prima. Partono dalla prima esecuzione, non per il passato.
+- Tolti i doppioni: la sezione Presenze di «Il mio spazio» e quella della scheda del dipendente (al suo posto un pulsante «Timesheet» che apre il foglio della persona). I vecchi link delle notifiche aprono il Timesheet.
+
+**People — Festività automatiche** (in locale, da approvare)
+- **Santo patrono ricavato dal comune** della sede, da un elenco di circa 7.700 comuni (`lib/patroni.json`, dataset del 2018). Il giorno si calcola ogni anno anche quando cambia: «terza domenica di settembre», «lunedì di Pentecoste»… Si calcola per il 93% dei comuni; per gli altri la sede mostra «Patrono da indicare» e si inserisce a mano. Il patrono indicato a mano ha sempre la precedenza.
+- **La sede principale prende comune e provincia dai dati aziendali** (Impostazioni), senza riscriverli.
+- **San Francesco d'Assisi (4 ottobre)** di nuovo festa nazionale dal 2026, calcolata: gli anni prima non cambiano.
+- Restano a mano solo le chiusure aziendali.
+
+## 2026-09-27 — Timesheet personale
+
+**People — Timesheet personale e Presenze per il controllo** (in locale, da approvare)
+- **Timesheet**: la schermata personale di ogni utente collegato a una scheda dipendente. Si vede solo il proprio foglio; ognuno inserisce, modifica ed elimina **solo le proprie ore**, conferma le proprie proposte e invia il mese. Chi non ha una scheda vede un avviso con il rimando a Impostazioni → Utenti.
+- **People → Presenze**: per HR e responsabili (anche senza il workspace People, se si è responsabili o delegati di qualcuno). Riepilogo dei collaboratori, fogli in sola lettura, approvazione o rinvio del mese con una nota, rettifiche dei mesi approvati, export CSV.
+- Nessuno scrive più nel foglio di un altro: né il responsabile, né l'ufficio del personale, né la chiave master. Tolte le **ore di squadra**. Un mese inviato non lo corregge nemmeno chi approva: lo rimanda indietro e corregge il dipendente. Resta l'eccezione della **rettifica** di un mese approvato, con motivo obbligatorio.
+- Le notifiche per chi approva (mese da approvare, mesi non inviati, conflitti, limitazioni) aprono Presenze; quelle per il dipendente aprono il suo Timesheet.
 
 ## Come continuare questo changelog
 

@@ -34,6 +34,30 @@ test('calendario della sede: patrono di Pescara, Pasquetta calcolata, nazionali 
   assert.ok(!national.find(h => h.date === '2026-10-10'), 'senza sede niente patrono');
 });
 
+test('patrono automatico dal comune; la sede principale prende il comune dai dati aziendali', async () => {
+  const other = (await t.api('POST', '/api/admin/hr/sites', { name: 'Cantina di Bolzano', city: 'Bolzano', province: 'bz' })).data.id;
+  let s = (await t.api('GET', '/api/admin/hr/sites')).data.find(x => x.id === other);
+  assert.deepEqual([s.patron.source, s.patron.name], ['automatico', 'Maria Santissima Assunta']);
+  const cal = (await t.api('GET', `/api/admin/hr/holidays?year=2027&site_id=${other}`)).data.calendar;
+  assert.equal(cal.find(h => h.kind === 'patrono').date, '2027-05-17', 'lunedì di Pentecoste, che cambia ogni anno');
+  assert.equal((await t.api('PATCH', `/api/admin/hr/sites/${other}`, { patron_day: '08-15', patron_name: 'Assunta' })).status, 200);
+  s = (await t.api('GET', '/api/admin/hr/sites')).data.find(x => x.id === other);
+  assert.deepEqual([s.patron.source, s.patron.date.slice(5)], ['manuale', '08-15'], 'quello indicato a mano vince');
+  await t.api('PATCH', `/api/admin/hr/sites/${other}`, { city: 'Comune inventato' , patron_day: '', patron_name: '' });
+  s = (await t.api('GET', '/api/admin/hr/sites')).data.find(x => x.id === other);
+  assert.equal(s.patron.source, 'mancante');
+
+  const main = (await t.api('GET', '/api/admin/hr/sites')).data.find(x => x.main);
+  const before = { patron_day: main.patron_day, patron_name: main.patron_name };
+  await t.api('PATCH', `/api/admin/hr/sites/${main.id}`, { patron_day: '', patron_name: '' });
+  t.db.prepare("INSERT INTO settings (key, value) VALUES ('company_city', 'Rosciano'), ('company_province', 'PE') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run();
+  const m = (await t.api('GET', '/api/admin/hr/sites')).data.find(x => x.main);
+  assert.deepEqual([m.location.city, m.location.from_company, m.patron.name, m.patron.date], ['Rosciano', true, "Sant'Eurosia", `${new Date().getFullYear()}-05-24`]);
+  t.db.prepare("UPDATE settings SET value = '' WHERE key IN ('company_city', 'company_province')").run();
+  await t.api('PATCH', `/api/admin/hr/sites/${main.id}`, before);
+  await t.api('PATCH', `/api/admin/hr/sites/${other}`, { active: 0 });
+});
+
 test('responsabile e delegato: si sale di livello se il responsabile non è attivo', async () => {
   const dir = await emp('Dario', 'Direttore');
   const capo = await emp('Carla', 'Capo', { manager_id: dir });

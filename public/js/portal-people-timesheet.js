@@ -1,10 +1,14 @@
-// Portale → People: presenze. Riepilogo del mese, foglio presenze del dipendente (righe, assenze,
-// proposte, conflitti, stati del mese, rettifiche), ore di squadra, export e configurazione.
+// Portale → People, due schermate sullo stesso foglio del mese:
+//  - Timesheet: il proprio foglio, per ogni utente collegato a una scheda dipendente. Ognuno inserisce solo
+//    le proprie ore (su centro di costo), conferma le proposte e invia il mese al responsabile.
+//  - Presenze: il controllo di HR e responsabili. Riepilogo dei collaboratori, fogli in sola lettura,
+//    approvazione o rinvio del mese, rettifiche dei mesi approvati, export per il consulente.
 const TS_STATUS = { aperto: ['grey', 'Aperto'], inviato: ['yellow', 'Inviato'], approvato: ['green', 'Approvato'] };
 const TS_ORIGIN = { manuale: '', squadra: 'squadra', proposta: 'proposta', assenza: 'assenza', rettifica: 'rettifica' };
 const TS_WEEKDAYS = ['', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
-// root: dove si disegna il foglio (la pagina Presenze, oppure «Il mio spazio»).
-const TS = { period: UI.thisMonth(), employeeId: null, sheet: null, options: null, root: null };
+// mode: 'self' (Timesheet, employeeId = la propria scheda) o 'review' (Presenze, reviewId = il collaboratore aperto).
+const TS = { period: UI.thisMonth(), mode: 'self', employeeId: null, reviewId: null, sheet: null, options: null };
+const tsRoot = () => document.getElementById(TS.mode === 'review' ? 'people-presenze-root' : 'people-timesheet-root');
 
 const tsHours = m => `${(m / 60).toLocaleString('it-IT', { maximumFractionDigits: 2 })} h`;
 async function tsOptions(force = false) {
@@ -15,37 +19,48 @@ const tsCenterOpts = (sel, empty = null) => UI.options(TS.options.centers, sel, 
 const tsObjectOpts = sel => UI.options(TS.options.objects, sel, { empty: '— Nessuno —', label: o => `${o.code} ${o.name} (${o.type})` });
 const tsWarn = res => { if (res?.warnings?.length) alert(res.warnings.join('\n')); };
 
-// ── Pagina Presenze: riepilogo del mese ────────────────────────────────────────
+// ── Timesheet: il proprio foglio ───────────────────────────────────────────────
 async function loadHrTimesheet() {
-  if (TS.root) { TS.root = null; TS.employeeId = null; } // si arriva da «Il mio spazio»: si riparte dal riepilogo
-  const root = document.getElementById('people-presenze-root');
+  TS.mode = 'self';
   await tsOptions(true);
-  if (TS.employeeId) return loadTsSheet();
-  const rows = await api(`/api/admin/hr/timesheet/overview?period=${TS.period}`);
-  if (rows.length === 1 && TS.options.me && rows[0].employee_id === TS.options.me.id && !TS.options.hr) { TS.employeeId = rows[0].employee_id; return loadTsSheet(); }
-  root.innerHTML = `<div class="list-card">
+  if (!TS.options.me) {
+    tsRoot().innerHTML = '<div class="list-card"><div class="mod-empty">La tua utenza non è collegata a una scheda dipendente, quindi non hai un Timesheet. Chiedi di collegarla in Impostazioni → Utenti.</div></div>';
+    return;
+  }
+  TS.employeeId = TS.options.me.id;
+  return loadTsSheet();
+}
+
+// ── Presenze: i fogli dei collaboratori (HR e responsabili) ─────────────────────
+async function loadHrPresenze() {
+  TS.mode = 'review';
+  await tsOptions(true);
+  if (TS.reviewId) return loadTsSheet();
+  // Il proprio foglio sta nel Timesheet: qui solo quelli degli altri.
+  const rows = (await api(`/api/admin/hr/timesheet/overview?period=${TS.period}`)).filter(x => x.employee_id !== TS.options.me?.id);
+  tsRoot().innerHTML = `<div class="list-card">
     <div class="list-toolbar">
-      <div class="list-toolbar-title"><h3>Presenze di ${esc(UI.monthLabel(TS.period))}</h3><p class="mod-intro">Ore registrate e assenze contro l'orario. Ogni mese si invia al responsabile, che lo approva: dopo, le correzioni si fanno con una rettifica.</p></div>
+      <div class="list-toolbar-title"><h3>Presenze di ${esc(UI.monthLabel(TS.period))}</h3><p class="mod-intro">I fogli dei collaboratori, in sola lettura: ognuno inserisce le proprie ore nel suo Timesheet e invia il mese. Qui si controlla, si approva o si rimanda indietro con una nota; dopo l'approvazione le correzioni si fanno con una rettifica.</p></div>
       <div class="list-spacer"></div>
-      <div class="mod-toolbar-fields"><input type="month" value="${TS.period}" onchange="TS.period = this.value || UI.thisMonth(); loadHrTimesheet()"></div>
-      ${TS.options.teams.length ? `<button class="btn secondary small" onclick="openTsTeamModal()">Ore di squadra</button>` : ''}
+      <div class="mod-toolbar-fields"><input type="month" value="${TS.period}" onchange="TS.period = this.value || UI.thisMonth(); loadHrPresenze()"></div>
       ${TS.options.hr ? `<button class="btn secondary small" onclick="UI.download('/api/admin/hr/timesheet/export/${TS.period}')">Esporta CSV</button>` : ''}
     </div>
-    ${rows.length ? `<div class="mod-table-wrap"><table class="mod-table"><thead><tr><th>Dipendente</th><th>Stato</th><th class="num">Lavorate</th><th class="num">Assenze</th><th class="num">Orario</th><th class="num">Giorni scoperti</th><th class="num">Conflitti</th><th class="num">Proposte</th></tr></thead><tbody>
-      ${rows.map(x => `<tr class="mod-clickable" onclick="TS.employeeId = ${x.employee_id}; loadTsSheet()"><td><b>${esc(x.name)}</b></td>
+    ${rows.length ? `<div class="mod-table-wrap"><table class="mod-table"><thead><tr><th>Dipendente</th><th>Stato</th><th class="num">Lavorate</th><th class="num">Assenze</th><th class="num">Orario</th><th class="num">Giorni scoperti</th><th class="num">Conflitti</th></tr></thead><tbody>
+      ${rows.map(x => `<tr class="mod-clickable" onclick="TS.reviewId = ${x.employee_id}; loadTsSheet()"><td><b>${esc(x.name)}</b></td>
         <td><span class="badge ${TS_STATUS[x.status][0]}">${TS_STATUS[x.status][1]}</span>${x.can_approve ? ' <span class="badge yellow">da approvare</span>' : ''}</td>
         <td class="num">${tsHours(x.worked)}</td><td class="num">${tsHours(x.absent)}</td><td class="num">${tsHours(x.scheduled)}</td>
         <td class="num" style="${x.missing_days ? 'color:var(--warn);font-weight:600' : ''}">${x.missing_days || '—'}</td>
-        <td class="num" style="${x.conflicts ? 'color:var(--bad);font-weight:600' : ''}">${x.conflicts || '—'}</td><td class="num">${x.proposals || '—'}</td></tr>`).join('')}
-    </tbody></table></div>` : '<div class="mod-empty">Nessun dipendente da mostrare.</div>'}
+        <td class="num" style="${x.conflicts ? 'color:var(--bad);font-weight:600' : ''}">${x.conflicts || '—'}</td></tr>`).join('')}
+    </tbody></table></div>` : '<div class="mod-empty">Nessun collaboratore da mostrare.</div>'}
   </div>`;
 }
 
-// ── Foglio presenze di un dipendente ───────────────────────────────────────────
+// ── Foglio del mese di un dipendente ───────────────────────────────────────────
 async function loadTsSheet() {
-  const root = document.getElementById(TS.root || 'people-presenze-root');
+  const root = tsRoot();
   if (!TS.options) await tsOptions();
-  const s = TS.sheet = await api(`/api/admin/hr/timesheet/month?employee_id=${TS.employeeId}&period=${TS.period}`);
+  const review = TS.mode === 'review';
+  const s = TS.sheet = await api(`/api/admin/hr/timesheet/month?employee_id=${review ? TS.reviewId : TS.employeeId}&period=${TS.period}`);
   const [cls, label] = TS_STATUS[s.status];
   const actions = [];
   if (s.can_submit) actions.push('<button class="btn small" onclick="tsMonthAction(\'submit\')">Invia al responsabile</button>');
@@ -54,13 +69,14 @@ async function loadTsSheet() {
   const t = s.totals;
   root.innerHTML = `<div class="list-card">
     <div class="rec-head">
-      ${TS.root ? '' : '<button class="btn secondary small" onclick="TS.employeeId = null; loadHrTimesheet()">← Presenze</button>'}
+      ${review ? '<button class="btn secondary small" onclick="TS.reviewId = null; loadHrPresenze()">← Presenze</button>' : ''}
       <div style="flex:1;min-width:200px"><div class="rec-name">${esc(s.employee.name)}</div><div class="rec-sub">${esc(UI.monthLabel(s.period))}</div></div>
       <input type="month" value="${s.period}" onchange="TS.period = this.value || UI.thisMonth(); loadTsSheet()" style="height:34px;border:1px solid var(--line-strong);border-radius:4px;padding:0 8px">
       <span class="badge ${cls}">${label}</span>
       ${actions.join('')}
     </div>
     <div class="mod-body">
+      ${review ? `<p class="mod-note" style="margin-top:0">Sola lettura: le ore le inserisce ${esc(s.employee.name)} nel suo Timesheet.</p>` : ''}
       ${s.month?.return_note && s.status === 'aperto' ? `<div class="mod-warn">Rimandato indietro: ${esc(s.month.return_note)}</div>` : ''}
       ${s.conflicts.length ? `<div class="mod-section-title">Conflitti tra ore e assenze</div>${s.conflicts.map(c => `<div class="mod-anomaly" style="display:flex;gap:10px;align-items:center;justify-content:space-between">
         <span>${esc(c.message)}</span>${s.can_edit ? `<button class="btn-outline-pill" onclick="tsResolveConflict(${c.id})">Risolto</button>` : ''}</div>`).join('')}` : ''}
@@ -107,13 +123,13 @@ function tsEntryLine(x, s) {
 }
 async function tsMonthAction(action) {
   try {
-    await api(`/api/admin/hr/timesheet/months/${action}`, { method: 'POST', body: JSON.stringify({ employee_id: TS.employeeId, period: TS.period }) });
+    await api(`/api/admin/hr/timesheet/months/${action}`, { method: 'POST', body: JSON.stringify({ employee_id: TS.sheet.employee.id, period: TS.sheet.period }) });
     loadTsSheet();
   } catch (e) { alert(e.message); }
 }
 function tsReturnMonth() {
   UI.modal({ id: 'ts-return-modal', title: 'Rimanda indietro il mese', width: 460, saveLabel: 'Rimanda', body: '<div class="field"><label>Cosa va corretto</label><textarea name="note" rows="3"></textarea></div>',
-    onSave: async b => { await api('/api/admin/hr/timesheet/months/return', { method: 'POST', body: JSON.stringify({ employee_id: TS.employeeId, period: TS.period, note: UI.val(b, 'note') }) }); loadTsSheet(); } });
+    onSave: async b => { await api('/api/admin/hr/timesheet/months/return', { method: 'POST', body: JSON.stringify({ employee_id: TS.sheet.employee.id, period: TS.sheet.period, note: UI.val(b, 'note') }) }); loadTsSheet(); } });
 }
 async function tsResolveConflict(id) {
   try { await api(`/api/admin/hr/timesheet/conflicts/${id}/resolve`, { method: 'POST', body: JSON.stringify({}) }); loadTsSheet(); } catch (e) { alert(e.message); }
@@ -181,42 +197,6 @@ function openTsEntryModal(date, entryId) {
   });
 }
 
-// ── Ore di squadra ─────────────────────────────────────────────────────────────
-const tsTeamMembers = t => (t?.members || []).map(m => `<label><input type="checkbox" data-member="${m.id}" checked> ${esc(m.name)}</label>`).join('');
-function tsTeamChanged(sel) {
-  document.getElementById('ts-team-members').innerHTML = tsTeamMembers(TS.options.teams.find(t => String(t.id) === sel.value));
-}
-async function openTsTeamModal() {
-  await tsOptions();
-  const teams = TS.options.teams;
-  UI.modal({
-    id: 'ts-team-modal', title: 'Ore di squadra', width: 620, saveLabel: 'Registra per tutti',
-    body: `
-      <div class="field"><label>Squadra</label><select name="team_id" onchange="tsTeamChanged(this)">${UI.options(teams, teams[0]?.id)}</select></div>
-      <div class="field-row">
-        <div class="field"><label>Giorno</label><input type="date" name="work_date" value="${new Date().toISOString().slice(0, 10)}"></div>
-        <div class="field"><label>Dalle</label><input name="start_time" placeholder="07:00"></div>
-        <div class="field"><label>Alle</label><input name="end_time" placeholder="12:00"></div>
-        <div class="field"><label>Tipo</label><select name="hour_type">${UI.options(Object.entries(TS.options.hour_types).map(([id, name]) => ({ id, name })), 'ordinaria')}</select></div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>Particella / centro</label><select name="cost_center_id">${tsCenterOpts('', '— Centro —')}</select></div>
-        <div class="field"><label>Operazione</label><select name="cost_object_id">${tsObjectOpts('')}</select></div>
-      </div>
-      <div class="field"><label>Chi c'era</label><div class="mod-checklist" id="ts-team-members">${tsTeamMembers(teams[0])}</div></div>
-      <div class="field"><label>Nota</label><input name="note"></div>
-      <p class="mod-note">Se per qualcuno c'è un blocco (abilitazione mancante, permesso scaduto, giorno di assenza…) non si registra nulla: togli la spunta a chi è bloccato e riprova.</p>`,
-    onSave: async b => {
-      const body = { member_ids: [...b.querySelectorAll('[data-member]:checked')].map(c => Number(c.dataset.member)) };
-      for (const k of ['team_id', 'work_date', 'start_time', 'end_time', 'hour_type', 'cost_center_id', 'cost_object_id', 'note']) body[k] = UI.val(b, k) || null;
-      const res = await api('/api/admin/hr/timesheet/team', { method: 'POST', body: JSON.stringify(body) });
-      tsWarn(res);
-      alert(`Ore registrate per ${res.ids.length} ${res.ids.length === 1 ? 'persona' : 'persone'}.`);
-      loadHrTimesheet();
-    },
-  });
-}
-
 // ── Rettifica (mese approvato) ─────────────────────────────────────────────────
 async function openTsAdjustModal() {
   const s = TS.sheet;
@@ -250,25 +230,13 @@ function tsAdjRow() {
   </div>`;
 }
 
-// ── Sezione Presenze della scheda (riepilogo) ──────────────────────────────────
-async function hrLoadTimesheetSummary() {
-  const months = [0, 1, 2].map(i => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });
-  REC.timesheet = { for: REC.id, months: await Promise.all(months.map(p => api(`/api/admin/hr/timesheet/month?employee_id=${REC.id}&period=${p}`).catch(() => null))) };
-}
-function hrTabTimesheet() {
-  const list = (REC.timesheet?.months || []).filter(Boolean);
-  if (!list.length) return '<div class="rec-locked">Le presenze di questa persona non sono visibili con il tuo accesso.</div>';
-  return `<div class="mod-table-wrap"><table class="mod-table" style="min-width:0"><thead><tr><th>Mese</th><th>Stato</th><th class="num">Ordinarie</th><th class="num">Straordinarie</th><th class="num">Assenze</th><th class="num">Giornate</th><th></th></tr></thead><tbody>
-    ${list.map(m => `<tr><td><b>${esc(UI.monthLabel(m.period))}</b></td><td><span class="badge ${TS_STATUS[m.status][0]}">${TS_STATUS[m.status][1]}</span></td>
-      <td class="num">${tsHours(m.totals.ordinaria)}</td><td class="num">${tsHours(m.totals.straordinaria + m.totals.notturna + m.totals.festiva)}</td>
-      <td class="num">${tsHours(Object.values(m.totals.absences).reduce((a, b) => a + b, 0))}</td><td class="num">${m.totals.worked_days}</td>
-      <td><button class="btn-outline-pill" onclick="tsOpenFromRecord('${m.period}')">Apri</button></td></tr>`).join('')}
-  </tbody></table></div><p class="mod-note">Straordinarie comprende notturne e festive. I saldi di ferie e permessi sono nella sezione Assenze.</p>`;
-}
-function tsOpenFromRecord(period) {
-  TS.employeeId = REC.id;
-  TS.period = period;
-  clickSidebarSub('people-presenze');
+// Apre un foglio da un altro punto: il proprio nel Timesheet, quello di un collaboratore in Presenze.
+function tsOpenFor(employeeId, period) {
+  if (period) TS.period = period;
+  const mine = !employeeId || (typeof ME !== 'undefined' && ME.data?.employee?.id === employeeId) || TS.options?.me?.id === employeeId;
+  if (!mine) TS.reviewId = employeeId;
+  if (!document.getElementById('module-people').classList.contains('active')) switchWorkspace('people');
+  clickSidebarSub(mine ? 'people-timesheet' : 'people-presenze');
 }
 
 // ── Configurazione ─────────────────────────────────────────────────────────────
@@ -278,7 +246,7 @@ async function loadHrTimesheetConfig() {
   const [s, opts] = await Promise.all([api('/api/admin/hr/timesheet/settings'), tsOptions(true)]);
   const centerSel = (name, code) => `<select id="ts-set-${name}">${UI.options(opts.centers, code, { value: c => c.code, label: c => `${c.code} ${c.name}` })}</select>`;
   box.innerHTML = `<div class="list-card">
-    <div class="list-toolbar"><div class="list-toolbar-title"><h3>Presenze</h3><p class="mod-intro">Passo degli orari, centri usati per le righe proposte e colonne dell'export per il consulente del lavoro.</p></div></div>
+    <div class="list-toolbar"><div class="list-toolbar-title"><h3>Timesheet</h3><p class="mod-intro">Passo degli orari, centri usati per le righe proposte e colonne dell'export per il consulente del lavoro.</p></div></div>
     <div class="mod-body">
       <div class="field-row">
         <div class="field"><label>Passo degli orari</label><select id="ts-set-granularity">${[15, 30, 60].map(g => `<option value="${g}" ${g === s.granularity ? 'selected' : ''}>${g} minuti</option>`).join('')}</select></div>
@@ -287,6 +255,10 @@ async function loadHrTimesheetConfig() {
       <div class="field-row">
         <div class="field"><label>Centro per gli eventi</label>${centerSel('event_center', s.event_center)}</div>
         <div class="field"><label>Centro per le fiere</label>${centerSel('fair_center', s.fair_center)}</div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Centro per le ore di vigneto</label>${centerSel('vineyard_center', s.vineyard_center)}</div>
+        <div class="field"></div>
       </div>
       <div class="field"><label>Colonne dell'export</label><div class="mod-checklist">${Object.entries(s.available_columns).map(([k, l]) => `<label><input type="checkbox" data-col="${k}" ${s.export_columns.includes(k) ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div></div>
       <button class="btn small" onclick="saveTsSettings()">Salva</button><div id="ts-set-msg"></div>
@@ -298,6 +270,7 @@ async function saveTsSettings() {
     await api('/api/admin/hr/timesheet/settings', { method: 'PUT', body: JSON.stringify({
       granularity: Number(document.getElementById('ts-set-granularity').value),
       booking_center: document.getElementById('ts-set-booking_center').value, event_center: document.getElementById('ts-set-event_center').value, fair_center: document.getElementById('ts-set-fair_center').value,
+      vineyard_center: document.getElementById('ts-set-vineyard_center').value,
       export_columns: [...document.querySelectorAll('#hr-timesheet-config-box [data-col]:checked')].map(c => c.dataset.col),
     }) });
     TS.options = null;

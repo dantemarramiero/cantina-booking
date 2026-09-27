@@ -1,0 +1,14 @@
+{
+  "name": "Campo · Marramiero",
+  "short_name": "Campo",
+  "description": "Interventi e trattamenti in vigneto dallo smartphone, anche senza rete.",
+  "start_url": "/campo.html",
+  "scope": "/campo",
+  "display": "standalone",
+  "background_color": "#f4ede2",
+  "theme_color": "#3f181e",
+  "lang": "it",
+  "icons": [
+    { "src": "/img/campo-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

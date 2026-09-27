@@ -120,7 +120,7 @@ test('unità a schermo: si scelgono in Impostazioni, solo valori ammessi; il cat
 
 test('ogni regola PRD delle fasi consegnate ha un test con il suo ID nel nome', () => {
   // Fasi consegnate: si aggiorna alla consegna di ogni fase.
-  const DELIVERED = ['Fase 1'];
+  const DELIVERED = ['Fase 1', 'Fase 2'];
   const doc = fs.readFileSync(path.join(__dirname, '..', 'docs', 'produzione', 'regole.md'), 'utf8');
   const sections = doc.split(/\n## /).filter(s => DELIVERED.some(f => s.startsWith(f)));
   const ids = sections.flatMap(s => [...s.matchAll(/\|\s*(PRD-[A-Z]\d{2})\s*\|/g)].map(m => m[1]));

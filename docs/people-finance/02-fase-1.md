@@ -2,6 +2,13 @@
 
 Stato: **completata in locale, in attesa di conferma** (non ancora in produzione).
 
+> **Aggiornamento del 26/09/2026 — festività automatiche.**
+> - **Santo patrono dal comune.** Se la sede non ha un patrono indicato a mano, si ricava da comune e provincia con `lib/patroni.json`. È un elenco di circa 7.700 comuni tratto dal dataset [Comuni-Italiani-2018](https://github.com/MatteoHenryChinaski/Comuni-Italiani-2018-Sql-Json-excel), che è del 2018 e non ha licenza dichiarata.
+>   - Il giorno è una regola in italiano, calcolata ogni anno da `patronDate` in `lib/calendar.js`: date fisse, «terza domenica di settembre», «lunedì successivo alla…», feste legate alla Pasqua.
+>   - Si calcola per il 93% dei comuni. Gli altri, o i comuni nati dopo il 2018, vanno indicati a mano: la sede mostra «Patrono da indicare».
+> - **Sede principale** (la sede attiva con l'id più basso): comune e provincia vengono dai dati aziendali di Impostazioni, se compilati.
+> - **San Francesco d'Assisi (4 ottobre)** è nazionale dal 2026, calcolata in `nationalByYear`, quindi i calcoli degli anni precedenti non cambiano.
+
 ## Cosa c'è
 
 **Finance** (workspace nuovo nel portale):

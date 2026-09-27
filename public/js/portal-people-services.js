@@ -29,10 +29,11 @@ async function loadMySpace() {
     return;
   }
   const d = ME.data;
-  const tabs = [['dati', 'I miei dati'], ['documenti', 'Documenti'], ['assenze', 'Ferie e permessi'], ['presenze', 'Presenze'], ['dotazioni', 'Dotazioni']];
+  const tabs = [['dati', 'I miei dati'], ['documenti', 'Documenti'], ['assenze', 'Ferie e permessi'], ['dotazioni', 'Dotazioni']];
+  if (!tabs.some(([k]) => k === ME.tab)) ME.tab = 'dati';
   root.innerHTML = `<div class="list-card">
     <div class="rec-head"><div class="rec-avatar">${esc(d.employee.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}</div>
-      <div style="flex:1"><div class="rec-name">${esc(d.employee.name)}</div><div class="rec-sub">Il tuo fascicolo, i tuoi documenti, le tue ferie e le tue ore.</div></div></div>
+      <div style="flex:1"><div class="rec-name">${esc(d.employee.name)}</div><div class="rec-sub">Il tuo fascicolo, i tuoi documenti e le tue ferie. Le ore si registrano in <a href="#" onclick="tsOpenFor(ME.data.employee.id); return false">People → Timesheet</a>.</div></div></div>
     <div class="rec-tabs">${tabs.map(([k, l]) => `<button class="${ME.tab === k ? 'active' : ''}" onclick="ME.tab='${k}'; loadMySpace()">${l}</button>`).join('')}</div>
     <div class="mod-body" id="me-body"></div>
   </div>`;
@@ -52,13 +53,6 @@ async function loadMySpace() {
       <div class="mod-section-title" style="margin-top:22px">Le mie richieste</div>
       <div class="list-card" style="margin:0;box-shadow:none">${list.map(a => absRow(a, { withName: false })).join('') || '<div class="mod-empty">Nessuna assenza.</div>'}</div>
       <button class="btn small" style="margin-top:10px" onclick="openAbsenceModal(ME.data.employee.id)">+ Chiedi ferie o permesso</button>`;
-  }
-  if (ME.tab === 'presenze') {
-    body.innerHTML = '<div id="me-presenze-root"></div>';
-    TS.root = 'me-presenze-root';
-    TS.employeeId = d.employee.id;
-    await tsOptions(true);
-    loadTsSheet();
   }
 }
 function meTabData(d) {
