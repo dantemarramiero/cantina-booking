@@ -6,7 +6,7 @@ const ABS_STATUS = {
 };
 const ABS_PARTS = { giorno: 'Giorno intero', mattina: 'Mattina', pomeriggio: 'Pomeriggio', ore: 'A ore' };
 const ABS_COUNTERS = { ferie: 'Ferie', rol: 'ROL', ex_festivita: 'Ex festività' };
-const ABS = { view: 'decidere', types: [], filter: { month: UI.thisMonth(), status: '', type_id: '' } };
+const ABS = { view: 'elenco', types: [], filter: { month: UI.thisMonth(), status: '', type_id: '' } };
 
 const absAmount = (amount, unit) => `${(amount / (unit === 'giorni' ? 1000 : 60)).toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${unit === 'giorni' ? 'gg' : 'h'}`;
 const absWhen = a => (a.start_date === a.end_date ? UI.date(a.start_date) : `${UI.date(a.start_date)} → ${UI.date(a.end_date)}`) + (a.part === 'ore' ? ` · ${a.start_time}–${a.end_time}` : a.part !== 'giorno' ? ` · ${ABS_PARTS[a.part].toLowerCase()}` : '');
@@ -17,8 +17,8 @@ async function absTypes() {
 function absRow(a, { withName = true } = {}) {
   const [cls, label] = ABS_STATUS[a.status];
   const acts = [];
-  if (a.can_decide && a.status === 'richiesta') acts.push(`<button class="btn small" onclick="event.stopPropagation(); decideAbsence(${a.id}, 'approve')">Approva</button>`, `<button class="btn secondary small" onclick="event.stopPropagation(); decideAbsence(${a.id}, 'reject')">Rifiuta</button>`);
-  if (a.can_decide && a.status === 'comunicata') acts.push(`<button class="btn small" onclick="event.stopPropagation(); decideAbsence(${a.id}, 'acknowledge')">Presa visione</button>`);
+  // Le decisioni si prendono in Timesheet → Richieste del team: qui (registro e scheda) solo il rimando.
+  if (a.can_decide && ['richiesta', 'comunicata'].includes(a.status)) acts.push(`<button class="btn small" onclick="event.stopPropagation(); tsOpenFor(null, null, 'team')">${a.status === 'richiesta' ? 'Decidi' : 'Prendi visione'} in Richieste del team</button>`);
   if (a.status === 'bozza') acts.push(`<button class="btn small" onclick="event.stopPropagation(); absAction(${a.id}, 'submit')">Invia</button>`);
   if (['bozza', 'richiesta', 'approvata', 'comunicata', 'presa_visione'].includes(a.status)) acts.push(`<button class="btn-outline-pill danger" onclick="event.stopPropagation(); cancelAbsence(${a.id}, '${a.status}')">${a.status === 'bozza' ? 'Elimina' : 'Annulla'}</button>`);
   return `<div class="mod-row">
@@ -32,18 +32,6 @@ function absRow(a, { withName = true } = {}) {
     ${acts.length ? `<div class="mod-row-actions">${acts.join('')}</div>` : ''}
   </div>`;
 }
-async function decideAbsence(id, action) {
-  if (action === 'reject') {
-    UI.modal({ id: 'abs-reject-modal', title: 'Non approvare', width: 440, saveLabel: 'Non approvare', body: '<div class="field"><label>Motivo</label><textarea name="note" rows="2"></textarea></div>',
-      onSave: async b => { await api(`/api/admin/hr/absences/${id}/reject`, { method: 'POST', body: JSON.stringify({ note: UI.val(b, 'note') }) }); absRefresh(); } });
-    return;
-  }
-  try {
-    const res = await api(`/api/admin/hr/absences/${id}/${action}`, { method: 'POST', body: JSON.stringify({}) });
-    if (res.warnings?.length) alert(res.warnings.join('\n'));
-    absRefresh();
-  } catch (e) { alert(e.message); }
-}
 async function absAction(id, action) {
   try {
     const res = await api(`/api/admin/hr/absences/${id}/${action}`, { method: 'POST', body: JSON.stringify({}) });
@@ -55,8 +43,9 @@ function cancelAbsence(id, status) {
   if (status === 'bozza') return UI.confirmDo('Eliminare la bozza?', () => api(`/api/admin/hr/absences/${id}`, { method: 'DELETE' }), absRefresh);
   UI.confirmDo('Annullare questa assenza? Il contatore torna come prima.', () => api(`/api/admin/hr/absences/${id}/cancel`, { method: 'POST', body: JSON.stringify({}) }), absRefresh);
 }
-// Dopo un'azione: ricarica la vista in cui si è (pagina Assenze o scheda del dipendente).
+// Dopo un'azione: ricarica la vista in cui si è (Timesheet, pagina Assenze o scheda del dipendente).
 function absRefresh() {
+  if (document.getElementById('module-people')?.classList.contains('active') && document.getElementById('sub-people-timesheet')?.classList.contains('active')) return loadHrTimesheet();
   if (document.getElementById('module-me')?.classList.contains('active')) return loadMySpace();
   if (document.getElementById('sub-people-assenze')?.classList.contains('active')) return loadHrAbsences();
   if (REC.id) return openHrRecord(REC.id, 'assenze');
@@ -123,24 +112,23 @@ async function saveAbsence(box, submit) {
 // ── Pagina Assenze ─────────────────────────────────────────────────────────────
 async function loadHrAbsences() {
   const root = document.getElementById('people-assenze-root');
-  const views = [['decidere', 'Da decidere'], ['elenco', 'Elenco'], ['contatori', 'Contatori']];
+  // Le richieste da decidere sono in Timesheet → Richieste del team: qui il registro (elenco e contatori).
+  const views = [['elenco', 'Elenco'], ['giustificativi', 'Giustificativi'], ['contatori', 'Contatori']];
+  if (!ABS.urlChecked) { ABS.urlChecked = true; const v = new URLSearchParams(location.search).get('view'); if (views.some(([k]) => k === v)) ABS.view = v; }
   const tabs = `<div class="rec-tabs" style="padding:0 22px">${views.map(([k, l]) => `<button class="${ABS.view === k ? 'active' : ''}" onclick="ABS.view='${k}'; loadHrAbsences()">${l}</button>`).join('')}</div>`;
   const types = await absTypes();
   const head = (title, intro, extra = '') => `<div class="list-toolbar"><div class="list-toolbar-title"><h3>${title}</h3><p class="mod-intro">${intro}</p></div><div class="list-spacer"></div>${extra}
     <button class="btn-generate" onclick="openAbsenceModal()">${UI.icon.plus} Nuova assenza</button></div>`;
-  if (ABS.view === 'decidere') {
-    const rows = await api('/api/admin/hr/absences?to_decide=1');
-    root.innerHTML = `<div class="list-card">${tabs}${head('Da decidere', 'Richieste da approvare e comunicazioni da prendere in visione. Dopo alcuni giorni di attesa passano al delegato.')}
-      ${rows.map(a => absRow(a)).join('') || '<div class="mod-empty">Niente da decidere.</div>'}</div>`;
-    return;
-  }
+  const toDecide = (await api('/api/admin/hr/absences?to_decide=1').catch(() => [])).length;
+  const decideNote = toDecide ? `<div class="mod-warn" style="margin:0 22px 12px">${toDecide === 1 ? '1 richiesta da decidere' : `${toDecide} richieste da decidere`}: si gestiscono nel <a href="#" onclick="tsOpenFor(null, null, 'team'); return false">Timesheet → Richieste del team</a>.</div>` : '';
   if (ABS.view === 'contatori') return loadHrAbsenceCounters(root, tabs, head);
+  if (ABS.view === 'giustificativi') return loadHrJustifications(root, tabs, head);
   const f = ABS.filter;
   const [y, m] = f.month.split('-').map(Number);
   const last = new Date(y, m, 0).getDate();
   const q = new URLSearchParams({ from: `${f.month}-01`, to: `${f.month}-${String(last).padStart(2, '0')}`, ...(f.status ? { status: f.status } : {}), ...(f.type_id ? { type_id: f.type_id } : {}) });
   const rows = await api(`/api/admin/hr/absences?${q}`);
-  root.innerHTML = `<div class="list-card">${tabs}${head('Assenze del mese', 'Le proprie, quelle dei collaboratori e, per l\'ufficio del personale, tutte.',
+  root.innerHTML = `<div class="list-card">${tabs}${decideNote}${head('Assenze del mese', 'Le proprie, quelle dei collaboratori e, per l\'ufficio del personale, tutte.',
     `<div class="mod-toolbar-fields"><input type="month" value="${f.month}" onchange="ABS.filter.month = this.value || UI.thisMonth(); loadHrAbsences()">
       <select onchange="ABS.filter.type_id = this.value; loadHrAbsences()">${UI.options(types, f.type_id, { empty: 'Tutti i tipi' })}</select>
       <select onchange="ABS.filter.status = this.value; loadHrAbsences()">${UI.options(Object.entries(ABS_STATUS).map(([id, [, name]]) => ({ id, name })), f.status, { empty: 'Tutti gli stati' })}</select></div>`)}
@@ -262,7 +250,18 @@ function openAbsTypeModal(id) {
         <div class="field"><label>Contatore</label><select name="counter">${UI.options(Object.entries(ABS_COUNTERS).map(([id2, name]) => ({ id: id2, name })), x?.counter, { empty: 'Nessuno' })}</select></div>
       </div>
       ${chk('paid', 'Retribuita')}${chk('requires_protocol', 'Serve il protocollo del certificato')}${chk('health', 'Per motivi di salute (conta per la visita di rientro dopo 60 giorni)')}
-      ${chk('allow_half_day', 'Si può prendere a mezza giornata')}${chk('allow_hours', 'Si può prendere a ore')}${x ? chk('active', 'Attivo') : ''}`,
+      ${chk('allow_half_day', 'Si può prendere a mezza giornata')}${chk('allow_hours', 'Si può prendere a ore')}${x ? chk('active', 'Attivo') : ''}
+      <div class="field" style="margin-top:12px"><label>Categoria (il pulsante nella richiesta del dipendente)</label><select name="category">${UI.options([{ id: 'ferie', name: 'Ferie' }, { id: 'permesso', name: 'Permesso' }, { id: 'malattia', name: 'Malattia' }, { id: 'congedo', name: 'Congedo' }], x?.category || 'permesso')}</select></div>
+      <div class="mod-section-title" style="margin-top:14px">Giustificativo</div>
+      ${chk('doc_required', 'Serve un giustificativo')}
+      <div class="field"><label>Documento richiesto</label><input name="doc_label" value="${UI.attr(x?.doc_label)}" placeholder="es. Attestazione della struttura sanitaria con data e orario"></div>
+      <div class="field"><label>Suggerimento per il dipendente</label><input name="doc_hint" value="${UI.attr(x?.doc_hint)}" placeholder="es. Non serve la diagnosi: basta l'attestazione"></div>
+      <div class="field-row">
+        <div class="field"><label>Entro quanti giorni dalla fine</label><input name="doc_deadline_days" inputmode="numeric" value="${UI.attr(x?.doc_deadline_days ?? '')}"></div>
+        <div class="field"><label>Si giustifica con</label><select name="doc_mode">${UI.options([{ id: 'file', name: 'Un documento (file)' }, { id: 'protocol', name: 'Il numero di protocollo (INPS)' }], x?.doc_mode || 'file')}</select></div>
+      </div>
+      ${chk('doc_self_cert', "Si accetta l'autocertificazione (DPR 445/2000)")}
+      <p class="mod-note">Tempi e documenti da verificare con il contratto collettivo e il consulente del lavoro. Chiedi solo ciò che giustifica l'assenza, mai la diagnosi.</p>`,
     onSave: async b => {
       const body = {};
       b.querySelectorAll('[name]').forEach(el => { body[el.name] = el.type === 'checkbox' ? el.checked : el.value.trim(); });

@@ -55,7 +55,9 @@ module.exports = function registerHrAbsences(app, deps) {
   };
   const userOfEmployee = id => (id ? db.prepare('SELECT portal_user_id FROM employees WHERE id = ?').get(id)?.portal_user_id ?? null : null);
   const notifyAll = (userIds, n) => { for (const u of new Set(userIds.filter(x => x !== undefined))) notifications.notify({ userId: u, ...n }); };
-  const LINK = '/portal.html?workspace=people&sub=people-assenze';
+  // Le richieste si decidono nel Timesheet (scheda «Richieste del team»); il dipendente le segue in «Ferie e permessi».
+  const LINK = '/portal.html?workspace=people&sub=people-timesheet&tab=team';
+  const LINK_SELF = '/portal.html?workspace=people&sub=people-timesheet&tab=ferie';
 
   // ── Impostazioni ────────────────────────────────────────────────────────────
   function absenceSettings() {
@@ -89,8 +91,15 @@ module.exports = function registerHrAbsences(app, deps) {
       name: pick('name', text), flow: pick('flow'), counter: pick('counter', v => v || null), unit: pick('unit'),
       paid: flag('paid'), requires_protocol: flag('requires_protocol'), health: flag('health'), allow_half_day: flag('allow_half_day'), allow_hours: flag('allow_hours'),
       active: b.active !== undefined ? (b.active ? 1 : 0) : existing?.active ?? 1,
+      // Categoria (i pulsanti della richiesta) e giustificativo richiesto (vedi migrazione 0040).
+      category: pick('category', v => v || 'permesso'), doc_required: flag('doc_required'), doc_label: pick('doc_label', text), doc_hint: pick('doc_hint', text),
+      doc_deadline_days: pick('doc_deadline_days', v => (v === '' || v == null ? null : parseInt(v))), doc_mode: pick('doc_mode', v => v || 'file'), doc_self_cert: flag('doc_self_cert'),
     };
     if (!f.name) throw new HttpError(400, 'Il nome è obbligatorio.');
+    if (!['ferie', 'permesso', 'malattia', 'congedo'].includes(f.category)) throw new HttpError(400, 'Categoria: ferie, permesso, malattia o congedo.');
+    if (!['file', 'protocol'].includes(f.doc_mode)) throw new HttpError(400, 'Giustificativo: file oppure numero di protocollo.');
+    if (f.doc_required && !f.doc_label) throw new HttpError(400, 'Indica quale documento serve come giustificativo.');
+    if (f.doc_required && !(f.doc_deadline_days >= 0 && f.doc_deadline_days <= 365)) throw new HttpError(400, 'Indica entro quanti giorni dalla fine dell\'assenza va consegnato il giustificativo (0–365).');
     if (!['approvazione', 'comunicazione'].includes(f.flow)) throw new HttpError(400, 'Flusso: approvazione oppure comunicazione.');
     if (!['giorni', 'ore'].includes(f.unit)) throw new HttpError(400, 'Unità: giorni oppure ore.');
     if (f.counter && !COUNTERS[f.counter]) throw new HttpError(400, 'Contatore non valido.');
@@ -106,8 +115,9 @@ module.exports = function registerHrAbsences(app, deps) {
     if (!code || !/^[a-z0-9_]+$/.test(code)) throw new HttpError(400, 'Codice: lettere minuscole, numeri e trattini bassi.');
     const f = typeFields(req.body || {});
     const order = db.prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM absence_types').get().n;
-    const id = Number(db.prepare(`INSERT INTO absence_types (code, name, flow, counter, unit, paid, requires_protocol, health, allow_half_day, allow_hours, active, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(code, f.name, f.flow, f.counter, f.unit, f.paid, f.requires_protocol, f.health, f.allow_half_day, f.allow_hours, f.active, order).lastInsertRowid);
+    const id = Number(db.prepare(`INSERT INTO absence_types (code, name, flow, counter, unit, paid, requires_protocol, health, allow_half_day, allow_hours, active, sort_order,
+      category, doc_required, doc_label, doc_hint, doc_deadline_days, doc_mode, doc_self_cert) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(code, f.name, f.flow, f.counter, f.unit, f.paid, f.requires_protocol, f.health, f.allow_half_day, f.allow_hours, f.active, order, f.category, f.doc_required, f.doc_label, f.doc_hint, f.doc_deadline_days, f.doc_mode, f.doc_self_cert).lastInsertRowid);
     audit(req, 'absence_type.created', { entity: 'absence_type', entityId: id, after: { code, ...f } });
     return { success: true, id };
   });
@@ -117,8 +127,9 @@ module.exports = function registerHrAbsences(app, deps) {
     const f = typeFields(req.body || {}, t);
     const used = db.prepare('SELECT COUNT(*) AS c FROM absences WHERE absence_type_id = ?').get(t.id).c;
     if (used && (f.unit !== t.unit || f.counter !== t.counter)) throw new HttpError(409, 'Tipo già usato: unità e contatore non si cambiano (crea un tipo nuovo).');
-    db.prepare(`UPDATE absence_types SET name = ?, flow = ?, counter = ?, unit = ?, paid = ?, requires_protocol = ?, health = ?, allow_half_day = ?, allow_hours = ?, active = ? WHERE id = ?`)
-      .run(f.name, f.flow, f.counter, f.unit, f.paid, f.requires_protocol, f.health, f.allow_half_day, f.allow_hours, f.active, t.id);
+    db.prepare(`UPDATE absence_types SET name = ?, flow = ?, counter = ?, unit = ?, paid = ?, requires_protocol = ?, health = ?, allow_half_day = ?, allow_hours = ?, active = ?,
+      category = ?, doc_required = ?, doc_label = ?, doc_hint = ?, doc_deadline_days = ?, doc_mode = ?, doc_self_cert = ? WHERE id = ?`)
+      .run(f.name, f.flow, f.counter, f.unit, f.paid, f.requires_protocol, f.health, f.allow_half_day, f.allow_hours, f.active, f.category, f.doc_required, f.doc_label, f.doc_hint, f.doc_deadline_days, f.doc_mode, f.doc_self_cert, t.id);
     audit(req, 'absence_type.updated', { entity: 'absence_type', entityId: t.id, before: t, after: f });
     return { success: true };
   });
@@ -353,7 +364,7 @@ module.exports = function registerHrAbsences(app, deps) {
     if (t.requires_protocol && !f.protocol && !b.from_incident) throw new HttpError(400, `Per «${t.name}» serve il numero di protocollo del certificato.`);
     return f;
   }
-  const decorate = a => a && ({ ...a, ...db.prepare(`SELECT t.name AS type_name, t.code AS type_code, t.unit, t.flow, t.counter, t.health, e.first_name || ' ' || e.last_name AS employee_name,
+  const decorate = a => a && ({ ...a, ...db.prepare(`SELECT t.name AS type_name, t.code AS type_code, t.unit, t.flow, t.counter, t.health, e.first_name || ' ' || e.last_name AS employee_name, e.job_title AS employee_job_title,
     ap.first_name || ' ' || ap.last_name AS approver_name, dl.first_name || ' ' || dl.last_name AS delegate_name, bp.name AS block_period_name
     FROM absences x JOIN absence_types t ON t.id = x.absence_type_id JOIN employees e ON e.id = x.employee_id LEFT JOIN employees ap ON ap.id = x.approver_employee_id
     LEFT JOIN employees dl ON dl.id = x.delegate_employee_id LEFT JOIN absence_block_periods bp ON bp.id = x.block_period_id WHERE x.id = ?`).get(a.id) });
@@ -442,7 +453,7 @@ module.exports = function registerHrAbsences(app, deps) {
   });
 
   function notifyRequester(a, t, title, body) {
-    notifyAll([userOfEmployee(a.employee_id), a.requested_user_id].filter(Boolean), { kind: 'hr.absence.decided', title, body, link: LINK, dedupeKey: `absence:${a.id}:${a.status}` });
+    notifyAll([userOfEmployee(a.employee_id), a.requested_user_id].filter(Boolean), { kind: 'hr.absence.decided', title, body, link: LINK_SELF, dedupeKey: `absence:${a.id}:${a.status}` });
   }
   r.post('/absences/:id/approve', req => {
     const a = absence(req.params.id);
