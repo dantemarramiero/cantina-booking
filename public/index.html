@@ -830,13 +830,15 @@ function renderVerifyContent(order, token) {
   if (order.status === 'in_attesa_pagamento') statusHtml = `<p class="desc">${t('verify_pending')}</p>`;
   else if (order.status === 'annullato') statusHtml = `<p class="desc">${t('verify_cancelled')}</p>`;
   else if (order.status === 'ritirato') statusHtml = `<p class="desc">${t('verify_picked_up')} ${order.picked_up_at}</p>`;
-  else statusHtml = `<button class="btn" style="width:100%" onclick="confirmVerifyPickup('${token}')">${t('verify_confirm_btn')}</button>`;
+  else statusHtml = `<button class="btn" style="width:100%" onclick="confirmVerifyPickup(VERIFY_TOKEN)">${t('verify_confirm_btn')}</button>`;
+  VERIFY_TOKEN = token;
   content.innerHTML = `<p style="font-weight:600;margin:8px 0">${esc(order.customer_name)} — ${order.ref}</p>` + itemsHtml + summaryHtml + statusHtml;
 }
 
 // La consegna la conferma il personale: serve l'accesso al portale con il permesso sui ritiri. La sessione
 // resta su questo dispositivo (quello del negozio) finché scade, così non si rientra a ogni QR.
 const STAFF_KEY = 'shop_staff_key';
+let VERIFY_TOKEN = null; // il token dell'ordine mostrato: i pulsanti lo leggono da qui, mai dall'HTML
 const staffKey = () => { try { return localStorage.getItem(STAFF_KEY); } catch { return null; } };
 async function confirmVerifyPickup(token) {
   try {
@@ -844,7 +846,11 @@ async function confirmVerifyPickup(token) {
     if (!key) return showStaffLogin(token);
     const res = await fetch(`/api/pickup-orders/verify/${token}/pickup`, { method: 'POST', headers: { 'x-admin-key': key } });
     const order = await res.json();
-    if (res.status === 401) { try { localStorage.removeItem(STAFF_KEY); } catch {} return showStaffLogin(token); }
+    if (res.status === 401 || res.status === 403) {
+      try { localStorage.removeItem(STAFF_KEY); } catch {}
+      if (res.status === 403) alert(order.error || t('generic_error'));
+      return showStaffLogin(token);
+    }
     if (!res.ok) throw new Error(order.error || t('generic_error'));
     renderVerifyContent(order, token);
   } catch (e) {
@@ -856,7 +862,7 @@ function showStaffLogin(token) {
   box.innerHTML = `<p class="desc" style="margin-top:14px">${t('verify_staff_login')}</p>
     <input id="staff-username" type="text" autocomplete="username" placeholder="${t('verify_staff_username')}" style="width:100%;margin:6px 0">
     <input id="staff-password" type="password" autocomplete="current-password" placeholder="${t('verify_staff_password')}" style="width:100%;margin:6px 0">
-    <button class="btn" style="width:100%" onclick="staffLoginAndConfirm('${token}')">${t('verify_staff_submit')}</button>`;
+    <button class="btn" style="width:100%" onclick="staffLoginAndConfirm(VERIFY_TOKEN)">${t('verify_staff_submit')}</button>`;
 }
 async function staffLoginAndConfirm(token) {
   try {
@@ -1116,8 +1122,16 @@ function showPaymentBanner() {
 
 (async function init() {
   const params = new URLSearchParams(window.location.search);
+  // Il token si accetta solo nel formato generato dal server: finisce in URL e non deve mai poter iniettare codice.
   const verifyToken = params.get('verify');
-  if (verifyToken) {
+  if (verifyToken !== null) {
+    if (!/^[A-Za-z0-9_-]{8,128}$/.test(verifyToken)) {
+      applyI18n();
+      document.body.classList.add('verify-mode');
+      document.getElementById('verify-view').classList.add('active');
+      document.getElementById('verify-content').innerHTML = `<p>${t('verify_not_found')}</p>`;
+      return;
+    }
     applyI18n();
     await initVerifyView(verifyToken);
     return;

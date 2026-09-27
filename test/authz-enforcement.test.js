@@ -142,3 +142,26 @@ test('operatori: di default tutti gli utenti attivi; con l\'opzione, solo chi co
   assert.equal(await selectable(b.id), true);
   await t.api('POST', '/api/admin/settings', { operators_selection: 'tutti' });
 });
+
+test('"Accesso completo" comprende sempre tutto e non si modifica; le capacità di altri moduli passano dai ruoli', async () => {
+  const full = t.db.prepare('SELECT id FROM roles WHERE is_system = 1').get().id;
+  assert.equal((await t.api('PATCH', `/api/admin/roles/${full}`, { workspaces: ['crm'] })).status, 409);
+  const u = await user(null);
+  await t.api('PATCH', `/api/admin/portal-users/${u.id}`, { role_id: full });
+  const me = (await u.call('GET', '/api/admin/me')).data;
+  assert.equal(me.permittedWorkspaces.length, 8, 'tutti i moduli');
+  assert.ok(me.capabilities.includes('enologo'));
+  // Una capacità che il catalogo non traduce (es. di un modulo nuovo) resta valida se il ruolo ce l'ha.
+  const other = await user(['finance']);
+  const roleId = t.db.prepare('SELECT role_id FROM portal_users WHERE id = ?').get(other.id).role_id;
+  t.db.prepare(`UPDATE roles SET capabilities = '["coge_contabile"]' WHERE id = ?`).run(roleId);
+  assert.deepEqual((await other.call('GET', '/api/admin/me')).data.capabilities, ['coge_contabile']);
+});
+
+test('un utente rimosso non si ricrea con la stessa email: il messaggio dice di riattivarlo', async () => {
+  const u = await user(['crm']);
+  await t.api('DELETE', `/api/admin/portal-users/${u.id}`);
+  const again = await t.api('POST', '/api/admin/portal-users', { name: 'Di nuovo', email: `enf${seq}@test.it`, username: `nuovo${seq}`, password: 'password-lunga' });
+  assert.equal(again.status, 400);
+  assert.match(again.data.error, /disattivato: riattivalo/);
+});

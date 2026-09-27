@@ -8,7 +8,7 @@ const XLSX    = require('xlsx');
 
 const { DatabaseSync } = require('node:sqlite');
 const { runMigrations } = require('./lib/migrations');
-const { createAuthz } = require('./lib/authz');
+const { createAuthz, FULL_ACCESS_ROLE } = require('./lib/authz');
 const { createEventBus } = require('./lib/events');
 const { createScheduler } = require('./lib/scheduler');
 const { createSessions, createSigner, createLoginThrottle, safeEqual, ACCESS_LEVELS, PRD_CAPABILITIES } = require('./lib/security');
@@ -1355,8 +1355,11 @@ function staffWith(code) {
 
 // Moduli da mostrare nell'interfaccia: quelli dei ruoli che l'utente ha oggi. Serve solo a comporre il menu:
 // il server blocca comunque ogni API senza il permesso.
+// Chi ha il ruolo di sistema "Accesso completo" vede tutti i moduli, anche quelli aggiunti dopo la migrazione.
+const hasFullAccessRole = req => authz.rolesOf(req).some(r => r.is_system && r.name === FULL_ACCESS_ROLE);
 function permittedWorkspacesFor(req) {
   if (req.isMasterKey) return null;
+  if (hasFullAccessRole(req)) return [...ALL_WORKSPACES];
   const ws = new Set();
   for (const r of authz.rolesOf(req)) { try { JSON.parse(r.workspaces).forEach(w => ws.add(w)); } catch {} }
   return [...ws];
@@ -1374,11 +1377,16 @@ const actorName = req => (req?.portalUser ? req.portalUser.name : req?.isMasterK
 // Capacità dentro Produzione (enologo, cantiniere…): i permessi produzione.prd.<capacità>. null = tutte.
 // "Sola lettura" vuol dire non averne nessuna (i permessi sono solo additivi): la si riporta comunque, se un
 // ruolo dell'utente la indica, perché la Produzione spieghi "sei in sola lettura" invece di "serve l'enologo".
+// Le capacità che il catalogo non traduce ancora in permessi (per esempio quelle di un modulo aggiunto dopo)
+// si leggono dai ruoli dell'utente come prima, così non si perdono in silenzio.
 function capabilitiesFor(req) {
   if (req.isMasterKey) return null;
+  const roles = authz.rolesOf(req);
+  const roleCaps = new Set(roles.flatMap(r => { try { return JSON.parse(r.capabilities || '[]'); } catch { return []; } }));
   const caps = Object.entries(CAPABILITY_PERMISSIONS).filter(([, code]) => authz.can(req, code)).map(([cap]) => cap);
-  const readOnly = authz.rolesOf(req).some(r => { try { return JSON.parse(r.capabilities || '[]').includes('sola_lettura'); } catch { return false; } });
-  return readOnly && !caps.length ? ['sola_lettura'] : caps;
+  const other = [...roleCaps].filter(c => !(c in CAPABILITY_PERMISSIONS) && c !== 'sola_lettura');
+  if (roleCaps.has('sola_lettura') && !caps.length) return ['sola_lettura', ...other];
+  return [...caps, ...other];
 }
 
 // ── ERP helpers ───────────────────────────────────────────────────────────────
@@ -4861,6 +4869,8 @@ app.post('/api/admin/portal-users', authAdmin, (req, res) => {
     res.json({ success: true, id: out, employee_id: db.prepare('SELECT id FROM employees WHERE portal_user_id = ?').get(out)?.id ?? null });
   } catch (e) {
     if (employeeChoiceError(res, e)) return;
+    const inactive = db.prepare('SELECT name FROM portal_users WHERE active = 0 AND (lower(email) = ? OR username = ?)').get(email.trim().toLowerCase(), username.trim());
+    if (inactive) return res.status(400).json({ error: `Username o email appartengono a ${inactive.name}, utente disattivato: riattivalo da Utenti del portale invece di crearne uno nuovo.` });
     res.status(400).json({ error: 'Username o email già in uso.' });
   }
 });
@@ -4944,6 +4954,11 @@ app.patch('/api/admin/roles/:id', authAdmin, (req, res) => {
   if (access_levels !== undefined) { updates.push('access_levels = ?'); params.push(JSON.stringify(cleanAccessLevels(access_levels))); }
   if (capabilities !== undefined) { updates.push('capabilities = ?'); params.push(JSON.stringify(cleanCapabilities(capabilities))); }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare.' });
+  const current = db.prepare('SELECT is_system FROM roles WHERE id = ?').get(req.params.id);
+  if (!current) return res.status(404).json({ error: 'Ruolo non trovato.' });
+  if (current.is_system && (workspaces !== undefined || access_levels !== undefined || capabilities !== undefined || name !== undefined)) {
+    return res.status(409).json({ error: 'È un ruolo di sistema: comprende sempre tutto e non si modifica.' });
+  }
   updates.push('updated_at = ?'); params.push(new Date().toISOString());
   params.push(req.params.id);
   const before = roleSnapshot(req.params.id);
