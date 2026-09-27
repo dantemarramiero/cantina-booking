@@ -285,6 +285,16 @@ Recap di tutto quello che è stato costruito, in ordine cronologico. Aggiornalo 
 - **San Francesco d'Assisi (4 ottobre)** di nuovo festa nazionale dal 2026, calcolata: gli anni prima non cambiano.
 - Restano a mano solo le chiusure aziendali.
 
+## 2026-09-27 — Organigramma e permessi, Fase 2
+
+- **Un solo controllo:** ogni API del portale chiede a `can()` se l'utente ha il permesso, in base ai suoi permessi effettivi. Livelli di riservatezza HR e capacità di Produzione passano da lì.
+- **Cataloghi PDF** non più scaricabili da un link pubblico: dal portale con link firmato, dall'area agenti con la sessione.
+- **Conferma del ritiro con QR:** la fa solo il personale con il permesso sui ritiri. Prima bastava il link, che ha anche il cliente.
+- **Portale agenti:** al login una sessione con scadenza al posto del token fisso. Nuova password o logout la chiudono; blocco dopo troppi tentativi, come il portale.
+- **Utenti:** "elimina" ora disattiva. Operatore, visite, vendite e registro attività mantengono il loro autore.
+- **Assenze:** il responsabile vede sempre quelle dei suoi collaboratori. Prima, con molte assenze in archivio, poteva perderne alcune.
+- **Operatori delle visite:** opzione `operators_selection` per renderli selezionabili solo con il permesso "conduce le visite". Di default restano tutti gli utenti attivi.
+
 ## 2026-09-27 — Timesheet personale
 
 **People — Timesheet personale e Presenze per il controllo** (in locale, da approvare)

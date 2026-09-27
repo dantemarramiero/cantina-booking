@@ -4589,7 +4589,7 @@ async function loadCatalogs() {
         <div class="list-row-sub">${c.created_at}</div>
       </div>
       <div class="list-row-meta">
-        <a class="btn-outline-pill" href="/api/catalogs/${c.id}/download" target="_blank" rel="noopener">Apri</a>
+        <button class="btn-outline-pill" onclick="UI.download('/api/admin/catalogs/${c.id}/download')">Apri</button>
         <button class="btn-outline-pill danger" onclick="deleteCatalog(${c.id})">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
         </button>
@@ -6854,7 +6854,7 @@ async function togglePortalUserActive(id, active) {
 }
 
 async function deletePortalUser(id) {
-  if (!confirm('Eliminare questo utente? Non potrà più accedere al gestionale.')) return;
+  if (!confirm('Rimuovere questo utente? Viene disattivato: non potrà più accedere, ma il suo storico (visite, vendite, registro attività) resta.')) return;
   await api('/api/admin/portal-users/' + id, { method: 'DELETE' });
   loadPortalUsers();
 }

@@ -493,6 +493,10 @@ const I18N = {
     verify_confirm_btn: 'Conferma consegna',
     verify_picked_up: 'Ordine già ritirato il',
     verify_success: 'Consegna confermata.',
+    verify_staff_login: 'Per confermare la consegna accedi con il tuo utente del portale.',
+    verify_staff_username: 'Username',
+    verify_staff_password: 'Password',
+    verify_staff_submit: 'Accedi e conferma',
   },
   en: {
     hero_title: 'Where time teaches restraint',
@@ -572,6 +576,10 @@ const I18N = {
     verify_confirm_btn: 'Confirm handover',
     verify_picked_up: 'Order already picked up on',
     verify_success: 'Handover confirmed.',
+    verify_staff_login: 'To confirm the handover, sign in with your staff account.',
+    verify_staff_username: 'Username',
+    verify_staff_password: 'Password',
+    verify_staff_submit: 'Sign in and confirm',
   }
 };
 
@@ -826,12 +834,39 @@ function renderVerifyContent(order, token) {
   content.innerHTML = `<p style="font-weight:600;margin:8px 0">${esc(order.customer_name)} — ${order.ref}</p>` + itemsHtml + summaryHtml + statusHtml;
 }
 
+// La consegna la conferma il personale: serve l'accesso al portale con il permesso sui ritiri. La sessione
+// resta su questo dispositivo (quello del negozio) finché scade, così non si rientra a ogni QR.
+const STAFF_KEY = 'shop_staff_key';
+const staffKey = () => { try { return localStorage.getItem(STAFF_KEY); } catch { return null; } };
 async function confirmVerifyPickup(token) {
   try {
-    const res = await fetch(`/api/pickup-orders/verify/${token}/pickup`, { method: 'POST' });
+    const key = staffKey();
+    if (!key) return showStaffLogin(token);
+    const res = await fetch(`/api/pickup-orders/verify/${token}/pickup`, { method: 'POST', headers: { 'x-admin-key': key } });
     const order = await res.json();
+    if (res.status === 401) { try { localStorage.removeItem(STAFF_KEY); } catch {} return showStaffLogin(token); }
     if (!res.ok) throw new Error(order.error || t('generic_error'));
     renderVerifyContent(order, token);
+  } catch (e) {
+    alert(e.message);
+  }
+}
+function showStaffLogin(token) {
+  const box = document.getElementById('verify-staff-login') || document.getElementById('verify-content').appendChild(Object.assign(document.createElement('div'), { id: 'verify-staff-login' }));
+  box.innerHTML = `<p class="desc" style="margin-top:14px">${t('verify_staff_login')}</p>
+    <input id="staff-username" type="text" autocomplete="username" placeholder="${t('verify_staff_username')}" style="width:100%;margin:6px 0">
+    <input id="staff-password" type="password" autocomplete="current-password" placeholder="${t('verify_staff_password')}" style="width:100%;margin:6px 0">
+    <button class="btn" style="width:100%" onclick="staffLoginAndConfirm('${token}')">${t('verify_staff_submit')}</button>`;
+}
+async function staffLoginAndConfirm(token) {
+  try {
+    const res = await fetch('/api/portal-users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: document.getElementById('staff-username').value.trim(), password: document.getElementById('staff-password').value }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || t('generic_error'));
+    try { localStorage.setItem(STAFF_KEY, data.key); } catch {}
+    document.getElementById('verify-staff-login')?.remove();
+    await confirmVerifyPickup(token);
   } catch (e) {
     alert(e.message);
   }

@@ -585,7 +585,7 @@ async function loadCatalogs() {
         <div class="cat-title">${esc(c.name)}</div>
         <div class="cat-date">${c.created_at}</div>
       </div>
-      <a class="btn small" href="/api/catalogs/${c.id}/download" target="_blank" rel="noopener">Apri PDF</a>
+      <a class="btn small" href="/api/agent/${TOKEN}/catalogs/${c.id}/download" target="_blank" rel="noopener">Apri PDF</a>
     </div>
   `).join('') : '<div class="box"><p style="margin:0" class="empty">Nessun catalogo disponibile.</p></div>';
 }

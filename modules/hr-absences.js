@@ -511,21 +511,24 @@ module.exports = function registerHrAbsences(app, deps) {
   });
 
   // Elenco: HR vede tutto, gli altri le proprie, quelle dei collaboratori e quelle da decidere.
+  // La visibilità è nella query, prima del LIMIT: prima si caricavano 500 righe e poi si toglievano quelle non
+  // visibili, e con molti dati un responsabile poteva non vedere le assenze dei suoi (regola 23, rischio R4).
   r.get('/absences', req => {
     const q = req.query;
+    const me = viewerEmployee(req);
+    const visible = hrFile.visibleEmployeeIds(req); // null = tutti (livello "personale")
+    const ids = visible === null ? [] : [...visible];
+    const scope = visible === null ? '1 = 1'
+      : `(${ids.length ? `a.employee_id IN (${ids.map(() => '?').join(', ')})` : '1 = 0'} OR a.approver_employee_id = ? OR a.delegate_employee_id = ?)`;
+    const scopeParams = visible === null ? [] : [...ids, me?.id ?? 0, me?.id ?? 0];
     const rows = db.prepare(`SELECT a.* FROM absences a JOIN employees e ON e.id = a.employee_id
       WHERE (? IS NULL OR a.employee_id = ?) AND (? IS NULL OR a.status = ?) AND (? IS NULL OR a.absence_type_id = ?)
         AND (? IS NULL OR a.end_date >= ?) AND (? IS NULL OR a.start_date <= ?) AND (? IS NULL OR e.site_id = ?)
         AND (? IS NULL OR a.employee_id IN (SELECT employee_id FROM team_members WHERE team_id = ?))
+        AND ${scope}
       ORDER BY a.start_date DESC, a.id DESC LIMIT 500`).all(q.employee_id || null, q.employee_id || null, q.status || null, q.status || null, q.type_id || null, q.type_id || null,
-      q.from || null, q.from || null, q.to || null, q.to || null, q.site_id || null, q.site_id || null, q.team_id || null, q.team_id || null);
-    const me = viewerEmployee(req);
-    const hrAll = hasAccessLevel(req, 'personale');
-    return rows.filter(a => {
-      if (hrAll) return true;
-      const e = employee(a.employee_id);
-      return isSelf(req, e) || isManagerOf(req, e, me) || (me && (a.approver_employee_id === me.id || a.delegate_employee_id === me.id));
-    }).filter(a => !q.to_decide || (['richiesta', 'comunicata'].includes(a.status) && canDecide(req, a))).map(a => ({ ...decorate(a), can_decide: canDecide(req, a) }));
+      q.from || null, q.from || null, q.to || null, q.to || null, q.site_id || null, q.site_id || null, q.team_id || null, q.team_id || null, ...scopeParams);
+    return rows.filter(a => !q.to_decide || (['richiesta', 'comunicata'].includes(a.status) && canDecide(req, a))).map(a => ({ ...decorate(a), can_decide: canDecide(req, a) }));
   });
   r.get('/absences/balances', req => {
     const me = viewerEmployee(req);

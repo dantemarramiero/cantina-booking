@@ -1200,6 +1200,7 @@ runMigrations(db, { dir: path.join(__dirname, 'migrations'), dbPath: DB_PATH });
 const events = createEventBus(db);
 const scheduler = createScheduler(db);
 const sessions = createSessions(db);
+const agentSessions = createSessions(db, { table: 'agent_sessions' });
 const signer = createSigner(process.env.SIGNING_SECRET || signingSecretFromSettings());
 const loginThrottle = createLoginThrottle();
 const { audit, list: listAudit } = createAudit(db);
@@ -1221,7 +1222,7 @@ function signingSecretFromSettings() {
 }
 scheduler.onTick(() => events.dispatch());
 scheduler.register('authz.recompute', 60, () => { authz.recompute(); return 'permessi effettivi ricalcolati'; });
-scheduler.register('sessions.cleanup', 60, () => `${sessions.cleanup()} sessioni scadute rimosse`);
+scheduler.register('sessions.cleanup', 60, () => `${sessions.cleanup() + agentSessions.cleanup()} sessioni scadute rimosse`);
 scheduler.register('housekeeping.job_runs', 24 * 60, () => {
   const limit = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   return `${db.prepare('DELETE FROM job_runs WHERE started_at < ?').run(limit).changes} esecuzioni vecchie rimosse`;
@@ -1330,6 +1331,23 @@ function authAdmin(req, res, next) {
   next();
 }
 
+// Per le poche API fuori da /api/admin usate dal personale (conferma del ritiro con QR): sessione del portale
+// nell'header x-admin-key e il permesso indicato, come authAdmin.
+function staffWith(code) {
+  return (req, res, next) => {
+    const session = req.headers['x-admin-key'] ? sessions.resolve(req.headers['x-admin-key']) : null;
+    if (!session) return res.status(401).json({ error: "Per confermare serve l'accesso del personale." });
+    req.portalSession = session;
+    if (session.user_id == null) req.isMasterKey = true;
+    else {
+      req.portalUser = db.prepare('SELECT * FROM portal_users WHERE id = ? AND active = 1').get(session.user_id);
+      if (!req.portalUser) return res.status(401).json({ error: 'Utente disattivato: accesso non più valido.' });
+    }
+    if (!authz.can(req, code)) return res.status(403).json({ error: 'Non hai i permessi per confermare il ritiro.' });
+    next();
+  };
+}
+
 // Permessi (Fase 2 di docs/audit_permessi.md): ogni controllo passa da authz.can(), che legge i permessi
 // effettivi (posizione → ruoli, concessioni nominative, deleghe). Le funzioni qui sotto traducono le domande
 // di sempre (moduli, livelli HR, capacità di Produzione) in permessi. null = tutto: solo la chiave master.
@@ -1387,6 +1405,9 @@ const ENUM_SETTINGS = {
   prd_unit_weight: { values: ['q', 'kg'], fallback: 'q', error: 'Unità dei pesi: quintali o chili.' },
   prd_unit_area: { values: ['ha', 'm2'], fallback: 'ha', error: 'Unità delle superfici: ettari o metri quadrati.' },
   prd_unit_sugar: { values: ['babo', 'brix'], fallback: 'babo', error: 'Scala degli zuccheri: °Babo o °Brix.' },
+  // Operatori selezionabili nelle visite: tutti gli utenti attivi (come sempre) oppure solo chi ha il permesso
+  // enoturismo.visite.conduce (docs/audit_permessi.md, Fase 2).
+  operators_selection: { values: ['tutti', 'permesso'], fallback: 'tutti', error: 'Operatori selezionabili: "tutti" o "permesso".' },
 };
 
 // ── Customizations: liste modificabili (Tipologie di cliente, Ruoli del contatto) ──
@@ -1514,10 +1535,17 @@ function verifyPassword(password, stored) {
   return hashBuf.length === candidateBuf.length && crypto.timingSafeEqual(hashBuf, candidateBuf);
 }
 
+// Portale agenti: il token nel percorso è una sessione con scadenza (agent_sessions, rischio R2), creata al
+// login. L'agente vede solo clienti, importatori e ordini assegnati a lui: ogni query filtra agent_id in SQL.
 function authAgent(req, res, next) {
-  const agent = db.prepare('SELECT * FROM agents WHERE token = ? AND active = 1').get(req.params.token);
-  if (!agent) return res.status(404).json({ error: 'Link non valido o agente disattivato.' });
+  const session = agentSessions.resolve(req.params.token);
+  const agent = session && db.prepare('SELECT * FROM agents WHERE id = ? AND active = 1').get(session.user_id);
+  if (!agent) {
+    if (session) agentSessions.revokeUser(session.user_id);
+    return res.status(401).json({ error: 'Sessione scaduta o agente disattivato: accedi di nuovo.' });
+  }
   req.agent = agent;
+  req.agentSession = session;
   next();
 }
 
@@ -2057,7 +2085,9 @@ app.get('/api/pickup-orders/verify/:token', (req, res) => {
   res.json(pickupOrderPublicView(order));
 });
 
-app.post('/api/pickup-orders/verify/:token/pickup', (req, res) => {
+// Il ritiro lo conferma il personale: serve una sessione del portale con il permesso sui ritiri. Prima bastava
+// il link del QR, che ha anche il cliente (docs/audit_permessi.md §3).
+app.post('/api/pickup-orders/verify/:token/pickup', staffWith('enoturismo.ritiri.scrivi'), (req, res) => {
   const order = db.prepare('SELECT * FROM pickup_orders WHERE pickup_token = ?').get(req.params.token);
   if (!order) return res.status(404).json({ error: 'Ordine non trovato.' });
   if (order.status === 'in_attesa_pagamento') return res.status(409).json({ error: 'Il pagamento non risulta ancora completato.' });
@@ -2584,10 +2614,16 @@ app.delete('/api/admin/newsletter/:id', authAdmin, (req, res) => {
 // Operatori: sola lettura — sono uno specchio automatico degli utenti del portale
 // (vedi syncOperatorForPortalUser). Per crearne/modificarne/disattivarne uno si passa
 // da Impostazioni → Utenti del portale, non da qui.
+// selectable: si può scegliere come operatore di una visita. Di default tutti gli utenti attivi; con
+// operators_selection = "permesso" solo chi ha enoturismo.visite.conduce.
 app.get('/api/admin/operators', authAdmin, (req, res) => {
   const operators = db.prepare('SELECT * FROM operators ORDER BY name').all();
   const visitCount = db.prepare("SELECT COUNT(*) AS c FROM bookings WHERE operator_id = ? AND status != 'annullata'");
-  res.json(operators.map(o => ({ ...o, visitCount: visitCount.get(o.id).c })));
+  const byPermission = getSetting('operators_selection', 'tutti') === 'permesso';
+  res.json(operators.map(o => ({
+    ...o, visitCount: visitCount.get(o.id).c,
+    selectable: !!o.active && !!o.portal_user_id && (!byPermission || authz.can({ id: o.portal_user_id }, 'enoturismo.visite.conduce')),
+  })));
 });
 
 // ── Enoturismo: eventi terzi (affitto struttura) — lato operativo ─────────────
@@ -3746,12 +3782,16 @@ app.post('/api/admin/agents/:id/regenerate-password', authAdmin, (req, res) => {
   const password = generateAgentPassword();
   const username = agent.username || generateAgentUsername(agent.name);
   db.prepare('UPDATE agents SET password_hash = ?, username = ? WHERE id = ?').run(hashPassword(password), username, req.params.id);
+  agentSessions.revokeUser(agent.id); // nuova password: le sessioni aperte finiscono
   res.json({ success: true, username, password });
 });
 
 app.post('/api/admin/agents/:id/regenerate-token', authAdmin, (req, res) => {
+  // Il token fisso non serve più per entrare (si entra con username e password e si riceve una sessione):
+  // rigenerarlo chiude tutte le sessioni aperte dell'agente.
   const token = generateAgentToken();
   db.prepare('UPDATE agents SET token = ? WHERE id = ?').run(token, req.params.id);
+  agentSessions.revokeUser(parseInt(req.params.id));
   res.json({ success: true, token });
 });
 
@@ -4476,11 +4516,18 @@ app.delete('/api/admin/crm/emails/:id', authAdmin, (req, res) => {
 app.post('/api/agent/login', (req, res) => {
   const { username, password } = req.body || {};
   if (!username?.trim() || !password) return res.status(400).json({ error: 'Inserisci username e password.' });
+  if (loginThrottle.blocked(req.ip)) return res.status(429).json({ error: 'Troppi tentativi: riprova tra qualche minuto.' });
   const agent = db.prepare('SELECT * FROM agents WHERE username = ? AND active = 1').get(username.trim());
   if (!agent || !verifyPassword(password, agent.password_hash)) {
+    loginThrottle.fail(req.ip);
     return res.status(401).json({ error: 'Credenziali non valide.' });
   }
-  res.json({ success: true, token: agent.token });
+  loginThrottle.reset(req.ip);
+  res.json({ success: true, token: agentSessions.create({ userId: agent.id, ip: req.ip, userAgent: req.headers['user-agent'] }) });
+});
+app.post('/api/agent/:token/logout', authAgent, (req, res) => {
+  agentSessions.revoke(req.params.token);
+  res.json({ success: true });
 });
 
 app.get('/api/agent/:token', authAgent, (req, res) => {
@@ -4701,11 +4748,14 @@ app.delete('/api/admin/catalogs/:id', authAdmin, (req, res) => {
   db.prepare('DELETE FROM catalogs WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
-app.get('/api/catalogs/:id/download', (req, res) => {
+// I cataloghi possono contenere prezzi e condizioni per gli agenti (decisione Q7): si scaricano solo dal
+// portale (link firmato, permesso commerciale.cataloghi.leggi) o dall'area agenti (sessione dell'agente).
+function sendCatalog(req, res) {
   const cat = db.prepare('SELECT * FROM catalogs WHERE id = ? AND active = 1').get(req.params.id);
   if (!cat) return res.status(404).json({ error: 'Catalogo non trovato.' });
   res.download(path.join(catalogsDir, cat.filename), `${cat.name}.pdf`);
-});
+}
+app.get('/api/admin/catalogs/:id/download', authAdmin, sendCatalog);
 
 // ── Pagamenti ordini (admin) ──────────────────────────────────────────────────
 app.patch('/api/admin/orders/:id/payment', authAdmin, (req, res) => {
@@ -4727,6 +4777,7 @@ app.get('/api/agent/:token/news', authAgent, (req, res) => {
   res.json(db.prepare('SELECT id, title, body, created_at FROM news WHERE active = 1 ORDER BY created_at DESC').all());
 });
 
+app.get('/api/agent/:token/catalogs/:id/download', authAgent, sendCatalog);
 app.get('/api/agent/:token/catalogs', authAgent, (req, res) => {
   res.json(db.prepare('SELECT id, name, created_at FROM catalogs WHERE active = 1 ORDER BY created_at DESC').all());
 });
@@ -4839,13 +4890,17 @@ app.patch('/api/admin/portal-users/:id', authAdmin, (req, res) => {
   }
 });
 
+// "Elimina" disattiva: l'utente resta per lo storico (prenotazioni, vendite, registri, operatore) e non entra
+// più (regola 20; prima la riga si cancellava e registri e operatore perdevano l'autore).
 app.delete('/api/admin/portal-users/:id', authAdmin, (req, res) => {
   const before = portalUserPublic(req.params.id);
-  deactivateOperatorForPortalUser(req.params.id);
-  db.prepare('DELETE FROM portal_users WHERE id = ?').run(req.params.id);
-  authz.invalidate(parseInt(req.params.id));
-  audit(req, 'portal_user.deleted', { entity: 'portal_user', entityId: req.params.id, before });
-  res.json({ success: true });
+  if (!before) return res.status(404).json({ error: 'Utente non trovato.' });
+  db.prepare('UPDATE portal_users SET active = 0 WHERE id = ?').run(before.id);
+  sessions.revokeUser(before.id);
+  deactivateOperatorForPortalUser(before.id);
+  authz.invalidate(before.id);
+  audit(req, 'portal_user.deactivated', { entity: 'portal_user', entityId: before.id, before, after: portalUserPublic(before.id) });
+  res.json({ success: true, deactivated: true });
 });
 
 // Dati di un utente adatti al registro attività (mai hash della password o chiavi).

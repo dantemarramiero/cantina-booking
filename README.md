@@ -72,15 +72,17 @@ In entrambi i casi il login crea una **sessione**: il browser tiene solo un toke
 - Si chiude al logout, quando l'utente viene disattivato e quando cambia la password.
 - Dopo 10 tentativi sbagliati in 15 minuti dallo stesso indirizzo il login si blocca.
 
-**Permessi per modulo** (ruoli in Impostazioni → Ruoli e permessi): sono controllati dal server su ogni API, non solo nell'interfaccia. La mappa "API → moduli che possono leggere/scrivere" è in `lib/security.js`. Un utente senza ruolo non accede a nessun modulo (solo la chiave master ha accesso completo); un ruolo ancora assegnato non si cancella.
+**Permessi** (ruoli in Impostazioni → Ruoli e permessi): li controlla il server su ogni API, non solo l'interfaccia, con un'unica funzione `can()` (`lib/authz.js`) che legge i permessi effettivi di ogni utente: posizione → ruoli, concessioni nominative, deleghe. Quale permesso serve a ogni gruppo di API è in `lib/permissions.js` (derivato da `lib/security.js`). Un utente senza ruolo non accede a nessun modulo (solo la chiave master ha accesso completo); un ruolo ancora assegnato non si cancella.
 
-**Organigramma e permessi** (in costruzione, `docs/audit_permessi.md`): catalogo dei permessi in `lib/permissions.js`, permessi effettivi e resolver `can()` / `scopeFilter()` in `lib/authz.js`. Nella Fase 1 si tengono allineati ai ruoli e il test di parità (`test/authz.test.js`) verifica che diano gli stessi accessi di `lib/security.js`.
+**Organigramma e permessi** (in costruzione, `docs/audit_permessi.md`): per ora i ruoli si modificano ancora da Impostazioni con i moduli, i livelli e le capacità di sempre, e si traducono da soli in permessi. Il test di parità (`test/authz.test.js`) verifica che la traduzione dia gli stessi accessi di prima.
 
 **Download ed export** (CSV, allegati CRM, foto delle fiere): passano da link firmati dal server, validi pochi minuti e legati alla sessione.
 
 Accessi, modifiche a utenti, ruoli, impostazioni e Customizations finiscono nel **registro attività** (`GET /api/admin/audit-log`).
 
-Il **portale agenti** (`agent.html`) ha un sistema separato: ogni agente ha username/password propri (generati alla creazione in CRM → Agenti), sessione persistita in `localStorage`.
+Il **portale agenti** (`agent.html`) ha un sistema separato: ogni agente ha username/password propri (generati alla creazione in CRM → Agenti). Il login crea una sessione con scadenza (`agent_sessions`, stesse regole del portale interno), tenuta nel browser in `localStorage`; nuova password o logout la chiudono. L'agente vede solo i propri clienti, importatori e ordini.
+
+I **cataloghi PDF** si scaricano solo dal portale (link firmato) o dall'area agenti. La **conferma del ritiro** dal QR richiede l'accesso di una persona del personale con il permesso sui ritiri (la sessione resta sul dispositivo del negozio).
 
 ## Variabili d'ambiente principali
 
