@@ -1,0 +1,28 @@
+# /etc/systemd/system/cantina.service — il backend su EC2/Lightsail.
+# Una sola istanza: i job periodici (lib/scheduler.js) girano nello stesso processo.
+[Unit]
+Description=Cantina Booking (Marramiero)
+After=network-online.target data.mount
+Wants=network-online.target
+RequiresMountsFor=/data
+
+[Service]
+Type=simple
+User=cantina
+Group=cantina
+WorkingDirectory=/opt/cantina
+EnvironmentFile=/etc/cantina/cantina.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+
+# Il codice è in sola lettura; si scrive solo sul disco dei dati.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/data
+
+[Install]
+WantedBy=multi-user.target
