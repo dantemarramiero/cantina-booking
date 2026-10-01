@@ -16,6 +16,7 @@ const { LEVEL_PERMISSIONS, CAPABILITY_PERMISSIONS } = require('./lib/permissions
 const { createAudit } = require('./lib/audit');
 const { createNotifications } = require('./lib/notifications');
 const { createSecureStore, resolveKey } = require('./lib/secure-files');
+const offsite = require('./lib/offsite-backup');
 
 const app   = express();
 // Dietro un reverse proxy (Caddy/nginx su AWS) req.ip e req.protocol arrivano dalle intestazioni
@@ -1228,6 +1229,14 @@ function signingSecretFromSettings() {
 scheduler.onTick(() => events.dispatch());
 scheduler.register('authz.recompute', 60, () => { authz.recompute(); return 'permessi effettivi ricalcolati'; });
 scheduler.register('sessions.cleanup', 60, () => `${sessions.cleanup() + agentSessions.cleanup()} sessioni scadute rimosse`);
+// Copia giornaliera fuori dal volume (S3): attiva solo con S3_BUCKET e le chiavi AWS.
+// Una configurazione incompleta non deve fermare il sito: si segnala e la copia resta spenta.
+let offsiteConfig = null;
+try { offsiteConfig = offsite.configFromEnv(); } catch (e) { console.error(`Copia su S3 disattivata: ${e.message}`); }
+const offsiteBackup = offsiteConfig
+  ? offsite.createOffsiteBackup({ db, dataDir: DATA_DIR, client: offsite.createS3Client(offsiteConfig), prefix: offsiteConfig.prefix })
+  : null;
+if (offsiteBackup) scheduler.register('backup.offsite', 24 * 60, () => offsiteBackup.run());
 scheduler.register('housekeeping.job_runs', 24 * 60, () => {
   const limit = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   return `${db.prepare('DELETE FROM job_runs WHERE started_at < ?').run(limit).changes} esecuzioni vecchie rimosse`;
@@ -5352,7 +5361,8 @@ if (require.main === module) {
     const emailProvider = gmailTransporter ? `✓ Gmail (${process.env.GMAIL_USER})` : resend ? '✓ Resend' : '✗ Nessun provider email';
     console.log(`   Email            →  ${emailProvider}`);
     const hrFilesState = { env: '✓ archivio cifrato', dev: '✓ archivio cifrato (chiave di sviluppo locale)', missing: '✗ manca HR_FILES_KEY: caricamento documenti disattivato' };
-    console.log(`   Documenti HR     →  ${hrFilesState[hrFilesKey.source]}\n`);
+    console.log(`   Documenti HR     →  ${hrFilesState[hrFilesKey.source]}`);
+    console.log(`   Copia su S3      →  ${offsiteConfig ? `✓ ogni 24 ore in s3://${offsiteConfig.bucket}/${offsiteConfig.prefix}` : '✗ non configurata (S3_BUCKET)'}\n`);
   });
   scheduler.start();
 }

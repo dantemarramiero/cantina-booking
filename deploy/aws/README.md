@@ -20,6 +20,7 @@ File in questa cartella:
 | `Caddyfile` | `/etc/caddy/Caddyfile` |
 | `cantina.env.example` | `/etc/cantina/cantina.env` (da compilare, permessi 600) |
 | `update.sh` | ogni deploy successivo, al posto di `railway up` |
+| `s3-backup-policy.json` | permessi dell'utente IAM per la copia su S3 (vedi «Copia giornaliera su S3») |
 
 ## 1. Risorse AWS
 
@@ -131,3 +132,51 @@ ssh ubuntu@<ip> sudo bash /opt/cantina/deploy/aws/update.sh main
 
 Scarica il branch, installa le dipendenze, lancia `npm test` (su un database temporaneo) e
 riavvia il servizio solo se i test passano. Log: `journalctl -u cantina -f`.
+
+## Copia giornaliera su S3
+
+Funziona già su Railway, prima del trasferimento: basta impostare le variabili. Una volta al giorno
+(la prima subito dopo l'avvio) il server carica nel bucket una copia compressa del database
+(`cantina/db/AAAA/MM/…db.gz`) e i file nuovi o cambiati di `uploads/`, `catalogs/`, `hr-files/`,
+`fair-attachments/` e `crm-attachments/` (`cantina/files/…`). Codice: `lib/offsite-backup.js`.
+
+### 1. Bucket (console S3)
+
+1. **Create bucket**: nome per esempio `marramiero-cantina-backup`, stessa regione del server
+   (`eu-south-1`). Lasciare **Block all public access** attivo e la cifratura predefinita (SSE-S3).
+2. **Bucket Versioning → Enable**: una copia sovrascritta o cancellata per errore resta recuperabile.
+3. **Management → Create lifecycle rule** «scadenza-copie»:
+   - prefisso `cantina/db/`, *Expire current versions* dopo **90 giorni**;
+   - una seconda regola su tutto il bucket: *Permanently delete noncurrent versions* dopo **90 giorni**.
+
+   I file in `cantina/files/` non scadono: sono l'unica copia di un documento cancellato dal volume.
+
+### 2. Utente IAM (console IAM)
+
+1. **Users → Create user** `cantina-backup`, senza accesso alla console.
+2. **Add permissions → Create inline policy → JSON**: incollare `s3-backup-policy.json` sostituendo
+   `NOME-DEL-BUCKET`. Il server può solo **scrivere** sotto `cantina/`: non può leggere né cancellare,
+   quindi chi rubasse le chiavi non potrebbe né scaricare né distruggere le copie.
+3. **Security credentials → Create access key** («Application running outside AWS»). Copiare subito
+   la Secret access key in un gestore di password: AWS non la mostra più.
+
+### 3. Variabili (Railway oggi, `cantina.env` su AWS)
+
+```
+S3_BUCKET=marramiero-cantina-backup
+AWS_REGION=eu-south-1
+AWS_ACCESS_KEY_ID=…
+AWS_SECRET_ACCESS_KEY=…
+```
+
+Dopo il deploy, nei log di avvio compare `Copia su S3 → ✓ ogni 24 ore in s3://…`. L'esito di ogni
+copia è nella tabella `job_runs` (job `backup.offsite`): `ok` con le dimensioni, oppure `error` con il
+codice di S3 (es. `S3 403 AccessDenied` = permessi o nome del bucket sbagliati). Dopo un errore si
+riprova entro 15 minuti. Controllare anche nella console S3 che sia comparso il primo `.db.gz`.
+
+### Ripristino
+
+Scaricare dalla console S3 il `.db.gz` del giorno voluto, `gunzip`, fermare il server, sostituire
+`/data/cantina.db` e riavviare. I file si scaricano da `cantina/files/` mantenendo i percorsi. I
+documenti HR si leggono solo con la **stessa `HR_FILES_KEY`**: tenerla nel gestore di password, mai
+nel bucket.

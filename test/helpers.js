@@ -16,6 +16,7 @@ async function startApp() {
   delete process.env.STRIPE_SECRET_KEY;
   delete process.env.GMAIL_USER;
   delete process.env.RESEND_API_KEY;
+  delete process.env.S3_BUCKET; // i test non caricano mai su un bucket vero
 
   const log = console.log;
   console.log = () => {}; // i messaggi di avvio non servono nei test
