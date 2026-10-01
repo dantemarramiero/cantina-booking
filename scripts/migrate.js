@@ -8,7 +8,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { migrationStatus, rollbackMigration } = require('../lib/migrations');
 
 const root = path.join(__dirname, '..');
-const dbPath = process.env.DB_PATH || path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH || root, 'cantina.db');
+const dbPath = process.env.DB_PATH || path.join(process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || root, 'cantina.db');
 const dir = path.join(root, 'migrations');
 const db = new DatabaseSync(dbPath);
 db.exec('PRAGMA foreign_keys = ON');

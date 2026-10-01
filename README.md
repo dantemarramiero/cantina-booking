@@ -93,11 +93,15 @@ Vedi `.env.example` per l'elenco completo. Le più importanti:
 | `ADMIN_PASSWORD` | consigliata | Chiave amministratore master |
 | `DB_PATH` | no | Path del file SQLite (in produzione: volume persistente Railway) |
 | `RAILWAY_VOLUME_MOUNT_PATH` | no | Cartella dei dati persistenti (database, allegati, cataloghi, foto in `uploads/`, copie in `backups/`). Su Railway la imposta il volume. |
+| `DATA_DIR` | no | Come sopra, fuori da Railway (su AWS: `/data`). Ha la precedenza su `RAILWAY_VOLUME_MOUNT_PATH`. |
+| `TRUST_PROXY` | no | Dietro un reverse proxy (Caddy su AWS): `loopback`. Serve per l'IP reale nel blocco dei login e per i link `https://` nelle email e in Stripe. |
 | `SIGNING_SECRET` | no | Segreto per firmare i link di download. Se manca, viene generato al primo avvio e conservato nel database. |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | no | Senza queste, il checkout pubblico usa la modalità "richiesta di prenotazione" (nessun pagamento online) |
 | `GMAIL_USER` + `GMAIL_PASS` oppure `RESEND_API_KEY` | no | Necessarie per: conferme prenotazione, avvisi scorte magazzino, **reset password utenti portale**. Senza provider configurato, le email vengono solo loggate in console. |
 
 ## Deploy (Railway)
+
+Per il trasferimento su AWS (EC2/Lightsail, Caddy, systemd) vedi [`deploy/aws/README.md`](deploy/aws/README.md).
 
 Progetto Railway: **cantina-marramiero**, servizio: **cantina-booking**, ambiente: **production**.
 

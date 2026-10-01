@@ -1,0 +1,10 @@
+# /etc/caddy/Caddyfile — HTTPS automatico (Let's Encrypt) davanti al backend su localhost:3000.
+# Il record DNS del dominio deve già puntare all'Elastic IP prima di avviare Caddy.
+prenotazioni.marramiero.it {
+	encode zstd gzip
+	# Caricamenti più grandi del limite di multer arrivano comunque al server, che risponde con l'errore giusto.
+	request_body {
+		max_size 50MB
+	}
+	reverse_proxy 127.0.0.1:3000
+}

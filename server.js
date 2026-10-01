@@ -18,13 +18,18 @@ const { createNotifications } = require('./lib/notifications');
 const { createSecureStore, resolveKey } = require('./lib/secure-files');
 
 const app   = express();
+// Dietro un reverse proxy (Caddy/nginx su AWS) req.ip e req.protocol arrivano dalle intestazioni
+// X-Forwarded-*: servono al blocco dei tentativi di login per IP e ai link https nelle email e in
+// Stripe. TRUST_PROXY=loopback se il proxy è sulla stessa macchina, oppure il numero di salti.
+if (process.env.TRUST_PROXY) app.set('trust proxy', /^\d+$/.test(process.env.TRUST_PROXY) ? Number(process.env.TRUST_PROXY) : process.env.TRUST_PROXY);
 const PORT  = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'cantina2026';
 const CANTINA_NAME    = process.env.CANTINA_NAME || 'Marramiero';
 const STRIPE_SECRET   = process.env.STRIPE_SECRET_KEY;
 const WEBHOOK_SECRET  = process.env.STRIPE_WEBHOOK_SECRET;
-// DATA_DIR: dove vivono i dati che devono sopravvivere ai deploy (su Railway è il volume /data).
-const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
+// DATA_DIR: dove vivono i dati che devono sopravvivere ai deploy (su Railway è il volume /data,
+// su AWS il disco EBS montato su /data: lì si imposta DATA_DIR).
+const DATA_DIR = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'cantina.db');
 
 const stripe = STRIPE_SECRET ? require('stripe')(STRIPE_SECRET) : null;
@@ -1727,8 +1732,8 @@ const uploadExpImage = multer({
   fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|webp|gif)$/.test(file.mimetype)),
 });
 
-// Cataloghi PDF: salvati sul volume persistente (RAILWAY_VOLUME_MOUNT_PATH) così sopravvivono ai redeploy.
-const catalogsDir = path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname, 'catalogs');
+// Cataloghi PDF: salvati sul volume persistente (DATA_DIR) così sopravvivono ai redeploy.
+const catalogsDir = path.join(DATA_DIR, 'catalogs');
 fs.mkdirSync(catalogsDir, { recursive: true });
 const uploadCatalog = multer({
   storage: multer.diskStorage({
@@ -4021,7 +4026,7 @@ app.delete('/api/admin/people/:id', authAdmin, (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // Commerciale: Fiere
 // ══════════════════════════════════════════════════════════════════════════════
-const fairAttachmentsDir = path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname, 'fair-attachments');
+const fairAttachmentsDir = path.join(DATA_DIR, 'fair-attachments');
 fs.mkdirSync(fairAttachmentsDir, { recursive: true });
 const uploadFairAttachment = multer({
   storage: multer.diskStorage({
@@ -4233,7 +4238,7 @@ function addFairEncounterNote(entityType, entityId, fairId) {
   db.prepare('INSERT INTO crm_notes (entity_type, entity_id, body) VALUES (?, ?, ?)').run(entityType, entityId, body);
 }
 
-const crmAttachmentsDir = path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname, 'crm-attachments');
+const crmAttachmentsDir = path.join(DATA_DIR, 'crm-attachments');
 fs.mkdirSync(crmAttachmentsDir, { recursive: true });
 const uploadCrmAttachment = multer({
   storage: multer.diskStorage({
